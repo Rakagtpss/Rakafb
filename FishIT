@@ -183,12 +183,12 @@ MonLabel.TextSize = 11
 EnableDrag(MonitorHUD, MonitorHUD) 
 
 -- ====================================================
--- [1] MINI FLOATING HUD (FISH STATS)
+-- [1] MINI FLOATING HUD (FISH STATS) - UPDATED POSITION
 -- ====================================================
 local FloatHUD = Instance.new("Frame", ScreenGui)
 FloatHUD.Name = "FloatingStats"
 FloatHUD.Size = UDim2.new(0, 150, 0, 100) 
-FloatHUD.Position = UDim2.new(0.85, 0, 0.4, 0)
+FloatHUD.Position = UDim2.new(0.72, 0, 0.4, 0) -- [UPDATED] Lebih ke tengah
 FloatHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18) 
 FloatHUD.BackgroundTransparency = 0.3
 FloatHUD.BorderSizePixel = 0 
@@ -1226,7 +1226,7 @@ MakeSwitch(PagePlayer, "Streamer Mode", States.StreamerMode, function(val)
 end)
 
 -- ====================================================
--- [NEW] SKIN ANIMATION MINI LIST
+-- [UPDATED] SKIN ANIMATION MINI LIST (SCROLLABLE & NO RANDOM)
 -- ====================================================
 local AnimLabel = Instance.new("TextLabel", PagePlayer)
 AnimLabel.Size = UDim2.new(1, 0, 0, 15)
@@ -1239,7 +1239,7 @@ AnimLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local AnimScroll = Instance.new("ScrollingFrame", PagePlayer)
 AnimScroll.Name = "AnimList"
-AnimScroll.Size = UDim2.new(1, -10, 0, 90) -- Mini list height
+AnimScroll.Size = UDim2.new(1, -10, 0, 85) -- Ukuran mini, scrollable
 AnimScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 AnimScroll.BackgroundTransparency = 0.5
 AnimScroll.ScrollBarThickness = 2
@@ -1257,7 +1257,9 @@ local AnimationList = {
     ["Princess Parasol"] = "Princess Parasol - FishCaught",
     ["Soul Scythe"] = "Soul Scythe - FishCaught",
     ["Eclipse Katana"] = "Eclipse Katana - FishCaught",
-    ["Ban Hammer"] = "1x1x1x1 Ban Hammer - FishCaught"
+    ["Ban Hammer"] = "1x1x1x1 Ban Hammer - FishCaught",
+    ["Big Hammer"] = "Big Hammer - FishCaught",
+    ["Trident"] = "Trident - FishCaught"
 }
 
 -- Tombol OFF
@@ -1266,7 +1268,7 @@ local function CreateAnimBtn(name, value, order)
     btn.LayoutOrder = order
     btn.Text = name
     btn.Font = UI_THEME.FontUI
-    btn.TextSize = 10
+    btn.TextSize = 9
     btn.TextColor3 = UI_THEME.TextMain
     btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     btn.BackgroundTransparency = 0.4
@@ -1290,23 +1292,19 @@ local function CreateAnimBtn(name, value, order)
 end
 
 CreateAnimBtn("OFF (Disable)", "Off", 0)
-CreateAnimBtn("RANDOM ANIM", "Random", 1)
+-- [NOTE] Pilihan Random telah dihapus sesuai permintaan
 
-local i = 2
+local i = 1
 for name, path in pairs(AnimationList) do
     CreateAnimBtn(name, path, i)
     i = i + 1
 end
 
-AnimScroll.CanvasSize = UDim2.new(0, 0, 0, i * 25)
+AnimScroll.CanvasSize = UDim2.new(0, 0, 0, (i + 1) * 24)
 
 -- ====================================================
 -- [ANIMATION LOGIC]
 -- ====================================================
-local AnimPaths = {}
--- Pre-load path strings to table for Random logic
-for _, path in pairs(AnimationList) do table.insert(AnimPaths, path) end
-
 local FishEvent = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:FindFirstChild("RE/FishCaught")
 
 local function PlaySelectedAnim()
@@ -1324,13 +1322,7 @@ local function PlaySelectedAnim()
             track:Stop(0.1)
         end
         
-        local targetAnimName = ""
-        if States.AnimSkin == "Random" then
-            targetAnimName = AnimPaths[math.random(1, #AnimPaths)]
-        else
-            targetAnimName = States.AnimSkin
-        end
-        
+        local targetAnimName = States.AnimSkin
         -- Cari Animation Object di ReplicatedStorage
         local AnimObj = Services.ReplicatedStorage.Modules.Animations:FindFirstChild(targetAnimName)
         
@@ -1809,3 +1801,4 @@ task.delay(1, function()
     Main.Visible = true
     FloatHUD.Visible = States.Panel 
 end)
+
