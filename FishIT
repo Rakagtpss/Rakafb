@@ -183,12 +183,13 @@ MonLabel.TextSize = 11
 EnableDrag(MonitorHUD, MonitorHUD) 
 
 -- ====================================================
--- [1] MINI FLOATING HUD (FISH STATS) - UPDATED POSITION
+-- [1] MINI FLOATING HUD (FISH STATS) - FIXED CENTER
 -- ====================================================
 local FloatHUD = Instance.new("Frame", ScreenGui)
 FloatHUD.Name = "FloatingStats"
+FloatHUD.AnchorPoint = Vector2.new(0.5, 0) -- Titik anchor di tengah
 FloatHUD.Size = UDim2.new(0, 150, 0, 100) 
-FloatHUD.Position = UDim2.new(0.72, 0, 0.4, 0) -- [UPDATED] Lebih ke tengah
+FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0) -- Tepat di tengah layar (secara horizontal)
 FloatHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18) 
 FloatHUD.BackgroundTransparency = 0.3
 FloatHUD.BorderSizePixel = 0 
@@ -1226,10 +1227,10 @@ MakeSwitch(PagePlayer, "Streamer Mode", States.StreamerMode, function(val)
 end)
 
 -- ====================================================
--- [UPDATED] SKIN ANIMATION MINI LIST (SCROLLABLE & NO RANDOM)
+-- [UPDATED] SKIN ANIMATION MINI LIST (FIXED VISIBILITY)
 -- ====================================================
 local AnimLabel = Instance.new("TextLabel", PagePlayer)
-AnimLabel.Size = UDim2.new(1, 0, 0, 15)
+AnimLabel.Size = UDim2.new(1, 0, 0, 20)
 AnimLabel.BackgroundTransparency = 1
 AnimLabel.Text = "CUSTOM CATCH ANIM"
 AnimLabel.TextColor3 = UI_THEME.TextDim
@@ -1237,18 +1238,25 @@ AnimLabel.Font = UI_THEME.FontBtn
 AnimLabel.TextSize = 10
 AnimLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-local AnimScroll = Instance.new("ScrollingFrame", PagePlayer)
+-- Container utama list animasi
+local AnimListContainer = Instance.new("Frame", PagePlayer)
+AnimListContainer.Name = "AnimListContainer"
+AnimListContainer.Size = UDim2.new(1, -5, 0, 100) -- Ukuran tetap agar terlihat
+AnimListContainer.BackgroundTransparency = 1
+
+local AnimScroll = Instance.new("ScrollingFrame", AnimListContainer)
 AnimScroll.Name = "AnimList"
-AnimScroll.Size = UDim2.new(1, -10, 0, 85) -- Ukuran mini, scrollable
+AnimScroll.Size = UDim2.new(1, 0, 1, 0)
 AnimScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 AnimScroll.BackgroundTransparency = 0.5
 AnimScroll.ScrollBarThickness = 2
 AnimScroll.BorderSizePixel = 0
+AnimScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y -- PENTING: Agar bisa discroll
+AnimScroll.CanvasSize = UDim2.new(0,0,0,0)
 Instance.new("UICorner", AnimScroll).CornerRadius = UDim.new(0, 6)
 
-local AnimGrid = Instance.new("UIGridLayout", AnimScroll)
-AnimGrid.CellSize = UDim2.new(0.95, 0, 0, 22)
-AnimGrid.CellPadding = UDim2.new(0, 2, 0, 2)
+local AnimGrid = Instance.new("UIListLayout", AnimScroll) -- Ganti ke UIListLayout agar lebih rapi
+AnimGrid.Padding = UDim.new(0, 3)
 AnimGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 AnimGrid.SortOrder = Enum.SortOrder.LayoutOrder
 
@@ -1266,6 +1274,7 @@ local AnimationList = {
 local function CreateAnimBtn(name, value, order)
     local btn = Instance.new("TextButton", AnimScroll)
     btn.LayoutOrder = order
+    btn.Size = UDim2.new(0.95, 0, 0, 24) -- Ukuran tombol fix
     btn.Text = name
     btn.Font = UI_THEME.FontUI
     btn.TextSize = 9
@@ -1292,15 +1301,12 @@ local function CreateAnimBtn(name, value, order)
 end
 
 CreateAnimBtn("OFF (Disable)", "Off", 0)
--- [NOTE] Pilihan Random telah dihapus sesuai permintaan
 
 local i = 1
 for name, path in pairs(AnimationList) do
     CreateAnimBtn(name, path, i)
     i = i + 1
 end
-
-AnimScroll.CanvasSize = UDim2.new(0, 0, 0, (i + 1) * 24)
 
 -- ====================================================
 -- [ANIMATION LOGIC]
@@ -1801,4 +1807,3 @@ task.delay(1, function()
     Main.Visible = true
     FloatHUD.Visible = States.Panel 
 end)
-
