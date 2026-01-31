@@ -1286,8 +1286,7 @@ local AnimationList = {
     ["Soul Scythe"] = "Soul Scythe - FishCaught",
     ["Eclipse Katana"] = "Eclipse Katana - FishCaught",
     ["Ban Hammer"] = "1x1x1x1 Ban Hammer - FishCaught",
-    ["Big Hammer"] = "Big Hammer - FishCaught",
-    ["Trident"] = "Trident - FishCaught"
+    ["Trident"] = "Holy Trident - FishCaught" -- [UPDATED] PATH
 }
 
 -- Buat Tombol dalam List
