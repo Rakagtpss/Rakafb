@@ -22,7 +22,7 @@ local function GetChar() return Player.Character or Player.CharacterAdded:Wait()
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 
--- // KONFIGURASI VISUAL (MODERN DARK TRANSPARENT 400x270)
+-- // KONFIGURASI VISUAL (MODERN DARK TRANSPARENT)
 local UI_THEME = {
     Width = 400,
     Height = 270, 
@@ -31,7 +31,7 @@ local UI_THEME = {
     SidebarColor = Color3.fromRGB(8, 8, 8), 
     SidebarTransparency = 0.5, 
     Transparency = 0.15, 
-    Accent = Color3.fromRGB(255, 255, 255), -- Putih Netral
+    Accent = Color3.fromRGB(255, 255, 255), 
     TextMain = Color3.fromRGB(240, 240, 240), 
     TextDim = Color3.fromRGB(160, 160, 170),
     FontUI = Enum.Font.GothamBlack,
@@ -183,13 +183,13 @@ MonLabel.TextSize = 11
 EnableDrag(MonitorHUD, MonitorHUD) 
 
 -- ====================================================
--- [1] MINI FLOATING HUD (FISH STATS) - FIXED CENTER
+-- [1] MINI FLOATING HUD (FISH STATS) - CENTERED
 -- ====================================================
 local FloatHUD = Instance.new("Frame", ScreenGui)
 FloatHUD.Name = "FloatingStats"
-FloatHUD.AnchorPoint = Vector2.new(0.5, 0) -- Titik anchor di tengah
+FloatHUD.AnchorPoint = Vector2.new(0.5, 0) 
 FloatHUD.Size = UDim2.new(0, 150, 0, 100) 
-FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0) -- Tepat di tengah layar (secara horizontal)
+FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0) -- Tengah Layar
 FloatHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18) 
 FloatHUD.BackgroundTransparency = 0.3
 FloatHUD.BorderSizePixel = 0 
@@ -406,7 +406,7 @@ PageArea.BackgroundTransparency = 1
 PageArea.BorderSizePixel = 0
 PageArea.ClipsDescendants = true
 
-local function CreatePage(name, visible)
+local function CreatePage(name, visible, isList)
     local pg = Instance.new("ScrollingFrame", PageArea)
     pg.Name = name
     pg.Size = UDim2.new(1, 0, 1, 0)
@@ -419,21 +419,27 @@ local function CreatePage(name, visible)
     pg.Visible = visible
     pg.BorderSizePixel = 0
     
-    local gl = Instance.new("UIGridLayout", pg)
-    gl.CellSize = UDim2.new(0.48, 0, 0, 26) 
-    gl.CellPadding = UDim2.new(0, 5, 0, 5)
-    gl.SortOrder = Enum.SortOrder.LayoutOrder
+    if isList then
+        local ll = Instance.new("UIListLayout", pg)
+        ll.Padding = UDim.new(0, 5)
+        ll.SortOrder = Enum.SortOrder.LayoutOrder
+    else
+        local gl = Instance.new("UIGridLayout", pg)
+        gl.CellSize = UDim2.new(0.48, 0, 0, 26) 
+        gl.CellPadding = UDim2.new(0, 5, 0, 5)
+        gl.SortOrder = Enum.SortOrder.LayoutOrder
+    end
     return pg
 end
 
-local PageMain   = CreatePage("PageMain", true)
-local PageEvent  = CreatePage("PageEvent", false)
-local PagePlayer = CreatePage("PagePlayer", false)
-local PageMisc   = CreatePage("PageMisc", false)
+-- PAGE INIT (Player is now LIST layout for Dropdown support)
+local PageMain   = CreatePage("PageMain", true, false)
+local PageEvent  = CreatePage("PageEvent", false, false)
+local PagePlayer = CreatePage("PagePlayer", false, true) -- LIST LAYOUT ENABLED
+local PageMisc   = CreatePage("PageMisc", false, false)
 
 local function SwitchTab(tabName)
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-    
     local tabs = {Main = TabMainBtn, Event = TabEventBtn, Player = TabPlayerBtn, Misc = TabMiscBtn}
     local pages = {Main = PageMain, Event = PageEvent, Player = PagePlayer, Misc = PageMisc}
     
@@ -517,6 +523,14 @@ end
 local function MakeSwitch(parent, text, defaultState, callback)
     local Frame = Instance.new("Frame")
     Frame.Name = "Switch_" .. text
+    
+    -- ADJUST SIZE FOR PLAYER TAB (Full Width) or GRID (Half Width)
+    if parent == PagePlayer then
+        Frame.Size = UDim2.new(0.95, 0, 0, 26) -- Full width for List Layout
+    else
+        -- Grid Layout handled by parent UIGridLayout, no Size needed usually, but safe to set
+    end
+
     Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     Frame.BackgroundTransparency = 0.3
     Frame.BorderSizePixel = 0
@@ -1150,9 +1164,10 @@ BtnQuestNPC.MouseButton1Click:Connect(function()
 end)
 
 
--- [TAB PLAYER]
+-- [TAB PLAYER] - UPDATED TO LIST LAYOUT FOR DROPDOWN
 local SpeedContainer = Instance.new("Frame", PagePlayer)
 SpeedContainer.Name = "SpeedContainer"
+SpeedContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Full Width
 SpeedContainer.BackgroundTransparency = 1
 
 local BtnSpeedToggle = Instance.new("TextButton", SpeedContainer)
@@ -1185,6 +1200,7 @@ Instance.new("UICorner", BoxSpeedInput).CornerRadius = UDim.new(0, 6)
 
 local FollowContainer = Instance.new("Frame", PagePlayer)
 FollowContainer.Name = "FollowContainer"
+FollowContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Full Width
 FollowContainer.BackgroundTransparency = 1
 
 local BtnFollowToggle = Instance.new("TextButton", FollowContainer)
@@ -1227,36 +1243,40 @@ MakeSwitch(PagePlayer, "Streamer Mode", States.StreamerMode, function(val)
 end)
 
 -- ====================================================
--- [UPDATED] SKIN ANIMATION MINI LIST (FIXED VISIBILITY)
+-- [UPDATED] DROPDOWN MENU ANIMATION (DRAWER STYLE)
 -- ====================================================
-local AnimLabel = Instance.new("TextLabel", PagePlayer)
-AnimLabel.Size = UDim2.new(1, 0, 0, 20)
-AnimLabel.BackgroundTransparency = 1
-AnimLabel.Text = "CUSTOM CATCH ANIM"
-AnimLabel.TextColor3 = UI_THEME.TextDim
-AnimLabel.Font = UI_THEME.FontBtn
-AnimLabel.TextSize = 10
-AnimLabel.TextXAlignment = Enum.TextXAlignment.Left
 
--- Container utama list animasi
-local AnimListContainer = Instance.new("Frame", PagePlayer)
-AnimListContainer.Name = "AnimListContainer"
-AnimListContainer.Size = UDim2.new(1, -5, 0, 100) -- Ukuran tetap agar terlihat
-AnimListContainer.BackgroundTransparency = 1
+-- 1. Container Utama (Header + List)
+local AnimContainer = Instance.new("Frame", PagePlayer)
+AnimContainer.Name = "AnimDropdown"
+AnimContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Ukuran awal (Tertutup)
+AnimContainer.BackgroundTransparency = 1
+AnimContainer.ClipsDescendants = true -- Kunci: Sembunyikan isi saat tertutup
 
-local AnimScroll = Instance.new("ScrollingFrame", AnimListContainer)
-AnimScroll.Name = "AnimList"
-AnimScroll.Size = UDim2.new(1, 0, 1, 0)
-AnimScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-AnimScroll.BackgroundTransparency = 0.5
-AnimScroll.ScrollBarThickness = 2
-AnimScroll.BorderSizePixel = 0
-AnimScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y -- PENTING: Agar bisa discroll
-AnimScroll.CanvasSize = UDim2.new(0,0,0,0)
-Instance.new("UICorner", AnimScroll).CornerRadius = UDim.new(0, 6)
+-- 2. Header (Tombol Pemicu)
+local AnimHeader = Instance.new("TextButton", AnimContainer)
+AnimHeader.Size = UDim2.new(1, 0, 0, 26)
+AnimHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+AnimHeader.BackgroundTransparency = 0.3
+AnimHeader.Text = "Animation: OFF"
+AnimHeader.TextColor3 = UI_THEME.TextMain
+AnimHeader.Font = UI_THEME.FontBtn
+AnimHeader.TextSize = 10
+AnimHeader.AutoButtonColor = true
+Instance.new("UICorner", AnimHeader).CornerRadius = UDim.new(0, 6)
 
-local AnimGrid = Instance.new("UIListLayout", AnimScroll) -- Ganti ke UIListLayout agar lebih rapi
-AnimGrid.Padding = UDim.new(0, 3)
+-- 3. List (Laci di dalam)
+local AnimListFrame = Instance.new("ScrollingFrame", AnimContainer)
+AnimListFrame.Size = UDim2.new(1, 0, 0, 120) -- Tinggi maksimal saat terbuka
+AnimListFrame.Position = UDim2.new(0, 0, 0, 30) -- Di bawah header
+AnimListFrame.BackgroundTransparency = 0.5
+AnimListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+AnimListFrame.ScrollBarThickness = 2
+AnimListFrame.BorderSizePixel = 0
+Instance.new("UICorner", AnimListFrame).CornerRadius = UDim.new(0, 6)
+
+local AnimGrid = Instance.new("UIListLayout", AnimListFrame)
+AnimGrid.Padding = UDim.new(0, 2)
 AnimGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 AnimGrid.SortOrder = Enum.SortOrder.LayoutOrder
 
@@ -1270,43 +1290,53 @@ local AnimationList = {
     ["Trident"] = "Trident - FishCaught"
 }
 
--- Tombol OFF
-local function CreateAnimBtn(name, value, order)
-    local btn = Instance.new("TextButton", AnimScroll)
+-- Buat Tombol dalam List
+local function CreateAnimItem(name, value, order)
+    local btn = Instance.new("TextButton", AnimListFrame)
     btn.LayoutOrder = order
-    btn.Size = UDim2.new(0.95, 0, 0, 24) -- Ukuran tombol fix
+    btn.Size = UDim2.new(0.95, 0, 0, 24)
     btn.Text = name
     btn.Font = UI_THEME.FontUI
     btn.TextSize = 9
     btn.TextColor3 = UI_THEME.TextMain
-    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     btn.BackgroundTransparency = 0.4
     btn.AutoButtonColor = true
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
     
     btn.MouseButton1Click:Connect(function()
+        -- Logika Pilih
         States.AnimSkin = value
-        -- Visual Feedback
-        for _, b in pairs(AnimScroll:GetChildren()) do
-            if b:IsA("TextButton") then 
-                b.BackgroundColor3 = Color3.fromRGB(30, 30, 40) 
-                b.TextColor3 = UI_THEME.TextMain
-            end
-        end
-        btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        btn.TextColor3 = Color3.new(0,0,0)
+        AnimHeader.Text = "Animation: " .. name
         Notify("ANIMATION", "Selected: " .. name, nil)
+        
+        -- Tutup Laci otomatis
+        Services.TweenService:Create(AnimContainer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.95, 0, 0, 26)}):Play()
     end)
-    return btn
 end
 
-CreateAnimBtn("OFF (Disable)", "Off", 0)
-
+CreateAnimItem("OFF (Disable)", "Off", 0)
 local i = 1
 for name, path in pairs(AnimationList) do
-    CreateAnimBtn(name, path, i)
+    CreateAnimItem(name, path, i)
     i = i + 1
 end
+AnimListFrame.CanvasSize = UDim2.new(0, 0, 0, (i + 1) * 26)
+
+-- 4. Logika Buka Tutup Laci
+local IsOpen = false
+AnimHeader.MouseButton1Click:Connect(function()
+    IsOpen = not IsOpen
+    if IsOpen then
+        -- Buka Laci (Expand Container)
+        Services.TweenService:Create(AnimContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0.95, 0, 0, 150)}):Play()
+        Services.TweenService:Create(AnimHeader, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}):Play()
+    else
+        -- Tutup Laci (Shrink Container)
+        Services.TweenService:Create(AnimContainer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0.95, 0, 0, 26)}):Play()
+        Services.TweenService:Create(AnimHeader, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 30, 40)}):Play()
+    end
+end)
 
 -- ====================================================
 -- [ANIMATION LOGIC]
