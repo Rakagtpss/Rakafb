@@ -432,11 +432,11 @@ local function CreatePage(name, visible, isList)
     return pg
 end
 
--- PAGE INIT (Player is now LIST layout for Dropdown support)
+-- PAGE INIT 
 local PageMain   = CreatePage("PageMain", true, false)
 local PageEvent  = CreatePage("PageEvent", false, false)
 local PagePlayer = CreatePage("PagePlayer", false, true) -- LIST LAYOUT ENABLED
-local PageMisc   = CreatePage("PageMisc", false, false)
+local PageMisc   = CreatePage("PageMisc", false, true)   -- [MODIFIED] LIST LAYOUT FOR DRAWER
 
 local function SwitchTab(tabName)
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
@@ -507,6 +507,11 @@ local function MakeBtn(parent, text)
     b.TextScaled = true 
     b.BorderSizePixel = 0
     
+    -- ADJUST WIDTH FOR MISC PAGE (Since it's now ListLayout)
+    if parent == PageMisc then
+        b.Size = UDim2.new(0.95, 0, 0, 26)
+    end
+
     local constraint = Instance.new("UITextSizeConstraint", b)
     constraint.MaxTextSize = 10 
     constraint.MinTextSize = 8
@@ -524,11 +529,11 @@ local function MakeSwitch(parent, text, defaultState, callback)
     local Frame = Instance.new("Frame")
     Frame.Name = "Switch_" .. text
     
-    -- ADJUST SIZE FOR PLAYER TAB (Full Width) or GRID (Half Width)
-    if parent == PagePlayer then
+    -- ADJUST SIZE FOR PLAYER/MISC TAB (Full Width)
+    if parent == PagePlayer or parent == PageMisc then
         Frame.Size = UDim2.new(0.95, 0, 0, 26) -- Full width for List Layout
     else
-        -- Grid Layout handled by parent UIGridLayout, no Size needed usually, but safe to set
+        -- Grid Layout handled by parent UIGridLayout
     end
 
     Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
@@ -704,7 +709,7 @@ local function SetHideRod(bool)
         Notify("MAIN", "Hide Rod: ON (Re-Equip)", nil) 
     else
         if Connections["GhostRod"] then Connections["GhostRod"]:Disconnect() end
-        Notify("MAIN", "Ghost Rod: OFF", nil)
+        Notify("MAIN", "Hide Rod: OFF", nil)
     end
 end
 
@@ -811,9 +816,9 @@ end
 -- ====================================================
 -- [NEW] STREAMER MODE LOGIC (NAME & CHAT SPOOF)
 -- ====================================================
-local RAW_NAME = ".gg/getseraphin" 
+local RAW_NAME = "discord.gg/getseraphin VISUAL" 
 local SPOOF_NAME = '<font face="GothamBold"><b>' .. RAW_NAME .. '</b></font>'
-local NAME_COLOR = "#FFA500" 
+local NAME_COLOR = "#00ffff" 
 local OVERHEAD_HTML = string.format('<font color="#FFFFFF">%s</font>', SPOOF_NAME)
 
 local NameSpoof = {
@@ -1036,7 +1041,7 @@ local function ProcessRelicWithSpots(relicContainer)
     if not hrp then return end
 
     if not States.HasTank then
-        pcall(function() TankRemote:InvokeServer(575) end)
+        pcall(function() TankRemote:InvokeServer(105) end)
         States.HasTank = true
         Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
     end
@@ -1385,6 +1390,161 @@ MakeSwitch(PageMisc, "Panel Fishing", States.Panel, function(val)
     States.Panel = val
     FloatHUD.Visible = val
 end)
+
+-- ====================================================
+-- [ADDON] BUY CHARM SYSTEM (DRAWER & QUANTITY)
+-- ====================================================
+
+-- Definisi Remote
+local PurchaseCharmRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/PurchaseCharm")
+
+-- Container Utama
+local CharmContainer = Instance.new("Frame", PageMisc)
+CharmContainer.Name = "CharmSystem"
+CharmContainer.Size = UDim2.new(0.95, 0, 0, 85) -- Ukuran default tertutup
+CharmContainer.BackgroundTransparency = 1
+CharmContainer.ClipsDescendants = true 
+
+-- 1. HEADER & DROPDOWN (LACI)
+local CharmDropdown = Instance.new("Frame", CharmContainer)
+CharmDropdown.Name = "Dropdown"
+CharmDropdown.Size = UDim2.new(1, 0, 0, 26)
+CharmDropdown.BackgroundTransparency = 1
+CharmDropdown.ZIndex = 5
+
+local CharmBtn = Instance.new("TextButton", CharmDropdown)
+CharmBtn.Size = UDim2.new(1, 0, 1, 0)
+CharmBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+CharmBtn.BackgroundTransparency = 0.3
+CharmBtn.Text = "Select Charm >"
+CharmBtn.TextColor3 = UI_THEME.TextMain
+CharmBtn.Font = UI_THEME.FontBtn
+CharmBtn.TextSize = 10
+CharmBtn.AutoButtonColor = true
+Instance.new("UICorner", CharmBtn).CornerRadius = UDim.new(0, 6)
+
+-- List Item (Isi Laci)
+local CharmListFrame = Instance.new("ScrollingFrame", CharmDropdown)
+CharmListFrame.Size = UDim2.new(1, 0, 0, 100)
+CharmListFrame.Position = UDim2.new(0, 0, 0, 30)
+CharmListFrame.BackgroundTransparency = 0.2
+CharmListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+CharmListFrame.ScrollBarThickness = 2
+CharmListFrame.Visible = false
+CharmListFrame.ZIndex = 6
+Instance.new("UICorner", CharmListFrame).CornerRadius = UDim.new(0, 6)
+
+local CharmListLayout = Instance.new("UIListLayout", CharmListFrame)
+CharmListLayout.Padding = UDim.new(0, 2)
+CharmListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- Data Charm
+local SelectedCharm = nil
+local CharmData = {
+    "Bone Charm",
+    "Magma Charm",
+    "Algae Charm",
+    "Clover Charm"
+}
+
+-- Fungsi Pilih Charm
+local function UpdateCharmSelect(name)
+    SelectedCharm = name
+    CharmBtn.Text = "Selected: " .. name
+    -- Tutup laci otomatis setelah memilih
+    CharmListFrame.Visible = false
+    Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+end
+
+for _, cName in pairs(CharmData) do
+    local btn = Instance.new("TextButton", CharmListFrame)
+    btn.Size = UDim2.new(0.95, 0, 0, 24)
+    btn.Text = cName
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.BackgroundTransparency = 0.5
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = UI_THEME.FontUI
+    btn.TextSize = 9
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    btn.MouseButton1Click:Connect(function()
+        UpdateCharmSelect(cName)
+    end)
+end
+CharmListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CharmData * 26))
+
+-- Toggle Laci
+local IsCharmOpen = false
+CharmBtn.MouseButton1Click:Connect(function()
+    IsCharmOpen = not IsCharmOpen
+    if IsCharmOpen then
+        CharmListFrame.Visible = true
+        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 140)}):Play()
+    else
+        CharmListFrame.Visible = false
+        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+    end
+end)
+
+-- 2. QUANTITY INPUT & BUY BUTTON
+local ActionFrame = Instance.new("Frame", CharmContainer)
+ActionFrame.Name = "Action"
+ActionFrame.Size = UDim2.new(1, 0, 0, 26)
+ActionFrame.Position = UDim2.new(0, 0, 1, -26) -- Selalu di paling bawah container
+ActionFrame.BackgroundTransparency = 1
+
+local QtyInput = Instance.new("TextBox", ActionFrame)
+QtyInput.Size = UDim2.new(0.3, 0, 1, 0)
+QtyInput.Position = UDim2.new(0, 0, 0, 0)
+QtyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+QtyInput.BackgroundTransparency = 0.3
+QtyInput.Text = "1"
+QtyInput.PlaceholderText = "Qty"
+QtyInput.TextColor3 = UI_THEME.Accent
+QtyInput.Font = UI_THEME.FontUI
+QtyInput.TextSize = 10
+Instance.new("UICorner", QtyInput).CornerRadius = UDim.new(0, 6)
+
+local BuyBtn = Instance.new("TextButton", ActionFrame)
+BuyBtn.Size = UDim2.new(0.65, 0, 1, 0)
+BuyBtn.Position = UDim2.new(0.35, 0, 0, 0)
+BuyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 100) -- Warna Hijau
+BuyBtn.BackgroundTransparency = 0.2
+BuyBtn.Text = "PURCHASE"
+BuyBtn.TextColor3 = Color3.new(1,1,1)
+BuyBtn.Font = UI_THEME.FontBtn
+BuyBtn.TextSize = 10
+Instance.new("UICorner", BuyBtn).CornerRadius = UDim.new(0, 6)
+
+-- 3. LOGIKA PEMBELIAN
+BuyBtn.MouseButton1Click:Connect(function()
+    if not SelectedCharm then 
+        Notify("SHOP", "Please Select a Charm!", Color3.fromRGB(255, 50, 50)) 
+        return 
+    end
+    
+    local amount = tonumber(QtyInput.Text) or 1
+    if amount < 1 then amount = 1 end
+    
+    Notify("SHOP", "Buying " .. amount .. " " .. SelectedCharm .. "...", Color3.fromRGB(255, 200, 0))
+    
+    -- Menggunakan task.spawn agar UI tidak freeze saat looping
+    task.spawn(function()
+        for i = 1, amount do
+            local success, err = pcall(function()
+                PurchaseCharmRF:InvokeServer(SelectedCharm)
+            end)
+            
+            if not success then
+                Notify("ERROR", "Failed to buy!", Color3.fromRGB(255, 0, 0))
+                break
+            end
+            task.wait(0.1) -- Delay kecil agar aman dari kick spam
+        end
+        Notify("SHOP", "Purchase Complete!", Color3.fromRGB(0, 255, 100))
+    end)
+end)
+
 
 -- ====================================================
 -- [UPDATED] SYSTEM MONITOR (REALTIME MS + COLOR)
