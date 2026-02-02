@@ -709,7 +709,7 @@ local function SetHideRod(bool)
         Notify("MAIN", "Hide Rod: ON (Re-Equip)", nil) 
     else
         if Connections["GhostRod"] then Connections["GhostRod"]:Disconnect() end
-        Notify("MAIN", "Hide Rod: OFF", nil)
+        Notify("MAIN", "Ghost Rod: OFF", nil)
     end
 end
 
@@ -753,12 +753,15 @@ local function SetAutoEquip(bool)
 end
 
 -- ====================================================
--- [UPDATED] CPU BOOSTER V2 (ULTRA LIGHT MODE - NO NOTIF)
+-- [UPDATED V3] CPU BOOSTER (ULTRA IMPROVED)
 -- ====================================================
 local function ToggleBoost(enable)
     States.Boost = enable
     if enable then
-        -- 1. Lighting Nuke
+        -- 1. Uncap FPS (Safety)
+        if setfpscap then setfpscap(999) end
+
+        -- 2. Lighting & Atmosphere Nuke
         pcall(function()
             local l = Services.Lighting
             l.GlobalShadows = false
@@ -766,50 +769,68 @@ local function ToggleBoost(enable)
             l.Brightness = 2
             l.EnvironmentDiffuseScale = 0
             l.EnvironmentSpecularScale = 0
-            -- Hapus efek berat
+            
+            -- Matikan semua efek Lighting
             for _, v in pairs(l:GetChildren()) do
-                if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("DepthOfField") or v:IsA("SunRays") then
+                if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("DepthOfField") or v:IsA("SunRays") or v:IsA("BlurEffect") or v:IsA("BloomEffect") then
                     v.Enabled = false
                 end
             end
         end)
         
-        -- 2. Terrain Simplification
+        -- 3. Terrain Nuke
         if Services.Workspace.Terrain then
             Services.Workspace.Terrain.WaterReflectance = 0
-            Services.Workspace.Terrain.WaterTransparency = 0 
+            Services.Workspace.Terrain.WaterTransparency = 1 
             Services.Workspace.Terrain.WaterWaveSize = 0
             Services.Workspace.Terrain.WaterWaveSpeed = 0
+            -- Material Hack (jika didukung)
+            pcall(function() Services.Workspace.Terrain.Material = Enum.Material.SmoothPlastic end)
         end
 
-        -- 3. Object Optimizer Function
+        -- 4. IMPROVED Object Optimizer Function
         local function OptimizeObject(v)
             pcall(function()
                 if v:IsA("BasePart") then
                     v.Material = Enum.Material.SmoothPlastic
                     v.Reflectance = 0
-                    v.CastShadow = false -- PENTING: Matikan bayangan
-                    if v.Name == "Water" then v.Transparency = 1 end 
+                    v.CastShadow = false
+                    -- Matikan TextureID jika itu MeshPart
+                    if v:IsA("MeshPart") then v.TextureID = "" end
+                    if v.Name == "Water" then v.Transparency = 1 end
+                    
                 elseif v:IsA("Decal") or v:IsA("Texture") then
                     v.Transparency = 1 
+                    
                 elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Explosion") then
                     v.Enabled = false 
+                    
+                -- ADDON: Matikan semua jenis lampu
+                elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
+                    v.Enabled = false
+                    
+                -- ADDON: Hapus aksesori pakaian pada NPC (Opsional, agar tidak terlalu berat)
+                elseif v:IsA("Clothing") then
+                    v:Destroy()
                 end
             end)
         end
         
-        -- 4. Apply to Existing Objects
+        -- 5. Apply to Existing Objects
         for _, v in pairs(Services.Workspace:GetDescendants()) do
             OptimizeObject(v)
         end
         
-        -- 5. Auto-Optimize New Objects (Loop Detector)
+        -- 6. Auto-Optimize New Objects (Loop Detector)
         if Connections["BoosterDynamic"] then Connections["BoosterDynamic"]:Disconnect() end
         Connections["BoosterDynamic"] = Services.Workspace.DescendantAdded:Connect(function(v)
             OptimizeObject(v)
         end)
+        
+        Notify("BOOST", "CPU Optimized (V3)", Color3.fromRGB(0, 255, 100))
     else
         if Connections["BoosterDynamic"] then Connections["BoosterDynamic"]:Disconnect() end
+        Notify("BOOST", "Optimization Disabled", nil)
     end
 end
 
@@ -1041,7 +1062,7 @@ local function ProcessRelicWithSpots(relicContainer)
     if not hrp then return end
 
     if not States.HasTank then
-        pcall(function() TankRemote:InvokeServer(105) end)
+        pcall(function() TankRemote:InvokeServer(575) end)
         States.HasTank = true
         Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
     end
@@ -1392,7 +1413,7 @@ MakeSwitch(PageMisc, "Panel Fishing", States.Panel, function(val)
 end)
 
 -- ====================================================
--- [ADDON] BUY CHARM SYSTEM (DRAWER & QUANTITY)
+-- [ADDON] BUY CHARM SYSTEM (DRAWER & QUANTITY) - FIXED ID
 -- ====================================================
 
 -- Definisi Remote
@@ -1438,13 +1459,21 @@ local CharmListLayout = Instance.new("UIListLayout", CharmListFrame)
 CharmListLayout.Padding = UDim.new(0, 2)
 CharmListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Data Charm
+-- Data Charm (MAPPING NAMA KE ID ANGKA)
 local SelectedCharm = nil
 local CharmData = {
-    "1",
-    "2",
-    "3",
-    "4"
+    "Bone Charm",
+    "Magma Charm",
+    "Algae Charm",
+    "Clover Charm"
+}
+
+-- MAPPING ID (SERVER REQUIREMENT)
+local CharmIDs = {
+    ["Bone Charm"] = 1,
+    ["Magma Charm"] = 2,
+    ["Algae Charm"] = 3,
+    ["Clover Charm"] = 4
 }
 
 -- Fungsi Pilih Charm
@@ -1516,7 +1545,7 @@ BuyBtn.Font = UI_THEME.FontBtn
 BuyBtn.TextSize = 10
 Instance.new("UICorner", BuyBtn).CornerRadius = UDim.new(0, 6)
 
--- 3. LOGIKA PEMBELIAN
+-- 3. LOGIKA PEMBELIAN (FIXED ID INTEGER)
 BuyBtn.MouseButton1Click:Connect(function()
     if not SelectedCharm then 
         Notify("SHOP", "Please Select a Charm!", Color3.fromRGB(255, 50, 50)) 
@@ -1526,20 +1555,28 @@ BuyBtn.MouseButton1Click:Connect(function()
     local amount = tonumber(QtyInput.Text) or 1
     if amount < 1 then amount = 1 end
     
+    -- Dapatkan ID dari Table Mapping
+    local targetID = CharmIDs[SelectedCharm]
+    
+    if not targetID then
+        Notify("ERROR", "Invalid ID Mapping", Color3.fromRGB(255,0,0))
+        return
+    end
+
     Notify("SHOP", "Buying " .. amount .. " " .. SelectedCharm .. "...", Color3.fromRGB(255, 200, 0))
     
-    -- Menggunakan task.spawn agar UI tidak freeze saat looping
     task.spawn(function()
         for i = 1, amount do
             local success, err = pcall(function()
-                PurchaseCharmRF:InvokeServer(SelectedCharm)
+                -- MENGIRIM ID ANGKA (CONTOH: 1, 2, 3)
+                PurchaseCharmRF:InvokeServer(targetID)
             end)
             
             if not success then
                 Notify("ERROR", "Failed to buy!", Color3.fromRGB(255, 0, 0))
                 break
             end
-            task.wait(0.1) -- Delay kecil agar aman dari kick spam
+            task.wait(0.1) -- Delay aman
         end
         Notify("SHOP", "Purchase Complete!", Color3.fromRGB(0, 255, 100))
     end)
@@ -1996,5 +2033,4 @@ end)
 task.delay(1, function()
     Main.Visible = true
     FloatHUD.Visible = States.Panel 
-
 end)
