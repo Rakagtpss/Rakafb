@@ -1,133 +1,158 @@
---[[
-    HYPER SPAM FISHING (BRUTAL MODE)
-    Target: Multi-Notifications & Instant Catch
-    Created by Gemini
-]]
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
-local RunService = game:GetService("RunService")
+local Window = Fluent:CreateWindow({
+    Title = "Auto Fishing " .. Fluent.Version,
+    SubTitle = "by Gemini",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true, 
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl 
+})
 
--- // CONFIGURATION \\ --
-local CONFIG = {
-    SpamIntensity = 100, -- Berapa kali kirim sinyal "Catch" sekaligus (Coba 3, 5, atau 10)
-    LoopSpeed = 0.01,     -- 0 = Secepat frame rate game
-}
+-- ===========================
+-- VARIABLES
+-- ===========================
+getgenv().fishingStart = false
+getgenv().spamCatch = false
+getgenv().delayReel = 0.1
+getgenv().delayBait = 0.1
 
-local AutoEnabled = false
-local Connection = nil -- Untuk menyimpan loop Heartbeat
+local rs = game:GetService("ReplicatedStorage")
+local net = rs:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0").net
 
--- // REMOTE EVENTS SETUP \\ --
-local NetPath = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_net@0.2.0"].net
-local ChargeRod = NetPath["RF/ChargeFishingRod"]
-local StartMinigame = NetPath["RF/RequestFishingMinigameStarted"]
-local CatchFish = NetPath["RF/CatchFishCompleted"]
+-- Arguments
+local args = { -1.115296483039856, 0, 1763651451.636425 }
 
--- // UI CREATION \\ --
-if CoreGui:FindFirstChild("HyperFishingUI") then
-    CoreGui.HyperFishingUI:Destroy()
+-- Remote Definitions
+local ChargeRod    = net["RF/ChargeFishingRod"]
+local RequestGame  = net["RF/RequestFishingMinigameStarted"]
+local CompleteGame = net["RF/CatchFishCompleted"] -- Target Update
+local CancelInput  = net["RF/CancelFishingInputs"]
+
+-- ===========================
+-- LOGIC
+-- ===========================
+
+local function executeCatch()
+    if getgenv().spamCatch then
+        -- SPAM MODE (5x Trigger)
+        for i = 1, 5 do
+            task.spawn(function()
+                pcall(function() CompleteGame:InvokeServer() end)
+            end)
+        end
+    else
+        -- NORMAL MODE (1x Trigger)
+        pcall(function() CompleteGame:InvokeServer() end)
+    end
 end
 
-local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local ToggleBtn = Instance.new("TextButton")
-local UIStroke = Instance.new("UIStroke")
-local UICorner = Instance.new("UICorner")
+local function startFishingLoop()
+    task.spawn(function()
+        while getgenv().fishingStart do
+            -- 1. Charge
+            pcall(function() ChargeRod:InvokeServer() end)
+            task.wait(0.05)
+            if not getgenv().fishingStart then break end
 
-ScreenGui.Name = "HyperFishingUI"
-ScreenGui.Parent = CoreGui
+            -- 2. Request Game
+            pcall(function() RequestGame:InvokeServer(unpack(args)) end)
 
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-MainFrame.Position = UDim2.new(0.85, 0, 0.5, 0)
-MainFrame.Size = UDim2.new(0, 140, 0, 80)
-MainFrame.Active = true
-MainFrame.Draggable = true
+            -- 3. Delay Reel
+            task.wait(getgenv().delayReel)
+            if not getgenv().fishingStart then break end
 
-UICorner.Parent = MainFrame
-UICorner.CornerRadius = UDim.new(0, 8)
+            -- 4. Catch (Spam or Normal)
+            executeCatch()
 
-UIStroke.Parent = MainFrame
-UIStroke.Color = Color3.fromRGB(255, 0, 255) -- Ungu (Hyper Mode)
-UIStroke.Thickness = 3
-
-Title.Parent = MainFrame
-Title.Text = "HYPER SPAM"
-Title.TextColor3 = Color3.fromRGB(255, 0, 255)
-Title.Font = Enum.Font.GothamBlack
-Title.TextSize = 16
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundTransparency = 1
-
-ToggleBtn.Parent = MainFrame
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.45, 0)
-ToggleBtn.Size = UDim2.new(0.8, 0, 0.4, 0)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Text = "OFF"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.TextSize = 14
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
-
--- // HYPER LOGIC \\ --
-
-local function StartHyperLoop()
-    -- Menggunakan Heartbeat untuk kecepatan maksimal (sesuai FPS)
-    Connection = RunService.Heartbeat:Connect(function()
-        if not AutoEnabled then return end
-        
-        task.spawn(function()
-            -- 1. LEMPAR & MULAI MINIGAME (Hampir Bersamaan)
-            pcall(function()
-                local now = tick()
-                -- Kirim Charge
-                ChargeRod:InvokeServer(nil, nil, now, nil)
-                
-                -- Kirim Start Minigame (langsung tanpa wait)
-                StartMinigame:InvokeServer(-0.99, 0.77, now) 
-            end)
+            -- 5. Delay Bait
+            task.wait(getgenv().delayBait)
             
-            -- Tunggu 1 frame saja agar server memproses "Start"
-            RunService.Heartbeat:Wait()
+            -- 6. Cancel Input (Safety)
+            pcall(function() CancelInput:InvokeServer() end)
             
-            -- 2. SPAM CATCH (Looping Brutal)
-            -- Ini yang bikin notif banyak/bertumpuk
-            for i = 1, CONFIG.SpamIntensity do
-                task.spawn(function()
-                    pcall(function()
-                        CatchFish:InvokeServer()
-                    end)
-                end)
-            end
-        end)
-        
-        -- Jeda Loop Utama (Agar tidak crash total)
-        -- Jika ingin lebih cepat, hapus baris task.wait ini, tapi risiko crash tinggi.
-        task.wait(0.05) 
+            task.wait(0.01)
+        end
     end)
 end
 
-local function StopHyperLoop()
-    if Connection then
-        Connection:Disconnect()
-        Connection = nil
-    end
-end
+-- ===========================
+-- UI ELEMENTS
+-- ===========================
 
--- // BUTTON LOGIC \\ --
-ToggleBtn.MouseButton1Click:Connect(function()
-    AutoEnabled = not AutoEnabled
-    
-    if AutoEnabled then
-        ToggleBtn.Text = "SPAMMING!"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 255) -- Ungu
-        StartHyperLoop()
+local Tabs = {
+    Main = Window:AddTab({ Title = "Fishing", Icon = "fish" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+Tabs.Main:AddToggle("AutoFish", {
+    Title = "Active Auto Fishing",
+    Default = false
+}):OnChanged(function()
+    getgenv().fishingStart = Options.AutoFish.Value
+    if getgenv().fishingStart then
+        startFishingLoop()
+        Fluent:Notify({
+            Title = "Fishing Started",
+            Content = "Auto fishing sedang berjalan.",
+            Duration = 3
+        })
     else
-        ToggleBtn.Text = "OFF"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        StopHyperLoop()
+        pcall(function() CancelInput:InvokeServer() end)
+        Fluent:Notify({
+            Title = "Fishing Stopped",
+            Content = "Auto fishing dimatikan.",
+            Duration = 3
+        })
     end
 end)
+
+Tabs.Main:AddToggle("SpamMode", {
+    Title = "Spam Catch Mode (Brutal)",
+    Description = "Mengirim sinyal tangkap berkali-kali (Risiko Ping Naik)",
+    Default = false
+}):OnChanged(function()
+    getgenv().spamCatch = Options.SpamMode.Value
+end)
+
+Tabs.Main:AddSlider("SliderReel", {
+    Title = "Delay Reel (Tunggu Ikan)",
+    Description = "Waktu tunggu sebelum menarik kail",
+    Default = 0.1,
+    Min = 0,
+    Max = 2,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().delayReel = Value
+    end
+})
+
+Tabs.Main:AddSlider("SliderBait", {
+    Title = "Delay Bait (Jeda Lempar)",
+    Description = "Waktu jeda sebelum melempar kembali",
+    Default = 0.1,
+    Min = 0,
+    Max = 2,
+    Rounding = 2,
+    Callback = function(Value)
+        getgenv().delayBait = Value
+    end
+})
+
+Tabs.Main:AddButton({
+    Title = "Unstuck Character",
+    Description = "Klik jika karakter nge-bug",
+    Callback = function()
+        pcall(function() CancelInput:InvokeServer() end)
+        if game.Players.LocalPlayer.Character then
+            game.Players.LocalPlayer.Character.Humanoid.Health = 0
+        end
+    end
+})
+
+Window:SelectTab(1)
