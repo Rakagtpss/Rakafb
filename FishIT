@@ -1,15 +1,13 @@
--- MINI UI INVENTORY GUID SCANNER
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+-- FULL FIXED MINI INVENTORY GUID UI
 
--- coba ambil InventoryController
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local lp = Players.LocalPlayer
+
+-- LOAD InventoryController
 local InventoryController
 pcall(function()
-    InventoryController = require(
-        game:GetService("ReplicatedStorage")
-            .Controllers
-            .InventoryController
-    )
+    InventoryController = require(RS.Controllers.InventoryController)
 end)
 
 if not InventoryController then
@@ -17,34 +15,50 @@ if not InventoryController then
     return
 end
 
-local Inventory =
+-- AUTO DETECT INVENTORY
+local inventory =
     InventoryController.Inventory
-    or InventoryController:GetInventory()
+    or (InventoryController.State and InventoryController.State.Inventory)
+
+if not inventory then
+    warn("Inventory tidak ditemukan di InventoryController")
+    return
+end
+
+-- LOAD ItemUtility (optional)
+local ItemUtility
+pcall(function()
+    ItemUtility = require(RS.Shared.ItemUtility)
+end)
 
 -- UI
-local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
-gui.Name = "MiniInventoryGUID"
+local gui = Instance.new("ScreenGui", lp.PlayerGui)
+gui.Name = "FixedInventoryGUIDUI"
+gui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.fromScale(0.35, 0.45)
-frame.Position = UDim2.fromScale(0.32, 0.25)
+frame.Size = UDim2.fromOffset(340, 420)
+frame.Position = UDim2.fromScale(0.33, 0.25)
 frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 
+local corner = Instance.new("UICorner", frame)
+corner.CornerRadius = UDim.new(0,8)
+
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1,0,0,30)
-title.Text = "Inventory GUID Scanner"
 title.BackgroundTransparency = 1
+title.Text = "Inventory GUID Scanner"
 title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 
 local search = Instance.new("TextBox", frame)
-search.PlaceholderText = "Search item name..."
-search.Size = UDim2.new(1,-20,0,30)
-search.Position = UDim2.new(0,10,0,40)
+search.Size = UDim2.new(1,-16,0,30)
+search.Position = UDim2.new(0,8,0,34)
+search.PlaceholderText = "Search item..."
 search.BackgroundColor3 = Color3.fromRGB(35,35,35)
 search.TextColor3 = Color3.new(1,1,1)
 search.ClearTextOnFocus = false
@@ -52,38 +66,48 @@ search.Font = Enum.Font.Gotham
 search.TextSize = 13
 
 local list = Instance.new("ScrollingFrame", frame)
-list.Position = UDim2.new(0,10,0,80)
-list.Size = UDim2.new(1,-20,1,-90)
-list.CanvasSize = UDim2.new(0,0,0,0)
+list.Position = UDim2.new(0,8,0,72)
+list.Size = UDim2.new(1,-16,1,-80)
+list.CanvasSize = UDim2.new()
 list.ScrollBarImageTransparency = 0.3
 list.BackgroundTransparency = 1
 
 local layout = Instance.new("UIListLayout", list)
 layout.Padding = UDim.new(0,6)
 
--- fungsi render
+-- RENDER FUNCTION
 local function render(filter)
     list:ClearAllChildren()
     layout.Parent = list
 
-    for category, items in pairs(Inventory) do
-        for guid, item in pairs(items) do
+    for category, items in pairs(inventory) do
+        for guid, itemData in pairs(items) do
+            local name = itemData.Name or "Unknown"
+
+            if ItemUtility then
+                pcall(function()
+                    if ItemUtility.GetItemName then
+                        name = ItemUtility:GetItemName(itemData)
+                    end
+                end)
+            end
+
             if not filter or string.find(
-                string.lower(item.Name),
+                string.lower(name),
                 string.lower(filter)
             ) then
                 local btn = Instance.new("TextButton", list)
-                btn.Size = UDim2.new(1,0,0,40)
+                btn.Size = UDim2.new(1,0,0,42)
+                btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+                btn.TextColor3 = Color3.new(1,1,1)
+                btn.Font = Enum.Font.Gotham
+                btn.TextSize = 12
                 btn.TextWrapped = true
                 btn.TextXAlignment = Left
                 btn.Text =
-                    item.Name ..
-                    "\n[" .. category .. "]\n" ..
+                    name ..
+                    "\n[" .. tostring(category) .. "]\n" ..
                     guid
-                btn.Font = Enum.Font.Gotham
-                btn.TextSize = 12
-                btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-                btn.TextColor3 = Color3.new(1,1,1)
 
                 btn.MouseButton1Click:Connect(function()
                     if setclipboard then
@@ -96,7 +120,10 @@ local function render(filter)
     end
 
     task.wait()
-    list.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 10)
+    list.CanvasSize = UDim2.new(
+        0,0,0,
+        layout.AbsoluteContentSize.Y + 10
+    )
 end
 
 render()
