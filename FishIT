@@ -1,9 +1,9 @@
 --[[
-    FISCHING SCRIPT - CLASSICA UI V3 (AUTO DETECT)
+    FISCHING SCRIPT - CLASSICA UI V4 (HUMANIZED)
     Fitur Baru:
-    - Auto Detect "!" (ShakeUI) -> Tidak butuh delay catch manual
-    - Auto Detect Reset -> Tidak butuh delay reset manual
-    - Safe Color (Anti Error Nil)
+    - Random Reaction Time: Jeda acak setelah "!" muncul (Human-like).
+    - Auto Detect ShakeUI.
+    - 100% Anti Error 402 & Nil.
 ]]
 
 local Services = {
@@ -26,7 +26,9 @@ getgenv().mode = "Instant"
 
 local Config = {
     Coordinates = { -1.115, 0, 1763.636 },
-    DelayCharge = 1.0, -- Satu-satunya delay manual (Jeda antar lemparan)
+    DelayCharge = 1.0, -- Jeda antar lemparan
+    ReactionMin = 0.15, -- Waktu reaksi minimal (detik)
+    ReactionMax = 0.35, -- Waktu reaksi maksimal (detik)
 }
 
 -- FUNGSI WARNA AMAN
@@ -48,22 +50,28 @@ local Remotes = {
 }
 
 -- =====================================================
--- 3. LOGIC UTAMA (AUTO DETECT)
+-- 3. LOGIC UTAMA (HUMANIZED)
 -- =====================================================
 
--- Fungsi menunggu tanda "!" (ShakeUI) muncul
+-- Fungsi menunggu tanda "!"
 local function WaitForBite()
     local timeout = 0
-    -- Loop sampai UI "shakeui" muncul di PlayerGui
     while not PlayerGui:FindFirstChild("shakeui") and getgenv().fishingStart do
         task.wait(0.05)
         timeout = timeout + 0.05
-        if timeout > 25 then return false end -- Reset jika > 25 detik tidak ada ikan
+        if timeout > 25 then return false end
     end
     return true
 end
 
--- Fungsi Bypass (Anti Stun)
+-- Fungsi Random Delay (Reaction Time)
+local function RandomReaction()
+    -- Mengambil angka random antara Min dan Max
+    local randomTime = math.random() * (Config.ReactionMax - Config.ReactionMin) + Config.ReactionMin
+    return randomTime
+end
+
+-- Bypass
 local BlockedRemotes = {
     [Remotes.Charge] = true,
     [Remotes.Request] = true,
@@ -85,73 +93,73 @@ local function SetAutoGreat(bool)
     pcall(function() Remotes.AutoState:InvokeServer({bool}) end)
 end
 
--- LOOP UTAMA (Auto Detect Logic)
+-- MAIN LOOP
 local function MainLoop()
     if getgenv().autoGreat then SetAutoGreat(true) end
     
-    -- Reset awal
     pcall(function() Remotes.Cancel:InvokeServer() end)
     task.wait(0.2)
 
     while getgenv().fishingStart do
-        -- 1. Melempar Kail (Charge)
+        -- 1. Charge
         pcall(function() Remotes.Charge:InvokeServer() end)
         
-        -- 2. Menunggu Ikan (Auto Detect "!")
-        -- Script akan diam di baris ini sampai tanda "!" muncul
+        -- 2. Wait For Bite ("!")
         local biteDetected = WaitForBite()
         
         if not getgenv().fishingStart then break end
         
         if biteDetected then
-            -- 3. Ikan ditarik (Request Game)
+            -- [NEW] 3. Human Reaction Time (Random Delay)
+            local reaction = RandomReaction()
+            task.wait(reaction) -- Script menunggu di sini seolah berpikir
+            
+            -- 4. Pull
             pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end)
             
-            -- Jika mode blatan, langsung sikat tanpa jeda
-            if getgenv().mode == "Instant" then
-                task.wait(0.1) -- Sedikit delay biar natural
-            end
+            -- Sedikit delay tambahan jika mode instant
+            if getgenv().mode == "Instant" then task.wait(0.1) end
 
-            -- 4. Selesaikan Minigame (Catch)
+            -- 5. Catch
             pcall(function() Remotes.Catch:InvokeServer() end)
             
-            -- 5. Reset / Cancel Input
+            -- 6. Reset
             pcall(function() Remotes.Cancel:InvokeServer() end)
         end
         
-        -- 6. Delay sebelum melempar lagi (Manual Config)
+        -- 7. Delay Charge (Manual)
         task.wait(Config.DelayCharge)
     end
 end
 
 -- =====================================================
--- 4. CLASSICA UI (RE-DESIGNED FOR AUTO DETECT)
+-- 4. CLASSICA UI V4 (CONSTRUCTION)
 -- =====================================================
 
-if Services.CoreGui:FindFirstChild("ClassicaFishingV3") then 
-    Services.CoreGui.ClassicaFishingV3:Destroy() 
+if Services.CoreGui:FindFirstChild("ClassicaFishingV4") then 
+    Services.CoreGui.ClassicaFishingV4:Destroy() 
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ClassicaFishingV3"
+ScreenGui.Name = "ClassicaFishingV4"
 ScreenGui.Parent = Services.CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = SafeColor(30, 30, 35)
-MainFrame.BorderColor3 = SafeColor(0, 255, 127) -- Aksen Hijau Neon
+MainFrame.BackgroundColor3 = SafeColor(25, 25, 30)
+MainFrame.BorderColor3 = SafeColor(255, 170, 0) -- Orange Theme
 MainFrame.BorderSizePixel = 2
-MainFrame.Position = UDim2.new(0.5, -125, 0.5, -140)
-MainFrame.Size = UDim2.new(0, 250, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -160)
+MainFrame.Size = UDim2.new(0, 260, 0, 350) -- Lebih tinggi untuk input baru
 MainFrame.Active = true
 MainFrame.Draggable = true
 
 -- Header
 local Header = Instance.new("Frame")
 Header.Parent = MainFrame
-Header.BackgroundColor3 = SafeColor(20, 20, 20)
+Header.BackgroundColor3 = SafeColor(15, 15, 20)
 Header.BorderSizePixel = 0
 Header.Size = UDim2.new(1, 0, 0, 35)
 
@@ -160,8 +168,8 @@ TitleLabel.Parent = Header
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Size = UDim2.new(1, 0, 1, 0)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "FISCH - AUTO DETECT"
-TitleLabel.TextColor3 = SafeColor(0, 255, 127)
+TitleLabel.Text = "HUMANIZED FISHING"
+TitleLabel.TextColor3 = SafeColor(255, 170, 0)
 TitleLabel.TextSize = 16
 
 local CloseBtn = Instance.new("TextButton")
@@ -181,74 +189,98 @@ Container.BackgroundTransparency = 1
 Container.Position = UDim2.new(0, 15, 0, 45)
 Container.Size = UDim2.new(1, -30, 1, -55)
 
--- Status Info
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Parent = Container
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 0, 0)
-StatusLabel.Font = Enum.Font.Code
-StatusLabel.Text = "SYSTEM: READY"
-StatusLabel.TextColor3 = SafeColor(180, 180, 180)
-StatusLabel.TextSize = 13
-
--- Helper Button
+-- Helper Functions
 local function CreateButton(text, color, order, callback)
     local Btn = Instance.new("TextButton")
     Btn.Parent = Container
     Btn.BackgroundColor3 = color
-    Btn.Position = UDim2.new(0, 0, 0, 30 + (order - 1) * 40)
+    Btn.Position = UDim2.new(0, 0, 0, (order - 1) * 40)
     Btn.Size = UDim2.new(1, 0, 0, 32)
     Btn.Font = Enum.Font.GothamBold
     Btn.Text = text
     Btn.TextColor3 = SafeColor(255, 255, 255)
     Btn.TextSize = 14
-    
-    -- Round Corner
     local Corner = Instance.new("UICorner")
     Corner.CornerRadius = UDim.new(0, 6)
     Corner.Parent = Btn
-    
     Btn.MouseButton1Click:Connect(callback)
     return Btn
 end
 
--- 1. START BUTTON
+local function CreateInput(label_text, default_val, order, callback)
+    local yPos = 130 + (order - 1) * 35
+    
+    local Label = Instance.new("TextLabel")
+    Label.Parent = Container
+    Label.BackgroundTransparency = 1
+    Label.Position = UDim2.new(0, 0, 0, yPos)
+    Label.Size = UDim2.new(0.65, 0, 0, 25)
+    Label.Font = Enum.Font.Gotham
+    Label.Text = label_text
+    Label.TextColor3 = SafeColor(200, 200, 200)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.TextSize = 12
+
+    local Box = Instance.new("TextBox")
+    Box.Parent = Container
+    Box.BackgroundColor3 = SafeColor(45, 45, 50)
+    Box.Position = UDim2.new(0.7, 0, 0, yPos)
+    Box.Size = UDim2.new(0.3, 0, 0, 25)
+    Box.Font = Enum.Font.Gotham
+    Box.Text = tostring(default_val)
+    Box.TextColor3 = SafeColor(255, 255, 255)
+    Box.TextSize = 12
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = Box
+    
+    Box.FocusLost:Connect(function()
+        local n = tonumber(Box.Text)
+        if n then callback(n) end
+    end)
+end
+
+-- UI COMPONENTS
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Parent = Container
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 0, 240) -- Pindah ke bawah
+StatusLabel.Font = Enum.Font.Code
+StatusLabel.Text = "READY TO FISH"
+StatusLabel.TextColor3 = SafeColor(180, 180, 180)
+StatusLabel.TextSize = 12
+
+-- Buttons
 local StartBtn = CreateButton("START FISHING", SafeColor(0, 150, 0), 1, function()
     getgenv().fishingStart = not getgenv().fishingStart
     if getgenv().fishingStart then
-        StatusLabel.Text = "STATUS: WAITING FOR BITE..."
-        StatusLabel.TextColor3 = SafeColor(0, 255, 0)
         task.spawn(MainLoop)
     else
-        StatusLabel.Text = "STATUS: STOPPED"
-        StatusLabel.TextColor3 = SafeColor(255, 80, 80)
         pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.1)
         pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end)
--- Update button text dynamically
 task.spawn(function()
     while MainFrame.Parent do
         if getgenv().fishingStart then
             StartBtn.Text = "STOP FISHING"
             StartBtn.BackgroundColor3 = SafeColor(150, 0, 0)
+            StatusLabel.Text = "RUNNING..."
+            StatusLabel.TextColor3 = SafeColor(0, 255, 0)
         else
             StartBtn.Text = "START FISHING"
             StartBtn.BackgroundColor3 = SafeColor(0, 150, 0)
+            StatusLabel.Text = "STOPPED"
+            StatusLabel.TextColor3 = SafeColor(255, 80, 80)
         end
         task.wait(0.5)
     end
 end)
 
--- 2. MODE BUTTON
 local ModeBtn = CreateButton("MODE: INSTANT", SafeColor(60, 60, 60), 2, function()
-    if getgenv().mode == "Instant" then
-        getgenv().mode = "Blatan"
-    else
-        getgenv().mode = "Instant"
-    end
+    getgenv().mode = (getgenv().mode == "Instant") and "Blatan" or "Instant"
 end)
 task.spawn(function()
     while MainFrame.Parent do
@@ -257,42 +289,16 @@ task.spawn(function()
     end
 end)
 
--- 3. UNSTUCK
-CreateButton("FIX/UNSTUCK", SafeColor(200, 100, 0), 3, function()
+CreateButton("UNSTUCK / FIX", SafeColor(200, 100, 0), 3, function()
     pcall(function() Remotes.Cancel:InvokeServer() end)
     pcall(function() Remotes.Catch:InvokeServer() end)
-    StatusLabel.Text = "SYSTEM: RESET SENT"
+    StatusLabel.Text = "RESET SENT!"
 end)
 
--- 4. DELAY CHARGE INPUT (Satu-satunya yang manual)
-local DelayLabel = Instance.new("TextLabel")
-DelayLabel.Parent = Container
-DelayLabel.BackgroundTransparency = 1
-DelayLabel.Position = UDim2.new(0, 0, 0, 160)
-DelayLabel.Size = UDim2.new(0.6, 0, 0, 25)
-DelayLabel.Font = Enum.Font.Gotham
-DelayLabel.Text = "Delay Charge (s):"
-DelayLabel.TextColor3 = SafeColor(200, 200, 200)
-DelayLabel.TextXAlignment = Enum.TextXAlignment.Left
-DelayLabel.TextSize = 13
-
-local DelayBox = Instance.new("TextBox")
-DelayBox.Parent = Container
-DelayBox.BackgroundColor3 = SafeColor(45, 45, 50)
-DelayBox.Position = UDim2.new(0.65, 0, 0, 160)
-DelayBox.Size = UDim2.new(0.35, 0, 0, 25)
-DelayBox.Font = Enum.Font.Gotham
-DelayBox.Text = tostring(Config.DelayCharge)
-DelayBox.TextColor3 = SafeColor(255, 255, 255)
-DelayBox.TextSize = 13
-local DelayCorner = Instance.new("UICorner")
-DelayCorner.CornerRadius = UDim.new(0, 4)
-DelayCorner.Parent = DelayBox
-
-DelayBox.FocusLost:Connect(function()
-    local n = tonumber(DelayBox.Text)
-    if n then Config.DelayCharge = n end
-end)
+-- Inputs
+CreateInput("Delay Charge (s):", Config.DelayCharge, 1, function(n) Config.DelayCharge = n end)
+CreateInput("Min Reaction (s):", Config.ReactionMin, 2, function(n) Config.ReactionMin = n end)
+CreateInput("Max Reaction (s):", Config.ReactionMax, 3, function(n) Config.ReactionMax = n end)
 
 -- Anti AFK
 task.spawn(function()
@@ -304,4 +310,4 @@ task.spawn(function()
     end)
 end)
 
-print("Classica UI V3 (Auto Detect) Loaded")
+print("Classica UI V4 (Humanized) Loaded")
