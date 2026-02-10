@@ -1,335 +1,186 @@
 --[[
-    FISCHING SCRIPT - CLASSICA UI V5 (FINAL FIX)
-    Fixes:
-    1. TextColor3 Nil Error -> Menggunakan Color3.fromRGB langsung (Statis).
-    2. Syntax Error '//' -> Semua komentar menggunakan standard Lua (--).
-    3. Stabilized Loop -> Mencegah crash saat spam.
+    UPDATED FISHING SCRIPT - MODERN AUTO DETECT
+    - Dynamic Pathfinding
+    - Auto Detect Bite (UI Based)
+    - Random Delay Support (Human-like)
 ]]
 
-local Services = {
-    Players = game:GetService("Players"),
-    ReplicatedStorage = game:GetService("ReplicatedStorage"),
-    RunService = game:GetService("RunService"),
-    VirtualUser = game:GetService("VirtualUser"),
-    CoreGui = game:GetService("CoreGui")
-}
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local Window = OrionLib:MakeWindow({Name = "Fishing Modern", HidePremium = false, SaveConfig = true, ConfigFolder = "FishConfig"})
 
-local LocalPlayer = Services.Players.LocalPlayer
+-- =====================================================
+-- 🛠️ 1. DYNAMIC PATHFINDER
+-- =====================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Packages = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
 
--- =====================================================
--- 1. CONFIG & COLORS (DEFINED FIRST TO PREVENT NIL)
--- =====================================================
-getgenv().fishingStart = false
-getgenv().autoGreat = false
-getgenv().mode = "Instant" 
-
-local Config = {
-    Coordinates = { -1.115, 0, 1763.636 },
-    DelayCharge = 1.0, 
-    ReactionMin = 0.15,
-    ReactionMax = 0.35, 
-}
-
--- PRE-DEFINED COLORS (Anti Error Nil)
-local Colors = {
-    Background = Color3.fromRGB(25, 25, 30),
-    Header = Color3.fromRGB(15, 15, 20),
-    TextWhite = Color3.fromRGB(255, 255, 255),
-    TextGray = Color3.fromRGB(180, 180, 180),
-    TextDim = Color3.fromRGB(200, 200, 200),
-    AccentOrange = Color3.fromRGB(255, 170, 0),
-    Green = Color3.fromRGB(0, 150, 0),
-    Red = Color3.fromRGB(150, 0, 0),
-    ButtonGray = Color3.fromRGB(60, 60, 60),
-    InputBG = Color3.fromRGB(45, 45, 50),
-    NeonGreen = Color3.fromRGB(0, 255, 127),
-    AlertRed = Color3.fromRGB(255, 80, 80)
-}
-
--- =====================================================
--- 2. REMOTE PATHS
--- =====================================================
--- Menggunakan pcall saat mengambil path agar tidak error seketika
-local Success, NetPath = pcall(function()
-    return Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
-end)
-
-if not Success then
-    warn("Failed to find NetPath. Trying alternative path...")
-    -- Fallback path jika yang pertama gagal
-    NetPath = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+local function GetNetPath()
+    for _, folder in pairs(Packages:GetChildren()) do
+        if folder.Name:match("sleitnick_net") then
+            return folder:WaitForChild("net")
+        end
+    end
+    return Packages:FindFirstChild("net", true) 
 end
 
-local Remotes = {
-    Charge      = NetPath:WaitForChild("RF/ChargeFishingRod"),
-    Catch       = NetPath:WaitForChild("RF/CatchFishCompleted"),
-    Cancel      = NetPath:WaitForChild("RF/CancelFishingInputs"),
-    Request     = NetPath:WaitForChild("RF/RequestFishingMinigameStarted"),
-    AutoState   = NetPath:WaitForChild("RF/UpdateAutoFishingState"),
-}
+local NetPath = GetNetPath()
+if not NetPath then
+    OrionLib:MakeNotification({Name = "Error", Content = "Remote Path tidak ketemu!", Time = 5})
+    return
+end
 
 -- =====================================================
--- 3. LOGIC UTAMA
+-- 📡 2. REMOTE DEFINITIONS
+-- =====================================================
+local ChargeRod    = NetPath:WaitForChild("RF/ChargeFishingRod")
+local RequestGame  = NetPath:WaitForChild("RF/RequestFishingMinigameStarted")
+local CompleteGame = NetPath:WaitForChild("RF/FishingCompleted")
+if not CompleteGame then CompleteGame = NetPath:FindFirstChild("RE/FishingCompleted") end
+local CancelInput  = NetPath:WaitForChild("RF/CancelFishingInputs")
+local UpdateAuto   = NetPath:WaitForChild("RF/UpdateAutoFishingState")
+
+-- Settings Variable
+getgenv().fishingStart = false
+local currentMode = "Legit"
+local useAutoDetect = true -- Modern Detect
+local targetUIName = "shakeui" -- Nama UI saat ikan memakan umpan (Cek PlayerGui)
+local minDelay = 5.0
+local maxDelay = 8.0
+local reactionTime = 0.1 -- Waktu jeda setelah terdeteksi
+
+local defaultArgs = { -1.115296483039856, 0, 1763651451.636425 }
+
+-- =====================================================
+-- 🧠 3. INTELLIGENT BITE DETECTION
 -- =====================================================
 
 local function WaitForBite()
-    local timeout = 0
-    while not PlayerGui:FindFirstChild("shakeui") and getgenv().fishingStart do
-        task.wait(0.05)
-        timeout = timeout + 0.05
-        if timeout > 25 then return false end
+    -- Jika Auto Detect dimatikan, gunakan Random Delay
+    if not useAutoDetect then
+        local randomTime = math.random() * (maxDelay - minDelay) + minDelay
+        OrionLib:MakeNotification({Name = "Wait", Content = string.format("Manual Delay: %.2fs", randomTime), Time = 1})
+        task.wait(randomTime)
+        return true
     end
-    return true
-end
 
-local function RandomReaction()
-    local randomTime = math.random() * (Config.ReactionMax - Config.ReactionMin) + Config.ReactionMin
-    return randomTime
-end
-
--- Bypass Logic
-local BlockedRemotes = {
-    [Remotes.Charge] = true,
-    [Remotes.Request] = true,
-    [Remotes.Catch] = true,
-    [Remotes.Cancel] = true
-}
-
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    if getgenv().fishingStart and BlockedRemotes[self] and not checkcaller() then
-        if method == "InvokeServer" then return task.wait(9e9) 
-        elseif method == "FireServer" then return nil end
-    end
-    return oldNamecall(self, ...)
-end)
-
-local function SetAutoGreat(bool)
-    pcall(function() Remotes.AutoState:InvokeServer({bool}) end)
-end
-
-local function MainLoop()
-    if getgenv().autoGreat then SetAutoGreat(true) end
+    -- MODERN DETECT: Menunggu UI muncul di PlayerGui
+    -- Ini loop menunggu sampai ada 'tanda' ikan menggigit
+    local startTime = tick()
+    local timeout = 15 -- Maksimal nunggu 15 detik biar gak stuck
     
-    pcall(function() Remotes.Cancel:InvokeServer() end)
-    task.wait(0.2)
-
-    while getgenv().fishingStart do
-        -- 1. Charge
-        pcall(function() Remotes.Charge:InvokeServer() end)
-        
-        -- 2. Wait Bite
-        local biteDetected = WaitForBite()
-        
-        if not getgenv().fishingStart then break end
-        
-        if biteDetected then
-            -- 3. Human Reaction
-            task.wait(RandomReaction()) 
-            
-            -- 4. Pull
-            pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end)
-            
-            if getgenv().mode == "Instant" then task.wait(0.1) end
-
-            -- 5. Catch
-            pcall(function() Remotes.Catch:InvokeServer() end)
-            
-            -- 6. Reset
-            pcall(function() Remotes.Cancel:InvokeServer() end)
+    repeat
+        -- Cek apakah UI Minigame muncul (Biasanya 'shakeui', 'reel', 'bar')
+        local uiFound = PlayerGui:FindFirstChild(targetUIName) or PlayerGui:FindFirstChild("minigame")
+        if uiFound and uiFound.Enabled then -- Kadang ada tapi enabled=false
+            task.wait(reactionTime) -- Jeda manusiawi
+            return true
         end
         
-        task.wait(Config.DelayCharge)
-    end
-end
-
--- =====================================================
--- 4. CLASSICA UI V5 (STABLE BUILD)
--- =====================================================
-
-if Services.CoreGui:FindFirstChild("ClassicaFishingV5") then 
-    Services.CoreGui.ClassicaFishingV5:Destroy() 
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ClassicaFishingV5"
-ScreenGui.Parent = Services.CoreGui
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Colors.Background
-MainFrame.BorderColor3 = Colors.AccentOrange
-MainFrame.BorderSizePixel = 2
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -160)
-MainFrame.Size = UDim2.new(0, 260, 0, 360)
-MainFrame.Active = true
-MainFrame.Draggable = true
-
--- Header
-local Header = Instance.new("Frame")
-Header.Parent = MainFrame
-Header.BackgroundColor3 = Colors.Header
-Header.BorderSizePixel = 0
-Header.Size = UDim2.new(1, 0, 0, 35)
-
-local TitleLabel = Instance.new("TextLabel")
-TitleLabel.Parent = Header
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Size = UDim2.new(1, 0, 1, 0)
-TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "FISCHING FIXED"
-TitleLabel.TextColor3 = Colors.AccentOrange
-TitleLabel.TextSize = 16
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Parent = Header
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Position = UDim2.new(1, -30, 0, 0)
-CloseBtn.Size = UDim2.new(0, 30, 0, 35)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Colors.AlertRed
-CloseBtn.TextSize = 16
-CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
-
-local Container = Instance.new("Frame")
-Container.Parent = MainFrame
-Container.BackgroundTransparency = 1
-Container.Position = UDim2.new(0, 15, 0, 45)
-Container.Size = UDim2.new(1, -30, 1, -55)
-
--- Helper Functions
-local function CreateButton(text, bgColor, order, callback)
-    local Btn = Instance.new("TextButton")
-    Btn.Parent = Container
-    Btn.BackgroundColor3 = bgColor
-    Btn.Position = UDim2.new(0, 0, 0, (order - 1) * 40)
-    Btn.Size = UDim2.new(1, 0, 0, 32)
-    Btn.Font = Enum.Font.GothamBold
-    Btn.Text = text
-    Btn.TextColor3 = Colors.TextWhite
-    Btn.TextSize = 14
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 6)
-    Corner.Parent = Btn
-    Btn.MouseButton1Click:Connect(callback)
-    return Btn
-end
-
-local function CreateInput(label_text, default_val, order, callback)
-    local yPos = 130 + (order - 1) * 35
-    
-    local Label = Instance.new("TextLabel")
-    Label.Parent = Container
-    Label.BackgroundTransparency = 1
-    Label.Position = UDim2.new(0, 0, 0, yPos)
-    Label.Size = UDim2.new(0.65, 0, 0, 25)
-    Label.Font = Enum.Font.Gotham
-    Label.Text = label_text
-    Label.TextColor3 = Colors.TextDim
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.TextSize = 12
-
-    local Box = Instance.new("TextBox")
-    Box.Parent = Container
-    Box.BackgroundColor3 = Colors.InputBG
-    Box.Position = UDim2.new(0.7, 0, 0, yPos)
-    Box.Size = UDim2.new(0.3, 0, 0, 25)
-    Box.Font = Enum.Font.Gotham
-    Box.Text = tostring(default_val)
-    Box.TextColor3 = Colors.TextWhite
-    Box.TextSize = 12
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 4)
-    Corner.Parent = Box
-    
-    Box.FocusLost:Connect(function()
-        local n = tonumber(Box.Text)
-        if n then callback(n) end
-    end)
-end
-
--- UI Components
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Parent = Container
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 0, 250)
-StatusLabel.Font = Enum.Font.Code
-StatusLabel.Text = "READY TO FISH"
-StatusLabel.TextColor3 = Colors.TextGray
-StatusLabel.TextSize = 12
-
--- 1. START BTN
-local StartBtn = CreateButton("START FISHING", Colors.Green, 1, function()
-    getgenv().fishingStart = not getgenv().fishingStart
-    if getgenv().fishingStart then
-        task.spawn(MainLoop)
-    else
-        pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.1)
-        pcall(function() Remotes.Cancel:InvokeServer() end)
-    end
-end)
+    until (tick() - startTime) > timeout
+    
+    return false -- Timeout
+end
 
--- Loop Monitor UI (Menggunakan pcall untuk mencegah crash)
-task.spawn(function()
-    while MainFrame.Parent do
-        pcall(function()
-            if getgenv().fishingStart then
-                StartBtn.Text = "STOP FISHING"
-                StartBtn.BackgroundColor3 = Colors.Red
-                StatusLabel.Text = "RUNNING..."
-                StatusLabel.TextColor3 = Colors.NeonGreen
-            else
-                StartBtn.Text = "START FISHING"
-                StartBtn.BackgroundColor3 = Colors.Green
-                StatusLabel.Text = "STOPPED"
-                StatusLabel.TextColor3 = Colors.AlertRed
-            end
-        end)
-        task.wait(0.5)
-    end
-end)
+-- =====================================================
+-- 🖥️ 4. UI SETUP
+-- =====================================================
 
--- 2. MODE BTN
-local ModeBtn = CreateButton("MODE: INSTANT", Colors.ButtonGray, 2, function()
-    getgenv().mode = (getgenv().mode == "Instant") and "Blatan" or "Instant"
-end)
+local Tab = Window:MakeTab({
+	Name = "Fishing",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
 
-task.spawn(function()
-    while MainFrame.Parent do
-        pcall(function()
-            ModeBtn.Text = "MODE: " .. string.upper(getgenv().mode)
-        end)
+Tab:AddToggle({
+	Name = "Enable Fishing",
+	Default = false,
+	Callback = function(Value)
+		getgenv().fishingStart = Value
+        if Value then StartFishingSystem() else pcall(function() CancelInput:InvokeServer() end) end
+	end    
+})
+
+Tab:AddSection({ Name = "Modern Detection (Auto Time)" })
+
+Tab:AddToggle({
+	Name = "Use UI Auto-Detect",
+	Default = true,
+	Callback = function(Value) useAutoDetect = Value end    
+})
+
+Tab:AddTextbox({
+	Name = "UI Name (Debug)",
+	Default = "shakeui",
+	TextDisappear = false,
+	Callback = function(Value) targetUIName = Value end	  
+})
+
+Tab:AddLabel("Jika Auto-Detect macet, matikan toggle di atas")
+Tab:AddLabel("dan gunakan Manual Random Delay di bawah.")
+
+Tab:AddSection({ Name = "Manual Random Delay (Fallback)" })
+
+Tab:AddTextbox({
+	Name = "Min Delay (Skin Bagus)",
+	Default = "5.0",
+	TextDisappear = false,
+	Callback = function(Value) minDelay = tonumber(Value) or 5.0 end	  
+})
+
+Tab:AddTextbox({
+	Name = "Max Delay (No Skin)",
+	Default = "8.0",
+	TextDisappear = false,
+	Callback = function(Value) maxDelay = tonumber(Value) or 8.0 end	  
+})
+
+-- =====================================================
+-- ⚙️ 5. LOGIC LOOP
+-- =====================================================
+
+function StartFishingSystem()
+    pcall(function() CancelInput:InvokeServer() end)
+    task.wait(0.5)
+
+    while getgenv().fishingStart do
+        -- 1. Lempar Kail
+        pcall(function() ChargeRod:InvokeServer() end)
+        task.wait(0.1)
+        if not getgenv().fishingStart then break end
+
+        -- 2. Taruh Bobber di air
+        RequestGame:InvokeServer(unpack(defaultArgs))
+        
+        -- 3. TUNGGU IKAN (Smart Wait)
+        -- Bagian ini akan otomatis nunggu sesuai skin kamu (karena nunggu UI game muncul)
+        local detected = WaitForBite()
+        
+        if not getgenv().fishingStart then break end
+
+        -- 4. Tarik Ikan
+        if detected or not useAutoDetect then
+             pcall(function() CompleteGame:FireServer() end)
+        end
+        
+        -- 5. Reset
         task.wait(0.2)
+        pcall(function() CancelInput:InvokeServer() end)
+        task.wait(0.5) -- Jeda antar lemparan
     end
-end)
+end
 
--- 3. UNSTUCK
-CreateButton("UNSTUCK / FIX", Colors.AccentOrange, 3, function()
-    pcall(function() Remotes.Cancel:InvokeServer() end)
-    pcall(function() Remotes.Catch:InvokeServer() end)
-    StatusLabel.Text = "RESET SENT!"
-end)
-
--- Inputs
-CreateInput("Delay Charge (s):", Config.DelayCharge, 1, function(n) Config.DelayCharge = n end)
-CreateInput("Min Reaction (s):", Config.ReactionMin, 2, function(n) Config.ReactionMin = n end)
-CreateInput("Max Reaction (s):", Config.ReactionMax, 3, function(n) Config.ReactionMax = n end)
-
--- Anti AFK
+-- Anti-Afk Standard
 task.spawn(function()
-    pcall(function()
-        LocalPlayer.Idled:Connect(function()
-            Services.VirtualUser:CaptureController()
-            Services.VirtualUser:ClickButton2(Vector2.new())
-        end)
+    local vu = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:connect(function()
+        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+        wait(1)
+        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
     end)
 end)
 
-print("Classica UI V5 (Final Stable) Loaded")
+OrionLib:Init()
