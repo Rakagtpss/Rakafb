@@ -1,30 +1,30 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "Fishing Logic Fix",
-    SubTitle = "Water Check Added",
+    Title = "GOD MODE FISHING",
+    SubTitle = "Super Blatant / Instant",
     TabWidth = 160,
-    Size = UDim2.fromOffset(500, 350), -- Ukuran Compact
+    Size = UDim2.fromOffset(450, 300), -- Ukuran Kecil
     Acrylic = true, 
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 -- ==========================================
--- VARIABLES & CONFIG
+-- CONFIG
 -- ==========================================
 local Options = Fluent.Options
 getgenv().Config = {
     Active = false,
-    DelayCast = 1.0,  -- Waktu kail terbang sampai kena air (WAJIB ADA)
-    DelayReel = 0.05  -- Waktu tarik ikan (Instan)
+    DelayCast = 0.05, -- Default sangat kecil (Hampir instan)
+    DelayReel = 0.0,  -- Instan catch
+    SpamMode = false  -- Fitur baru: Spam Request
 }
 
--- Services
+-- Services & Remotes
 local RS = game:GetService("ReplicatedStorage")
 local Net = RS.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
--- Remotes
 local Remotes = {
     Charge   = Net["RF/ChargeFishingRod"],
     Request  = Net["RF/RequestFishingMinigameStarted"],
@@ -32,75 +32,77 @@ local Remotes = {
     Cancel   = Net["RF/CancelFishingInputs"]
 }
 
--- Args Koordinat (Pastikan ini valid di game, atau gunakan args dinamis jika perlu)
 local args = { -1.115296483039856, 0, 1763651451.636425 }
 
 -- ==========================================
--- LOGIC FUNCTION
+-- LOGIC: INSTANT / GOD MODE
 -- ==========================================
-local function StartFishing()
+local function RunSuperBlatant()
     task.spawn(function()
         while getgenv().Config.Active do
-            -- 1. LEMPAR (Cast)
+            -- 1. LEMPAR (Charge)
             pcall(function() Remotes.Charge:InvokeServer() end)
             
-            -- 2. TUNGGU SAMPAI AIR (Water Check)
-            -- Ini menunggu kail jatuh dari udara ke air agar server mendeteksi "InWater".
-            -- Jika terlalu cepat, "!" tidak akan valid.
-            task.wait(getgenv().Config.DelayCast)
+            -- [BYPASS LOGIKA AIR]
+            -- Kita hanya menunggu 1 frame (task.wait()) atau sesuai input user (0.0)
+            -- Ini mencoba memanipulasi server agar menerima request minigame SEGERA.
+            if getgenv().Config.DelayCast > 0 then
+                task.wait(getgenv().Config.DelayCast)
+            else
+                task.wait() -- Tunggu 1 frame minimal agar tidak crash
+            end
             
             if not getgenv().Config.Active then break end
 
-            -- 3. BYPASS "!" (Force Start Minigame)
-            -- Begitu sampai air, langsung request game tanpa nunggu ikan datang.
+            -- 2. PAKSA MINIGAME (Request)
+            -- Mencoba melewati pengecekan "InWater" dengan kecepatan tinggi
             pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
 
-            -- 4. FAST REEL (Durasi Minigame)
-            task.wait(getgenv().Config.DelayReel)
+            -- 3. INSTANT CATCH (Reel)
+            if getgenv().Config.DelayReel > 0 then
+                task.wait(getgenv().Config.DelayReel)
+            end
             
-            if not getgenv().Config.Active then break end
-
-            -- 5. CATCH (Selesai)
+            -- 4. SELESAI
             pcall(function() Remotes.Catch:InvokeServer() end)
             
-            -- Jeda Sedikit sebelum lempar lagi
-            task.wait(0.15)
+            -- Reset instan untuk loop selanjutnya
+            pcall(function() Remotes.Cancel:InvokeServer() end)
+            
+            -- Speed Limiter (Agar tidak disconnect)
+            task.wait(0.05) 
         end
-        
-        -- Reset input saat stop
-        pcall(function() Remotes.Cancel:InvokeServer() end)
     end)
 end
 
 -- ==========================================
--- UI ELEMENTS
+-- UI SETTINGS
 -- ==========================================
 local Tabs = {
-    Main = Window:AddTab({ Title = "Fishing", Icon = "waves" }),
+    Main = Window:AddTab({ Title = "God Mode", Icon = "flash" }),
 }
 
-local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Enable Auto Fish", Default = false })
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "AKTIFKAN GOD MODE", Default = false })
 
 Toggle:OnChanged(function()
     getgenv().Config.Active = Options.MyToggle.Value
     if getgenv().Config.Active then
-        StartFishing()
-        Fluent:Notify({Title = "Started", Content = "Fishing Loop Running", Duration = 2})
+        RunSuperBlatant()
     else
-        Fluent:Notify({Title = "Stopped", Content = "Fishing Loop Stopped", Duration = 2})
+        pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end)
 
 Tabs.Main:AddParagraph({
-    Title = "PENTING: Delay Sampai Air",
-    Content = "Atur 'Delay ke Air' agar kail sempat menyentuh permukaan air. \nJika terlalu cepat, script akan gagal karena kail masih di udara."
+    Title = "Instruksi Blatant",
+    Content = "Set 'Delay ke Air' jadi 0 atau 0.05 untuk efek instan.\nJika kail nyangkut di udara, naikkan sedikit ke 0.2."
 })
 
--- Input 1: Waktu Terbang (Penting untuk validasi "!")
+-- Input Delay Cast (Bisa diset ke 0)
 local InputCast = Tabs.Main:AddInput("InputCast", {
-    Title = "Delay ke Air (Detik)",
-    Default = "1.0",
-    Placeholder = "Masukan angka (cth: 0.8)",
+    Title = "Delay ke Air (Bypass Air)",
+    Default = "0.05",
+    Placeholder = "0 untuk Instan",
     Numeric = true,
     Finished = true,
     Callback = function(Value)
@@ -109,11 +111,11 @@ local InputCast = Tabs.Main:AddInput("InputCast", {
     end
 })
 
--- Input 2: Waktu Tarik (Reel)
+-- Input Delay Reel (Bisa diset ke 0)
 local InputReel = Tabs.Main:AddInput("InputReel", {
-    Title = "Delay Reel (Detik)",
-    Default = "0.05",
-    Placeholder = "Masukan angka (cth: 0.05)",
+    Title = "Delay Reel (Instan Catch)",
+    Default = "0.0",
+    Placeholder = "0 untuk Instan",
     Numeric = true,
     Finished = true,
     Callback = function(Value)
