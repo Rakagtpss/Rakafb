@@ -1,39 +1,17 @@
--- =====================================================
--- 1. SETUP LIBRARY (FLUENT)
--- =====================================================
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-
 local Window = Fluent:CreateWindow({
-    Title = "Fishing GOD MODE",
-    SubTitle = "Instant Bite & Catch",
+    Title = "Fishing FIX - Debugger",
+    SubTitle = "Jika tidak mancing, coba ini",
     TabWidth = 140,
-    Size = UDim2.fromOffset(500, 320),
-    Acrylic = true, 
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
+    Size = UDim2.fromOffset(500, 350),
+    Theme = "Dark"
 })
 
-local Tabs = {
-    Main = Window:AddTab({ Title = "Auto Fish", Icon = "fish" }),
-    Settings = Window:AddTab({ Title = "Config", Icon = "settings" })
-}
-
+local Tabs = { Main = Window:AddTab({ Title = "Fix Fishing", Icon = "tool" }) }
 local Options = Fluent.Options
+local net = game:GetService("ReplicatedStorage").Packages["_Index"]["sleitnick_net@0.2.0"].net
 
--- =====================================================
--- 2. VARIABLES & REMOTES
--- =====================================================
-getgenv().fishingStart = false
-getgenv().mode = "Legit" 
-
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local rs = game:GetService("ReplicatedStorage")
-local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
-
--- Definisi Remote
+-- Remote
 local Remotes = {
     Charge = net["RF/ChargeFishingRod"],
     Request = net["RF/RequestFishingMinigameStarted"],
@@ -41,182 +19,91 @@ local Remotes = {
     Cancel = net["RF/CancelFishingInputs"]
 }
 
--- Config Default
-local Config = {
-    Bait = 1.15, -- Waktu lempar (Legit)
-    Reel = 0.56, -- Waktu tunggu (Legit)
-    Reset = 0.25 
-}
+getgenv().fishingStart = false
+local LocalPlayer = game:GetService("Players").LocalPlayer
 
--- =====================================================
--- 3. BYPASS & ANTI-LAG (OPTIMIZED)
--- =====================================================
-local BypassConfig = { Enabled = false }
-local BlacklistRemotes = {
-    [Remotes.Cancel] = true,
-    [Remotes.Charge] = true,
-    [Remotes.Request] = true, 
-    [Remotes.Catch] = true
-}
-
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
+-- LOGIKA BARU: Cek & Lempar
+local function AttemptCast()
+    -- Cara 1: Kirim Power 1.0
+    Remotes.Charge:InvokeServer(1.0)
     
-    if BypassConfig.Enabled and not checkcaller() and BlacklistRemotes[self] then
-        if method == "FireServer" then return nil end
-        if method == "InvokeServer" then return task.wait(9e9) end
-    end
-
-    return oldNamecall(self, ...)
-end)
-
--- =====================================================
--- 4. UTILITY & ARGS
--- =====================================================
-local function HasRod()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if tool and (tool.Name:find("Rod") or tool:FindFirstChild("Bobber") or tool:FindFirstChild("Cast")) then
-        return true
-    end
-    return false
+    -- Cara 2: Kirim tanpa argumen (Fallback)
+    task.delay(0.1, function()
+        Remotes.Charge:InvokeServer()
+    end)
 end
 
-local function GetArgs()
-    -- Menggunakan koordinat statis untuk respon server tercepat
-    return { -1.115, 0, tick() }
-end
-
--- =====================================================
--- 5. LOGIKA "INSTANT BITE" (Bypass Waiting)
--- =====================================================
-local StatusLabel
-
-local function UpdateStatus(text)
-    if StatusLabel then StatusLabel:SetTitle("Status: " .. text) end
-end
-
-local function AutoFishingLoop()
+local function StartLoop()
     while getgenv().fishingStart do
         pcall(function()
             if not LocalPlayer.Character then return end
-            if not HasRod() then
-                UpdateStatus("Equip Rod First!")
-                task.wait(1)
+            
+            local Tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+            if not Tool then
+                Fluent:Notify({Title = "Error", Content = "PEGANG PANCINGAN DULU!", Duration = 2})
+                task.wait(2)
                 return
             end
 
-            -- [STEP 1] FAST CHARGE
-            -- Kita lempar Full Power (1.0)
-            Remotes.Charge:InvokeServer(1.0) 
+            -- 1. LEMPAR (Dual Method)
+            AttemptCast()
             
-            -- BYPASS DELAY LEMPAR
-            if getgenv().mode == "Instant" then
-                -- Kita hanya menunggu 1 frame agar server mendaftarkan bobber
-                -- JANGAN 0 detik, server butuh waktu 0.05s untuk spawn bobber
-                task.wait(0.05) 
-            else
-                task.wait(Config.Bait)
-            end
+            -- Tunggu bobber muncul (Wajib ada delay minimal)
+            task.wait(Options.DelayBait.Value) 
             
             if not getgenv().fishingStart then return end
 
-            -- [STEP 2] INSTANT BITE (FORCE REQUEST)
-            UpdateStatus("Bypassing Wait...")
+            -- 2. TARIK (Bypass "!")
+            -- Koordinat statis paling stabil
+            Remotes.Request:InvokeServer(-1.115, 0, tick()) 
             
-            -- Ini adalah kunci mempercepat tanda "!"
-            -- Kita langsung minta minigame tanpa menunggu animasi bobber turun
-            Remotes.Request:InvokeServer(unpack(GetArgs()))
-            
-            -- [STEP 3] INSTANT CATCH
-            -- Langsung kirim sinyal selesai tanpa main minigame
+            -- 3. TANGKAP
+            -- Delay Reel
+            task.wait(Options.DelayReel.Value)
             Remotes.Catch:InvokeServer()
-            UpdateStatus("CAUGHT! ("..getgenv().mode..")")
             
-            -- [STEP 4] FAST RESET
-            if getgenv().mode == "Instant" then
-                -- Reset input seketika
-                Remotes.Cancel:InvokeServer()
-                task.wait() -- Tunggu sekejap untuk hindari crash
-            else
-                task.wait(Config.Reset)
-                Remotes.Cancel:InvokeServer()
-            end
+            -- 4. RESET
+            task.wait(Options.DelayReset.Value)
+            Remotes.Cancel:InvokeServer()
         end)
-        
-        -- Speed Control Loop
-        if getgenv().mode == "Instant" then
-            task.wait() -- No Delay Loop
-        else
-            task.wait(0.1)
-        end
+        task.wait(0.1)
     end
-    UpdateStatus("Stopped")
 end
 
--- =====================================================
--- 6. UI CONSTRUCTION
--- =====================================================
-
-StatusLabel = Tabs.Main:AddParagraph({
-    Title = "Status: Idle",
-    Content = "Pilih Mode 'Instant' untuk Bypass Tanda '!'"
-})
-
--- Mode Selector
-local DropdownMode = Tabs.Main:AddDropdown("ModeSelect", {
-    Title = "Fishing Mode",
-    Values = {"Legit", "Instant"},
-    Multi = false,
-    Default = 1,
-})
-
-DropdownMode:OnChanged(function(Value)
-    getgenv().mode = Value
-    if Value == "Instant" then
-        Fluent:Notify({Title = "GOD MODE", Content = "Warning: Sangat Cepat (Risk High)", Duration = 3})
-    end
+-- UI
+Tabs.Main:AddToggle("ToggleFish", {Title = "Activate Fix Loop", Default = false }):OnChanged(function(v)
+    getgenv().fishingStart = v
+    if v then task.spawn(StartLoop) else pcall(function() Remotes.Cancel:InvokeServer() end) end
 end)
 
--- Toggle
-local ToggleFish = Tabs.Main:AddToggle("FishingToggle", {Title = "Enable Auto Fishing", Default = false })
+Tabs.Main:AddSection("Pengaturan Delay (Aman)")
 
-ToggleFish:OnChanged(function()
-    getgenv().fishingStart = Options.FishingToggle.Value
-    BypassConfig.Enabled = Options.FishingToggle.Value
-    
-    if getgenv().fishingStart then
-        pcall(function() Remotes.Cancel:InvokeServer() end)
-        task.spawn(AutoFishingLoop)
-    else
-        pcall(function() Remotes.Cancel:InvokeServer() end)
-    end
-end)
-
-Tabs.Settings:AddSection("Settings (Legit Mode Only)")
-
-Tabs.Settings:AddInput("InputBait", {
-    Title = "Delay Bait",
-    Default = "1.15",
+Tabs.Main:AddInput("DelayBait", {
+    Title = "Delay Charge (Lempar)",
+    Description = "Kalau tidak melempar, NAIKKAN angka ini",
+    Default = "1.2", -- Default aman
     Numeric = true,
-    Finished = false,
-    Callback = function(v) Config.Bait = tonumber(v) or 1.15 end
+    Callback = function(v) end
 })
 
-Tabs.Settings:AddButton({
-    Title = "Unstuck Character",
+Tabs.Main:AddInput("DelayReel", {
+    Title = "Delay Reel (Tarik)",
+    Default = "0.1", -- Semi-Instant
+    Numeric = true,
+    Callback = function(v) end
+})
+
+Tabs.Main:AddInput("DelayReset", {
+    Title = "Delay Reset",
+    Default = "0.5",
+    Numeric = true,
+    Callback = function(v) end
+})
+
+Tabs.Main:AddButton({
+    Title = "Tes Manual: Lempar Sekali",
     Callback = function()
-        pcall(function() Remotes.Cancel:InvokeServer() end)
+        AttemptCast()
+        Fluent:Notify({Title = "Test", Content = "Mencoba melempar...", Duration = 1})
     end
 })
-
--- =====================================================
--- 7. FINALIZE
--- =====================================================
-SaveManager:SetLibrary(Fluent)
-InterfaceManager:SetLibrary(Fluent)
-SaveManager:IgnoreThemeSettings()
-InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-Window:SelectTab(1)
