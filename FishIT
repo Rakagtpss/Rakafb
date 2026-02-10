@@ -1,10 +1,10 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "Fishing Fast (Fixed)",
-    SubTitle = "by Gemini",
+    Title = "Fishing Logic Fix",
+    SubTitle = "Water Check Added",
     TabWidth = 160,
-    Size = UDim2.fromOffset(480, 320), -- Ukuran Compact
+    Size = UDim2.fromOffset(500, 350), -- Ukuran Compact
     Acrylic = true, 
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
@@ -16,102 +16,104 @@ local Window = Fluent:CreateWindow({
 local Options = Fluent.Options
 getgenv().Config = {
     Active = false,
-    DelayBait = 0.15, -- Waktu tunggu sebelum bypass "!"
-    DelayReel = 0.05  -- Waktu tunggu sebelum catch
+    DelayCast = 1.0,  -- Waktu kail terbang sampai kena air (WAJIB ADA)
+    DelayReel = 0.05  -- Waktu tarik ikan (Instan)
 }
 
 -- Services
 local RS = game:GetService("ReplicatedStorage")
 local Net = RS.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
--- Remotes (Updated)
+-- Remotes
 local Remotes = {
     Charge   = Net["RF/ChargeFishingRod"],
     Request  = Net["RF/RequestFishingMinigameStarted"],
-    Catch    = Net["RF/CatchFishCompleted"], -- InvokeServer
+    Catch    = Net["RF/CatchFishCompleted"], 
     Cancel   = Net["RF/CancelFishingInputs"]
 }
 
+-- Args Koordinat (Pastikan ini valid di game, atau gunakan args dinamis jika perlu)
 local args = { -1.115296483039856, 0, 1763651451.636425 }
 
 -- ==========================================
--- LOGIC
+-- LOGIC FUNCTION
 -- ==========================================
 local function StartFishing()
     task.spawn(function()
         while getgenv().Config.Active do
-            -- 1. Charge Rod
+            -- 1. LEMPAR (Cast)
             pcall(function() Remotes.Charge:InvokeServer() end)
             
-            -- 2. BYPASS "!" (Delay Bait)
-            -- Menunggu sebentar sesuai input, lalu paksa mulai minigame
-            task.wait(getgenv().Config.DelayBait)
+            -- 2. TUNGGU SAMPAI AIR (Water Check)
+            -- Ini menunggu kail jatuh dari udara ke air agar server mendeteksi "InWater".
+            -- Jika terlalu cepat, "!" tidak akan valid.
+            task.wait(getgenv().Config.DelayCast)
+            
             if not getgenv().Config.Active then break end
 
-            -- 3. Force Start Minigame
+            -- 3. BYPASS "!" (Force Start Minigame)
+            -- Begitu sampai air, langsung request game tanpa nunggu ikan datang.
             pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
 
-            -- 4. Fast Reel (Delay Reel)
+            -- 4. FAST REEL (Durasi Minigame)
             task.wait(getgenv().Config.DelayReel)
+            
             if not getgenv().Config.Active then break end
 
-            -- 5. Finish (Catch)
+            -- 5. CATCH (Selesai)
             pcall(function() Remotes.Catch:InvokeServer() end)
             
-            -- Cooldown script
-            task.wait(0.1)
+            -- Jeda Sedikit sebelum lempar lagi
+            task.wait(0.15)
         end
         
-        -- Reset saat loop berhenti
+        -- Reset input saat stop
         pcall(function() Remotes.Cancel:InvokeServer() end)
     end)
 end
 
 -- ==========================================
--- UI TABS
+-- UI ELEMENTS
 -- ==========================================
 local Tabs = {
-    Main = Window:AddTab({ Title = "Main", Icon = "fish" }),
+    Main = Window:AddTab({ Title = "Fishing", Icon = "waves" }),
 }
 
--- Toggle
-local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Fishing", Default = false })
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Enable Auto Fish", Default = false })
 
 Toggle:OnChanged(function()
     getgenv().Config.Active = Options.MyToggle.Value
     if getgenv().Config.Active then
         StartFishing()
-        Fluent:Notify({
-            Title = "Started",
-            Content = "Bypass '!' Active",
-            Duration = 2
-        })
+        Fluent:Notify({Title = "Started", Content = "Fishing Loop Running", Duration = 2})
     else
-        Fluent:Notify({
-            Title = "Stopped",
-            Content = "Fishing stopped",
-            Duration = 2
-        })
+        Fluent:Notify({Title = "Stopped", Content = "Fishing Loop Stopped", Duration = 2})
     end
 end)
 
--- Inputs (Manual Typing)
-local InputBait = Tabs.Main:AddInput("InputBait", {
-    Title = "Delay Bait (Bypass !)",
-    Default = "0.15",
-    Placeholder = "Enter seconds...",
-    Numeric = true, -- Hanya angka
-    Finished = true, -- Update saat enter ditekan
+Tabs.Main:AddParagraph({
+    Title = "PENTING: Delay Sampai Air",
+    Content = "Atur 'Delay ke Air' agar kail sempat menyentuh permukaan air. \nJika terlalu cepat, script akan gagal karena kail masih di udara."
+})
+
+-- Input 1: Waktu Terbang (Penting untuk validasi "!")
+local InputCast = Tabs.Main:AddInput("InputCast", {
+    Title = "Delay ke Air (Detik)",
+    Default = "1.0",
+    Placeholder = "Masukan angka (cth: 0.8)",
+    Numeric = true,
+    Finished = true,
     Callback = function(Value)
         local num = tonumber(Value)
-        if num then getgenv().Config.DelayBait = num end
+        if num then getgenv().Config.DelayCast = num end
     end
 })
 
+-- Input 2: Waktu Tarik (Reel)
 local InputReel = Tabs.Main:AddInput("InputReel", {
-    Title = "Delay Reel (Fast Catch)",
+    Title = "Delay Reel (Detik)",
     Default = "0.05",
-    Placeholder = "Enter seconds...",
+    Placeholder = "Masukan angka (cth: 0.05)",
     Numeric = true,
     Finished = true,
     Callback = function(Value)
