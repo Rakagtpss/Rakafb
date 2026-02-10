@@ -1,130 +1,131 @@
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
-local Window = OrionLib:MakeWindow({Name = "Fishing Fix - Auto Position", HidePremium = false, SaveConfig = false, ConfigFolder = "FishFix"})
 
--- =====================================================
--- VARIABLES
--- =====================================================
+local Window = OrionLib:MakeWindow({
+    Name = "Fishing Super Fast (Input Mode)", 
+    HidePremium = true, 
+    SaveConfig = true, 
+    ConfigFolder = "FishingConfig"
+})
+
+-- Variables
 getgenv().fishingStart = false
-getgenv().CastDelay = 0.5
-getgenv().ReelDelay = 0.1
-getgenv().ResetDelay = 0.25
+getgenv().baitDelay = 0.15 -- Default delay lempar ke minigame (Bypass !)
+getgenv().reelDelay = 0.05 -- Default delay catch (Fast Reel)
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+-- Services & Remotes
 local rs = game:GetService("ReplicatedStorage")
-local net = rs:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
--- Remote Definitions (Pastikan nama ini BENAR sesuai game)
-local ChargeRod    = net:WaitForChild("RF/ChargeFishingRod")
-local RequestGame  = net:WaitForChild("RF/RequestFishingMinigameStarted")
-local CompleteGame = net:WaitForChild("RF/CatchFishCompleted") 
-local CancelInput  = net:WaitForChild("RF/CancelFishingInputs")
+-- DEFINISI REMOTE BARU
+local ChargeRod    = net["RF/ChargeFishingRod"]
+local RequestGame  = net["RF/RequestFishingMinigameStarted"]
+local CompleteGame = net["RF/CatchFishCompleted"] -- UPDATED: Menggunakan RF sesuai request
+local CancelInput  = net["RF/CancelFishingInputs"]
 
--- =====================================================
--- FUNGSI UTAMA
--- =====================================================
+-- Args Koordinat Default
+local args = { -1.115296483039856, 0, 1763651451.636425 }
 
-local function getPositionArgs()
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local pos = LocalPlayer.Character.HumanoidRootPart.Position
-        return { pos.X, pos.Y, pos.Z } -- Mengirim posisi kamu saat ini
-    else
-        return { 0, 0, 0 }
-    end
-end
-
-local function startFishing()
+-- Functions
+local function StartFishing()
     task.spawn(function()
         while getgenv().fishingStart do
-            -- Cek apakah pegang pancingan
-            if not LocalPlayer.Character:FindFirstChildWhichIsA("Tool") then
-                OrionLib:MakeNotification({Name = "Error", Content = "PEGANG PANCINGAN DULU!", Time = 3})
-                getgenv().fishingStart = false
-                break
-            end
-
-            -- 1. LEMPAR (Charge)
-            local success, err = pcall(function() 
-                ChargeRod:InvokeServer() 
-            end)
-            if not success then warn("[Charge Error]:", err) end
+            -- 1. Lempar Joran
+            pcall(function() ChargeRod:InvokeServer() end)
             
-            task.wait(tonumber(getgenv().CastDelay) or 0.5)
+            -- 2. Logic Bypass "!" (Delay Bait)
+            -- Kita menunggu waktu yang ditentukan di Input Box, lalu memaksa minigame mulai
+            task.wait(getgenv().baitDelay)
+            
             if not getgenv().fishingStart then break end
 
-            -- 2. TRIGGER MINIGAME
-            -- Kita pakai posisi dinamis sekarang
-            local myArgs = getPositionArgs()
-            local s2, e2 = pcall(function() 
-                RequestGame:InvokeServer(unpack(myArgs)) 
-            end)
-            if not s2 then warn("[Request Error]:", e2) end
+            -- 3. Force Start Minigame (Melewati animasi tanda seru)
+            pcall(function() RequestGame:InvokeServer(unpack(args)) end)
 
-            task.wait(tonumber(getgenv().ReelDelay) or 0.1)
+            -- 4. Logic Fast Reel (Delay Reel)
+            -- Menunggu waktu sesingkat mungkin sebelum claim ikan
+            task.wait(getgenv().reelDelay)
+            
             if not getgenv().fishingStart then break end
 
-            -- 3. CATCH FISH
-            local s3, e3 = pcall(function() 
-                -- Coba InvokeServer dulu (jika RemoteFunction)
-                CompleteGame:InvokeServer() 
-            end)
-            -- Jika gagal Invoke, coba FireServer (Siapa tau itu RemoteEvent)
-            if not s3 then 
-                pcall(function() CompleteGame:FireServer() end)
-                warn("[Catch Error - Trying FireServer]:", e3) 
-            end
-
-            task.wait(tonumber(getgenv().ResetDelay) or 0.2)
+            -- 5. Selesai (Catch) - Menggunakan InvokeServer untuk RF
+            pcall(function() CompleteGame:InvokeServer() end)
             
-            -- Reset
-            pcall(function() CancelInput:InvokeServer() end)
+            -- Sedikit jeda agar tidak crash/disconnect
             task.wait(0.05)
         end
     end)
 end
 
--- =====================================================
--- UI
--- =====================================================
-
+-- UI TABS
 local MainTab = Window:MakeTab({
-	Name = "Control",
-	Icon = "rbxassetid://4483345998",
-	PremiumOnly = false
+    Name = "Main Fishing",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- SECTION: TOGGLE
+MainTab:AddSection({
+    Name = "Auto Fish Controls"
 })
 
 MainTab:AddToggle({
-	Name = "Aktifkan Fishing (Pegang Pancingan!)",
-	Default = false,
-	Callback = function(Value)
-		getgenv().fishingStart = Value
+    Name = "Aktifkan Auto Fish",
+    Default = false,
+    Callback = function(Value)
+        getgenv().fishingStart = Value
         if Value then
-            startFishing()
-            OrionLib:MakeNotification({Name = "Fishing", Content = "Script Berjalan...", Time = 2})
+            StartFishing()
+            OrionLib:MakeNotification({
+                Name = "Started",
+                Content = "Fishing dimulai! (Bypass '!' Aktif)",
+                Image = "rbxassetid://4483345998",
+                Time = 3
+            })
         else
+            -- Reset jika dimatikan
             pcall(function() CancelInput:InvokeServer() end)
+            OrionLib:MakeNotification({
+                Name = "Stopped",
+                Content = "Fishing berhenti.",
+                Image = "rbxassetid://4483345998",
+                Time = 3
+            })
         end
-	end    
+    end
 })
 
-MainTab:AddLabel("Tekan F9 jika tidak jalan untuk lihat Error")
-
-MainTab:AddInput({
-	Name = "Delay Muncul (!) / Cast",
-	Default = "0.5",
-	Callback = function(Value) getgenv().CastDelay = tonumber(Value) end    
+-- SECTION: INPUTS (NO SLIDERS)
+MainTab:AddSection({
+    Name = "Pengaturan Waktu (Ketik Angka)"
 })
 
-MainTab:AddInput({
-	Name = "Delay Tarik / Reel",
-	Default = "0.1",
-	Callback = function(Value) getgenv().ReelDelay = tonumber(Value) end    
+MainTab:AddTextbox({
+    Name = "Delay Bait (Bypass '!')",
+    Default = "0.15",
+    TextDisappear = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then
+            getgenv().baitDelay = num
+        end
+    end
 })
 
-MainTab:AddInput({
-	Name = "Delay Reset",
-	Default = "0.25",
-	Callback = function(Value) getgenv().ResetDelay = tonumber(Value) end    
+MainTab:AddParagraph("Info Delay Bait", "Semakin kecil angka (cth: 0.1), semakin cepat minigame dimulai tanpa menunggu tanda seru muncul.")
+
+MainTab:AddTextbox({
+    Name = "Delay Reel (Fast Catch)",
+    Default = "0.05",
+    TextDisappear = false,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then
+            getgenv().reelDelay = num
+        end
+    end
 })
 
+MainTab:AddParagraph("Info Delay Reel", "Isi 0 untuk instan catch. Jika disconnect, naikkan jadi 0.1 atau 0.2.")
+
+-- INIT
 OrionLib:Init()
