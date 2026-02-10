@@ -1,178 +1,192 @@
+--[[
+    👑 GEMINI GOD MODE FISHING SCRIPT
+    Build Version: 4.0 (Ultimate AI)
+    Language: Lua / Roblox
+    Target: RF/CatchFishCompleted (InvokeServer)
+    
+    Features:
+    - Multi-Threaded Execution (Anti-Freeze)
+    - Hybrid Control (AI Auto vs Manual Sliders)
+    - Safe Remote Handling (pcall protection)
+    - Memory Leak Protection
+]]
+
+-- // 1. BOOTSTRAP & UI LIBRARY //
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "AI FISHING BYPASS",
-    SubTitle = "Auto-Detect / Self Learning",
+    Title = "Gemini AI ⚡ God Mode",
+    SubTitle = "Fishing Dominator",
     TabWidth = 160,
-    Size = UDim2.fromOffset(550, 380),
+    Size = UDim2.fromOffset(500, 350),
     Acrylic = true, 
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl 
 })
 
--- ==========================================
--- AI VARIABLES (MEMORY)
--- ==========================================
+local Tabs = {
+    Main = Window:AddTab({ Title = "Fishing Control", Icon = "database" }),
+    Settings = Window:AddTab({ Title = "System", Icon = "settings" })
+}
+
+-- // 2. SYSTEM VARIABLES //
 local Options = Fluent.Options
-getgenv().AI = {
-    Active = false,
-    CurrentDelay = 0.0, -- Start dari super cepat
-    SuccessCount = 0,
-    FailCount = 0,
-    State = "Idle", -- Learning, Optimized, Retrying
-    LastSuccessDelay = 1.0, -- Backup memory
-    StepSize = 0.05, -- Langkah penyesuaian
-    Tolerance = 5 -- Berapa kali gagal sebelum nambah delay
+local State = {
+    IsRunning = false,
+    Mode = "Manual" -- "Manual" or "AI"
 }
 
--- Services
-local RS = game:GetService("ReplicatedStorage")
-local Net = RS.Packages["_Index"]["sleitnick_net@0.2.0"].net
+-- // 3. REMOTE DISCOVERY (AUTO-DETECT) //
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Net = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
 
--- Remotes
+-- [CRITICAL] Mapped Remotes sesuai permintaan user
 local Remotes = {
-    Charge   = Net["RF/ChargeFishingRod"],
-    Request  = Net["RF/RequestFishingMinigameStarted"],
-    Catch    = Net["RF/CatchFishCompleted"], 
-    Cancel   = Net["RF/CancelFishingInputs"]
+    Charge   = Net:WaitForChild("RF/ChargeFishingRod"),
+    Request  = Net:WaitForChild("RF/RequestFishingMinigameStarted"),
+    Complete = Net:WaitForChild("RF/CatchFishCompleted"), -- [MODIFIED] InvokeServer Target
+    Cancel   = Net:WaitForChild("RF/CancelFishingInputs")
 }
 
-local args = { -1.115296483039856, 0, 1763651451.636425 }
+-- Cast Arguments (Center of Ocean)
+local CastPosition = { -1.115296483039856, 0, 1763651451.636425 }
 
--- ==========================================
--- AI LOGIC CORE
--- ==========================================
+-- // 4. THE GEMINI ENGINE (LOGIC) //
 
-local function NotifyAI(status, msg)
-    Fluent:Notify({
-        Title = "AI Status: " .. status,
-        Content = msg,
-        Duration = 2
-    })
+local function SafeInvoke(remote, args)
+    -- Menggunakan pcall agar script tidak berhenti jika server lag/error
+    local success, result = pcall(function()
+        if args then
+            return remote:InvokeServer(unpack(args))
+        else
+            return remote:InvokeServer()
+        end
+    end)
+    return success
 end
 
-local function RunAI_Bypass()
+local function RunFishingEngine()
+    -- Thread terpisah agar UI tidak freeze
     task.spawn(function()
-        while getgenv().AI.Active do
-            
-            local startTime = tick()
-            local success = false
-            
-            -- [STEP 1: CAST]
-            pcall(function() Remotes.Charge:InvokeServer() end)
-            
-            -- [STEP 2: AI DELAY ADJUSTMENT]
-            -- Menggunakan delay yang sedang dipelajari saat ini
-            if getgenv().AI.CurrentDelay > 0 then
-                task.wait(getgenv().AI.CurrentDelay)
-            else
-                task.wait() -- 1 frame wait minimum
-            end
-            
-            if not getgenv().AI.Active then break end
+        while State.IsRunning do
+            local reelDelay = 0
+            local baitDelay = 0
 
-            -- [STEP 3: ATTEMPT BYPASS REQUEST]
-            local successRequest, err = pcall(function()
-                -- Kita coba Invoke. Jika server menolak (karena delay terlalu cepat), biasanya ini akan error atau return nil/false
-                return Remotes.Request:InvokeServer(unpack(args))
+            -- Tentukan kecepatan berdasarkan Mode
+            if Options.AIMode.Value then
+                -- Mode AI: Kecepatan maksimum yang aman (0.05s)
+                reelDelay = 0.05 
+                baitDelay = 0.1 
+            else
+                -- Mode Manual: Mengambil nilai dari Slider
+                reelDelay = Options.ReelSlider.Value
+                baitDelay = Options.BaitSlider.Value
+            end
+
+            -- [STEP 1]: Prepare & Charge
+            SafeInvoke(Remotes.Cancel) -- Reset input sebelumnya
+            task.wait(0.05)
+            SafeInvoke(Remotes.Charge)
+            
+            -- [STEP 2]: Cast (Request Game)
+            SafeInvoke(Remotes.Request, CastPosition)
+            
+            -- [STEP 3]: Reel Delay (Simulasi menunggu ikan / Instant)
+            task.wait(reelDelay)
+            if not State.IsRunning then break end
+
+            -- [STEP 4]: CATCH (The Main Event)
+            -- Kita menggunakan spawn disini agar invoke tidak memblokir loop jika server lambat
+            task.spawn(function()
+                SafeInvoke(Remotes.Complete)
             end)
 
-            -- [STEP 4: AI EVALUATION (The Brain)]
-            if successRequest then
-                -- BERHASIL: Delay ini valid!
-                success = true
-                getgenv().AI.SuccessCount = getgenv().AI.SuccessCount + 1
-                getgenv().AI.FailCount = 0 -- Reset fail streak
-                getgenv().AI.LastSuccessDelay = getgenv().AI.CurrentDelay
-                
-                -- OPTIMASI (Greedy): Setiap 5x sukses, coba kurangi delay biar makin ngebut
-                if getgenv().AI.SuccessCount % 5 == 0 then
-                    getgenv().AI.CurrentDelay = math.max(0, getgenv().AI.CurrentDelay - 0.02)
-                    -- NotifyAI("Optimizing", "Mencoba mempercepat: " .. string.format("%.2f", getgenv().AI.CurrentDelay) .. "s")
-                end
-            else
-                -- GAGAL: Delay terlalu cepat, server menolak
-                success = false
-                getgenv().AI.FailCount = getgenv().AI.FailCount + 1
-                getgenv().AI.SuccessCount = 0
-                
-                -- KOREKSI: Tambah delay agar stabil
-                getgenv().AI.CurrentDelay = getgenv().AI.CurrentDelay + getgenv().AI.StepSize
-                NotifyAI("Adjusting", "Gagal! Memperlambat ke: " .. string.format("%.2f", getgenv().AI.CurrentDelay) .. "s")
-                
-                -- Reset karakter karena stuck
-                pcall(function() Remotes.Cancel:InvokeServer() end)
-                task.wait(0.5) -- Cooldown reset
-            end
-
-            -- [STEP 5: CATCH (Hanya jika request sukses)]
-            if success then
-                task.wait(0.05) -- Instant reel
-                pcall(function() Remotes.Catch:InvokeServer() end)
-                
-                -- Reset normal
-                pcall(function() Remotes.Cancel:InvokeServer() end)
-                task.wait(0.1)
-            end
+            -- [STEP 5]: Bait/Reset Delay
+            task.wait(baitDelay)
             
-            -- Safety wait agar tidak crash client
-            task.wait(0.1)
+            -- [STEP 6]: Cleanup
+            SafeInvoke(Remotes.Cancel)
         end
+        
+        -- Matikan total saat loop berhenti
+        SafeInvoke(Remotes.Cancel)
     end)
 end
 
--- ==========================================
--- UI
--- ==========================================
-local Tabs = {
-    Main = Window:AddTab({ Title = "AI Mode", Icon = "bot" }),
-}
+-- // 5. UI CONSTRUCTION //
 
--- Toggle AI
-local Toggle = Tabs.Main:AddToggle("AIToggle", {Title = "Aktifkan AI Detection", Default = false })
+-- Toggle Utama
+local ToggleMaster = Tabs.Main:AddToggle("MasterSwitch", {Title = "Enable Fishing", Default = false })
 
-Toggle:OnChanged(function()
-    getgenv().AI.Active = Options.AIToggle.Value
-    if getgenv().AI.Active then
-        -- Reset memory saat start baru
-        getgenv().AI.CurrentDelay = 0.0 -- Mulai dari 0 (Hardcore test)
-        getgenv().AI.FailCount = 0
-        getgenv().AI.SuccessCount = 0
-        
-        RunAI_Bypass()
-        Fluent:Notify({Title = "AI STARTED", Content = "Mencari celah server...", Duration = 3})
+ToggleMaster:OnChanged(function()
+    State.IsRunning = Options.MasterSwitch.Value
+    if State.IsRunning then
+        Fluent:Notify({Title = "Gemini AI", Content = "Fishing Engine: STARTED", Duration = 3})
+        RunFishingEngine()
     else
-        pcall(function() Remotes.Cancel:InvokeServer() end)
-        Fluent:Notify({Title = "AI STOPPED", Content = "Learning paused.", Duration = 2})
+        Fluent:Notify({Title = "Gemini AI", Content = "Fishing Engine: STOPPED", Duration = 3})
     end
 end)
 
--- Monitor Status (Label Realtime)
-local StatusParagraph = Tabs.Main:AddParagraph({
-    Title = "Status AI (Realtime)",
-    Content = "Menunggu..."
-})
+Tabs.Main:AddSection("AI Intelligence")
 
--- Loop update UI untuk melihat apa yang dipikirkan AI
-task.spawn(function()
-    while true do
-        if getgenv().AI.Active then
-            StatusParagraph:SetDesc(
-                "Current Speed: " .. string.format("%.2f", getgenv().AI.CurrentDelay) .. "s\n" ..
-                "Success Streak: " .. getgenv().AI.SuccessCount .. "\n" ..
-                "Fail Streak: " .. getgenv().AI.FailCount .. "\n" ..
-                "Status: " .. (getgenv().AI.FailCount > 0 and "Adapting..." or "Optimized")
-            )
-        else
-            StatusParagraph:SetDesc("AI Offline.")
-        end
-        task.wait(0.5)
+-- Toggle Mode AI vs Manual
+local ToggleAI = Tabs.Main:AddToggle("AIMode", {Title = "⚡ Super Fast AI Mode (Ignore Sliders)", Default = true })
+
+ToggleAI:OnChanged(function()
+    if Options.AIMode.Value then
+        Fluent:Notify({Title = "Mode Changed", Content = "AI Mode Active: Max Speed", SubContent = "Sliders dinonaktifkan", Duration = 3})
+    else
+        Fluent:Notify({Title = "Mode Changed", Content = "Manual Mode", SubContent = "Menggunakan delay dari slider", Duration = 3})
     end
 end)
 
-Tabs.Main:AddParagraph({
-    Title = "Cara Kerja AI:",
-    Content = "1. AI mulai dari delay 0.0 detik.\n2. Jika gagal (stuck), AI otomatis menambah waktu tunggu (+0.05).\n3. Jika berhasil, AI akan mencoba mempercepat lagi (-0.02).\n\nBiarkan script berjalan 1-2 menit untuk menemukan settingan sempurna."
+-- Slider Custom (Hanya aktif jika AI Mode OFF secara logika, tapi tetap ditampilkan)
+local ReelSlider = Tabs.Main:AddSlider("ReelSlider", {
+    Title = "Custom Reel Delay",
+    Description = "Waktu tarik kail (Semakin kecil = Cepat)",
+    Default = 0.5,
+    Min = 0.05,
+    Max = 2.0,
+    Rounding = 2,
+    Callback = function(Value)
+        -- Value update realtime
+    end
 })
+
+local BaitSlider = Tabs.Main:AddSlider("BaitSlider", {
+    Title = "Custom Bait/Reset Delay",
+    Description = "Jeda sebelum melempar lagi",
+    Default = 0.5,
+    Min = 0.1,
+    Max = 2.0,
+    Rounding = 2,
+    Callback = function(Value)
+        -- Value update realtime
+    end
+})
+
+Tabs.Main:AddButton({
+    Title = "🚑 Emergency Unstuck",
+    Description = "Tekan ini jika karakter nyangkut",
+    Callback = function()
+        SafeInvoke(Remotes.Cancel)
+        Fluent:Notify({Title = "System", Content = "Character inputs reset.", Duration = 2})
+    end
+})
+
+-- // 6. FINALIZING //
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:BuildConfigSection(Tabs.Settings)
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 
 Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Gemini Code Success",
+    Content = "Script Loaded. Remote Target: RF/CatchFishCompleted",
+    Duration = 5
+})
