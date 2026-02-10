@@ -1,23 +1,28 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "SERVER SIDE BYPASS",
-    SubTitle = "Parallel Execution",
+    Title = "AI FISHING BYPASS",
+    SubTitle = "Auto-Detect / Self Learning",
     TabWidth = 160,
-    Size = UDim2.fromOffset(500, 350),
+    Size = UDim2.fromOffset(550, 380),
     Acrylic = true, 
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 -- ==========================================
--- CONFIG
+-- AI VARIABLES (MEMORY)
 -- ==========================================
 local Options = Fluent.Options
-getgenv().Config = {
+getgenv().AI = {
     Active = false,
-    SyncDelay = 0.05, -- Delay sinkronisasi (Sangat kecil)
-    SpamIntensity = 5 -- Seberapa banyak request dikirim dalam 1 frame
+    CurrentDelay = 0.0, -- Start dari super cepat
+    SuccessCount = 0,
+    FailCount = 0,
+    State = "Idle", -- Learning, Optimized, Retrying
+    LastSuccessDelay = 1.0, -- Backup memory
+    StepSize = 0.05, -- Langkah penyesuaian
+    Tolerance = 5 -- Berapa kali gagal sebelum nambah delay
 }
 
 -- Services
@@ -35,99 +40,139 @@ local Remotes = {
 local args = { -1.115296483039856, 0, 1763651451.636425 }
 
 -- ==========================================
--- LOGIC: PARALLEL BYPASS
+-- AI LOGIC CORE
 -- ==========================================
-local function RunServerBypass()
+
+local function NotifyAI(status, msg)
+    Fluent:Notify({
+        Title = "AI Status: " .. status,
+        Content = msg,
+        Duration = 2
+    })
+end
+
+local function RunAI_Bypass()
     task.spawn(function()
-        while getgenv().Config.Active do
+        while getgenv().AI.Active do
             
-            -- [STEP 1: THREAD LEMPAR]
-            -- Kita jalankan ini di thread terpisah agar tidak menahan kode di bawahnya
-            task.spawn(function()
-                pcall(function() Remotes.Charge:InvokeServer() end)
+            local startTime = tick()
+            local success = false
+            
+            -- [STEP 1: CAST]
+            pcall(function() Remotes.Charge:InvokeServer() end)
+            
+            -- [STEP 2: AI DELAY ADJUSTMENT]
+            -- Menggunakan delay yang sedang dipelajari saat ini
+            if getgenv().AI.CurrentDelay > 0 then
+                task.wait(getgenv().AI.CurrentDelay)
+            else
+                task.wait() -- 1 frame wait minimum
+            end
+            
+            if not getgenv().AI.Active then break end
+
+            -- [STEP 3: ATTEMPT BYPASS REQUEST]
+            local successRequest, err = pcall(function()
+                -- Kita coba Invoke. Jika server menolak (karena delay terlalu cepat), biasanya ini akan error atau return nil/false
+                return Remotes.Request:InvokeServer(unpack(args))
             end)
 
-            -- [STEP 2: LATENCY GAP]
-            -- Kita beri celah super kecil (0.05 - 0.1) agar server sempat membuat object Bobber.
-            -- Jika 0, server mungkin menolak karena Bobber belum ada (nil).
-            task.wait(getgenv().Config.SyncDelay)
-            
-            if not getgenv().Config.Active then break end
-
-            -- [STEP 3: THREAD REQUEST (SPAM)]
-            -- Kita kirim request minigame SEOLAH-OLAH kail sudah di air.
-            -- Kita spamming ini agar salah satu request masuk tepat di celah frame server.
-            task.spawn(function()
-                for i = 1, getgenv().Config.SpamIntensity do
-                    if not getgenv().Config.Active then break end
-                    pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
-                    -- Tidak pakai wait() di sini agar terkirim dalam 1 frame (Burst)
+            -- [STEP 4: AI EVALUATION (The Brain)]
+            if successRequest then
+                -- BERHASIL: Delay ini valid!
+                success = true
+                getgenv().AI.SuccessCount = getgenv().AI.SuccessCount + 1
+                getgenv().AI.FailCount = 0 -- Reset fail streak
+                getgenv().AI.LastSuccessDelay = getgenv().AI.CurrentDelay
+                
+                -- OPTIMASI (Greedy): Setiap 5x sukses, coba kurangi delay biar makin ngebut
+                if getgenv().AI.SuccessCount % 5 == 0 then
+                    getgenv().AI.CurrentDelay = math.max(0, getgenv().AI.CurrentDelay - 0.02)
+                    -- NotifyAI("Optimizing", "Mencoba mempercepat: " .. string.format("%.2f", getgenv().AI.CurrentDelay) .. "s")
                 end
-            end)
+            else
+                -- GAGAL: Delay terlalu cepat, server menolak
+                success = false
+                getgenv().AI.FailCount = getgenv().AI.FailCount + 1
+                getgenv().AI.SuccessCount = 0
+                
+                -- KOREKSI: Tambah delay agar stabil
+                getgenv().AI.CurrentDelay = getgenv().AI.CurrentDelay + getgenv().AI.StepSize
+                NotifyAI("Adjusting", "Gagal! Memperlambat ke: " .. string.format("%.2f", getgenv().AI.CurrentDelay) .. "s")
+                
+                -- Reset karakter karena stuck
+                pcall(function() Remotes.Cancel:InvokeServer() end)
+                task.wait(0.5) -- Cooldown reset
+            end
 
-            -- [STEP 4: INSTANT CATCH]
-            -- Langsung tarik tanpa basa-basi
-            task.wait(0.05) 
-            pcall(function() Remotes.Catch:InvokeServer() end)
+            -- [STEP 5: CATCH (Hanya jika request sukses)]
+            if success then
+                task.wait(0.05) -- Instant reel
+                pcall(function() Remotes.Catch:InvokeServer() end)
+                
+                -- Reset normal
+                pcall(function() Remotes.Cancel:InvokeServer() end)
+                task.wait(0.1)
+            end
             
-            -- [STEP 5: RESET]
-            pcall(function() Remotes.Cancel:InvokeServer() end)
-            
-            -- Jeda Loop (Wajib ada biar gak crash client)
+            -- Safety wait agar tidak crash client
             task.wait(0.1)
         end
     end)
 end
 
 -- ==========================================
--- UI SETTINGS
+-- UI
 -- ==========================================
 local Tabs = {
-    Main = Window:AddTab({ Title = "Bypass", Icon = "zap" }),
+    Main = Window:AddTab({ Title = "AI Mode", Icon = "bot" }),
 }
 
-local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Enable Server Bypass", Default = false })
+-- Toggle AI
+local Toggle = Tabs.Main:AddToggle("AIToggle", {Title = "Aktifkan AI Detection", Default = false })
 
 Toggle:OnChanged(function()
-    getgenv().Config.Active = Options.MyToggle.Value
-    if getgenv().Config.Active then
-        RunServerBypass()
-        Fluent:Notify({Title = "BYPASS ACTIVE", Content = "Parallel Execution Started", Duration = 2})
+    getgenv().AI.Active = Options.AIToggle.Value
+    if getgenv().AI.Active then
+        -- Reset memory saat start baru
+        getgenv().AI.CurrentDelay = 0.0 -- Mulai dari 0 (Hardcore test)
+        getgenv().AI.FailCount = 0
+        getgenv().AI.SuccessCount = 0
+        
+        RunAI_Bypass()
+        Fluent:Notify({Title = "AI STARTED", Content = "Mencari celah server...", Duration = 3})
     else
         pcall(function() Remotes.Cancel:InvokeServer() end)
-        Fluent:Notify({Title = "Stopped", Content = "Script Stopped", Duration = 2})
+        Fluent:Notify({Title = "AI STOPPED", Content = "Learning paused.", Duration = 2})
+    end
+end)
+
+-- Monitor Status (Label Realtime)
+local StatusParagraph = Tabs.Main:AddParagraph({
+    Title = "Status AI (Realtime)",
+    Content = "Menunggu..."
+})
+
+-- Loop update UI untuk melihat apa yang dipikirkan AI
+task.spawn(function()
+    while true do
+        if getgenv().AI.Active then
+            StatusParagraph:SetDesc(
+                "Current Speed: " .. string.format("%.2f", getgenv().AI.CurrentDelay) .. "s\n" ..
+                "Success Streak: " .. getgenv().AI.SuccessCount .. "\n" ..
+                "Fail Streak: " .. getgenv().AI.FailCount .. "\n" ..
+                "Status: " .. (getgenv().AI.FailCount > 0 and "Adapting..." or "Optimized")
+            )
+        else
+            StatusParagraph:SetDesc("AI Offline.")
+        end
+        task.wait(0.5)
     end
 end)
 
 Tabs.Main:AddParagraph({
-    Title = "Cara Setting Bypass",
-    Content = "1. Mulai dengan Sync Delay 0.05\n2. Jika kail nyangkut di udara, NAIKKAN Sync Delay (0.1 / 0.15).\n3. Jika terlalu lambat, TURUNKAN ke 0.01."
-})
-
--- Input Sync Delay (Kunci Bypass)
-local InputSync = Tabs.Main:AddInput("InputSync", {
-    Title = "Sync Delay (Latency Gap)",
-    Default = "0.05",
-    Placeholder = "Cari celah server...",
-    Numeric = true,
-    Finished = true,
-    Callback = function(Value)
-        local num = tonumber(Value)
-        if num then getgenv().Config.SyncDelay = num end
-    end
-})
-
--- Input Spam Intensity
-local InputSpam = Tabs.Main:AddInput("InputSpam", {
-    Title = "Burst Intensity (Paket per Frame)",
-    Default = "5",
-    Placeholder = "5-10",
-    Numeric = true,
-    Finished = true,
-    Callback = function(Value)
-        local num = tonumber(Value)
-        if num then getgenv().Config.SpamIntensity = num end
-    end
+    Title = "Cara Kerja AI:",
+    Content = "1. AI mulai dari delay 0.0 detik.\n2. Jika gagal (stuck), AI otomatis menambah waktu tunggu (+0.05).\n3. Jika berhasil, AI akan mencoba mempercepat lagi (-0.02).\n\nBiarkan script berjalan 1-2 menit untuk menemukan settingan sempurna."
 })
 
 Window:SelectTab(1)
