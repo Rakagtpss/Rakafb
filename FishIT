@@ -1,134 +1,123 @@
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Fishing Fast (Fixed)",
+    SubTitle = "by Gemini",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(480, 320), -- Ukuran Compact
+    Acrylic = true, 
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
 
 -- ==========================================
--- CONFIG & VARIABLES
+-- VARIABLES & CONFIG
 -- ==========================================
-getgenv().FishingConfig = {
+local Options = Fluent.Options
+getgenv().Config = {
     Active = false,
-    DelayBait = 0.15, -- Waktu tunggu sebelum bypass "!" (semakin kecil = instan)
-    DelayReel = 0.05  -- Waktu tunggu sebelum catch (semakin kecil = instan)
+    DelayBait = 0.15, -- Waktu tunggu sebelum bypass "!"
+    DelayReel = 0.05  -- Waktu tunggu sebelum catch
 }
 
--- Args untuk Request Minigame (Sesuai script kamu sebelumnya)
-local args = { -1.115296483039856, 0, 1763651451.636425 }
-
--- Services & Remotes
+-- Services
 local RS = game:GetService("ReplicatedStorage")
 local Net = RS.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
+-- Remotes (Updated)
 local Remotes = {
     Charge   = Net["RF/ChargeFishingRod"],
     Request  = Net["RF/RequestFishingMinigameStarted"],
-    Catch    = Net["RF/CatchFishCompleted"], -- UPDATED: Sesuai request (RF)
+    Catch    = Net["RF/CatchFishCompleted"], -- InvokeServer
     Cancel   = Net["RF/CancelFishingInputs"]
 }
 
--- ==========================================
--- LOGIC FUNCTION
--- ==========================================
-local function RunFishingLoop()
-    task.spawn(function()
-        while true do
-            if not getgenv().FishingConfig.Active then
-                task.wait(0.5)
-                continue
-            end
+local args = { -1.115296483039856, 0, 1763651451.636425 }
 
-            -- 1. Lempar Kail (Cast)
+-- ==========================================
+-- LOGIC
+-- ==========================================
+local function StartFishing()
+    task.spawn(function()
+        while getgenv().Config.Active do
+            -- 1. Charge Rod
             pcall(function() Remotes.Charge:InvokeServer() end)
             
             -- 2. BYPASS "!" (Delay Bait)
-            -- Kita menunggu sebentar lalu MEMAKSA minigame mulai tanpa menunggu server kasih tanda "!"
-            task.wait(getgenv().FishingConfig.DelayBait)
-            
-            if not getgenv().FishingConfig.Active then break end
+            -- Menunggu sebentar sesuai input, lalu paksa mulai minigame
+            task.wait(getgenv().Config.DelayBait)
+            if not getgenv().Config.Active then break end
 
             -- 3. Force Start Minigame
             pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
 
-            -- 4. FAST REEL (Delay Reel)
-            task.wait(getgenv().FishingConfig.DelayReel)
-            
-            if not getgenv().FishingConfig.Active then break end
+            -- 4. Fast Reel (Delay Reel)
+            task.wait(getgenv().Config.DelayReel)
+            if not getgenv().Config.Active then break end
 
-            -- 5. Catch Fish (Selesai)
+            -- 5. Finish (Catch)
             pcall(function() Remotes.Catch:InvokeServer() end)
             
-            -- Cooldown kecil biar aman
+            -- Cooldown script
             task.wait(0.1)
         end
+        
+        -- Reset saat loop berhenti
+        pcall(function() Remotes.Cancel:InvokeServer() end)
     end)
 end
 
 -- ==========================================
--- UI SETUP (COMPACT SIZE)
+-- UI TABS
 -- ==========================================
-local Window = WindUI:CreateWindow({
-    Title = "Fast Fish", -- Judul pendek biar muat
-    Icon = "fish",
-    Author = ".lua",
-    Folder = "FishCompact",
-    Size = UDim2.fromOffset(400, 300), -- UKURAN KECIL (Compact)
-    Transparent = true,
-    Theme = "Dark",
-    SideBarWidth = 140,
-    HasOutline = true,
-})
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "fish" }),
+}
 
-local Tab = Window:Tab({
-    Title = "Main",
-    Icon = "anchor"
-})
+-- Toggle
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Auto Fishing", Default = false })
 
-Tab:Section({ Title = "Controls" })
-
-Tab:Toggle({
-    Title = "Active Fishing",
-    Desc = "On/Off Auto Fish",
-    Value = false,
-    Callback = function(state)
-        getgenv().FishingConfig.Active = state
-        if state then
-            RunFishingLoop()
-        else
-            -- Reset Input jika dimatikan
-            pcall(function() Remotes.Cancel:InvokeServer() end)
-        end
+Toggle:OnChanged(function()
+    getgenv().Config.Active = Options.MyToggle.Value
+    if getgenv().Config.Active then
+        StartFishing()
+        Fluent:Notify({
+            Title = "Started",
+            Content = "Bypass '!' Active",
+            Duration = 2
+        })
+    else
+        Fluent:Notify({
+            Title = "Stopped",
+            Content = "Fishing stopped",
+            Duration = 2
+        })
     end
-})
+end)
 
-Tab:Section({ Title = "Delays (Input)" })
-
-Tab:Input({
+-- Inputs (Manual Typing)
+local InputBait = Tabs.Main:AddInput("InputBait", {
     Title = "Delay Bait (Bypass !)",
-    Desc = "Detik (Cth: 0.1)",
-    Value = "0.15",
-    Placeholder = "Number...",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            getgenv().FishingConfig.DelayBait = num
-        end
+    Default = "0.15",
+    Placeholder = "Enter seconds...",
+    Numeric = true, -- Hanya angka
+    Finished = true, -- Update saat enter ditekan
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then getgenv().Config.DelayBait = num end
     end
 })
 
-Tab:Input({
-    Title = "Delay Reel (Fast)",
-    Desc = "Detik (Cth: 0.05)",
-    Value = "0.05",
-    Placeholder = "Number...",
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then
-            getgenv().FishingConfig.DelayReel = num
-        end
+local InputReel = Tabs.Main:AddInput("InputReel", {
+    Title = "Delay Reel (Fast Catch)",
+    Default = "0.05",
+    Placeholder = "Enter seconds...",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num then getgenv().Config.DelayReel = num end
     end
 })
 
--- Notifikasi
-WindUI:Notify({
-    Title = "Loaded",
-    Content = "Compact Script Ready!",
-    Duration = 2,
-    Icon = "check"
-})
+Window:SelectTab(1)
