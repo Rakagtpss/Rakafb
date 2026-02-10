@@ -1,18 +1,19 @@
 -- ==========================================
--- SCRIPT CONFIG & VARIABLES
+-- SMART TRIGGER CONFIG
 -- ==========================================
-getgenv().FishingConfig = {
+getgenv().FishConfig = {
     Active = false,
-    SpamCatch = false,
-    DelayReel = 0.1, -- Default
-    DelayBait = 0.1, -- Default
-    Args = { -1.115296483039856, 0, 1763651451.636425 }
+    SmartTrigger = true, -- Jika TRUE, delay manual diabaikan (mengikuti respon server)
+    ManualDelay = 0.1,   -- Dipakai jika SmartTrigger dimatikan
+    SpamMode = false,    -- Mode brutal
+    ShowLogs = true      -- Tampilkan notifikasi status
 }
 
+-- Services
 local rs = game:GetService("ReplicatedStorage")
 local net = rs:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0").net
-local players = game:GetService("Players")
-local lp = players.LocalPlayer
+local runService = game:GetService("RunService")
+local coreGui = game:GetService("CoreGui")
 
 -- Remote Definitions
 local ChargeRod    = net["RF/ChargeFishingRod"]
@@ -20,231 +21,223 @@ local RequestGame  = net["RF/RequestFishingMinigameStarted"]
 local CompleteGame = net["RF/CatchFishCompleted"]
 local CancelInput  = net["RF/CancelFishingInputs"]
 
+-- Arguments
+local args = { -1.115296483039856, 0, 1763651451.636425 }
+
 -- ==========================================
--- FISHING LOGIC
+-- TRIGGER LOGIC
 -- ==========================================
-local function doFishing()
+local function Log(msg, color)
+    if not getgenv().FishConfig.ShowLogs then return end
+    print("[Trigger System]: " .. msg)
+    -- Visual indicator bisa ditambahkan disini
+end
+
+local function executeCatch()
+    if getgenv().FishConfig.SpamMode then
+        for i = 1, 5 do
+            task.spawn(function()
+                CompleteGame:InvokeServer()
+            end)
+        end
+    else
+        CompleteGame:InvokeServer()
+    end
+end
+
+local function SmartFishingLoop()
     task.spawn(function()
-        while getgenv().FishingConfig.Active do
-            -- 1. Charge Rod
-            pcall(function() ChargeRod:InvokeServer() end)
-            task.wait(0.05)
-            if not getgenv().FishingConfig.Active then break end
+        while getgenv().FishConfig.Active do
+            
+            -- STEP 1: CHARGE (LEMPAR)
+            -- Trigger System: Kita tunggu server membalas InvokeServer sebelum lanjut
+            -- Ini memastikan kita tidak meminta minigame sebelum kail terlempar
+            Log("1. Melempar Kail (Charging)...")
+            local success, err = pcall(function()
+                ChargeRod:InvokeServer()
+            end)
 
-            -- 2. Request Game
-            pcall(function() RequestGame:InvokeServer(unpack(getgenv().FishingConfig.Args)) end)
-
-            -- 3. Custom Delay Reel (Input User)
-            task.wait(getgenv().FishingConfig.DelayReel)
-            if not getgenv().FishingConfig.Active then break end
-
-            -- 4. Catch Execution
-            if getgenv().FishingConfig.SpamCatch then
-                -- SPAM MODE: 5x Invoke tanpa tunggu
-                for i = 1, 5 do
-                    task.spawn(function()
-                        pcall(function() CompleteGame:InvokeServer() end)
-                    end)
-                end
-            else
-                -- NORMAL MODE
-                pcall(function() CompleteGame:InvokeServer() end)
+            if not success then 
+                Log("Gagal Charge, mengulang...", Color3.new(1,0,0))
+                task.wait(1)
+                continue 
             end
 
-            -- 5. Custom Delay Bait (Input User)
-            task.wait(getgenv().FishingConfig.DelayBait)
+            -- Jika pakai Delay Manual (Bukan Trigger)
+            if not getgenv().FishConfig.SmartTrigger then
+                task.wait(getgenv().FishConfig.ManualDelay)
+            end
+
+            if not getgenv().FishConfig.Active then break end
+
+            -- STEP 2: REQUEST MINIGAME (UMPAN DIMAKAN)
+            Log("2. Trigger Minigame...")
+            local reqSuccess = pcall(function()
+                RequestGame:InvokeServer(unpack(args))
+            end)
+
+            -- STEP 3: EXECUTE CATCH (TANGKAP)
+            -- Di sistem trigger, kita langsung sikat begitu request minigame terkirim
+            if reqSuccess then
+                Log("3. Sinyal Diterima! MENANGKAP!")
+                executeCatch()
+            end
             
-            -- 6. Cancel Input
+            -- STEP 4: RESET/COOLDOWN
+            -- Tunggu sebentar biar server tidak kick karena spam request
             pcall(function() CancelInput:InvokeServer() end)
             
-            task.wait(0.02)
+            -- Smart Wait: Hanya tunggu 1 frame jika Trigger aktif (Kecepatan Maksimal)
+            if getgenv().FishConfig.SmartTrigger then
+                runService.Heartbeat:Wait() 
+            else
+                task.wait(getgenv().FishConfig.ManualDelay)
+            end
         end
-        -- Saat stop, pastikan cancel dipanggil
+        
+        -- Cleanup saat stop
         pcall(function() CancelInput:InvokeServer() end)
     end)
 end
 
 -- ==========================================
--- MINI UI (CUSTOM & DRAGGABLE)
+-- UI SIMPLE (TRIGGER CONTROL)
 -- ==========================================
+if coreGui:FindFirstChild("TriggerFishUI") then coreGui.TriggerFishUI:Destroy() end
+
 local ScreenGui = Instance.new("ScreenGui")
-local MainFrame = Instance.new("Frame")
+local Frame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
-local UICorner = Instance.new("UICorner")
-local UIStroke = Instance.new("UIStroke")
-
--- Input Fields
-local ReelInput = Instance.new("TextBox")
-local BaitInput = Instance.new("TextBox")
-local ReelLabel = Instance.new("TextLabel")
-local BaitLabel = Instance.new("TextLabel")
-
--- Buttons
+local Status = Instance.new("TextLabel")
+local ToggleBtn = Instance.new("TextButton")
+local TriggerBtn = Instance.new("TextButton")
 local SpamBtn = Instance.new("TextButton")
-local StartBtn = Instance.new("TextButton")
 local CloseBtn = Instance.new("TextButton")
+local UIStroke = Instance.new("UIStroke")
+local UICorner = Instance.new("UICorner")
 
--- Protect UI
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
-ScreenGui.Parent = game:GetService("CoreGui")
-ScreenGui.Name = "MiniFishUI"
+ScreenGui.Name = "TriggerFishUI"
+ScreenGui.Parent = coreGui
 
--- Main Frame Styling
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -100) -- Tengah Layar
-MainFrame.Size = UDim2.new(0, 200, 0, 230) -- Ukuran Kecil (200x230 pixel)
-MainFrame.Active = true
-MainFrame.Draggable = true -- Bisa digeser
+-- Frame Setup
+Frame.Parent = ScreenGui
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Frame.Position = UDim2.new(0.5, -110, 0.5, -100)
+Frame.Size = UDim2.new(0, 220, 0, 200)
+Frame.Active = true
+Frame.Draggable = true
 
-UICorner.Parent = MainFrame
-UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Frame; UICorner.CornerRadius = UDim.new(0, 10)
+UIStroke.Parent = Frame; UIStroke.Color = Color3.fromRGB(0, 255, 128); UIStroke.Thickness = 2
 
-UIStroke.Parent = MainFrame
-UIStroke.Color = Color3.fromRGB(60, 60, 60)
-UIStroke.Thickness = 2
-
--- Title
-Title.Parent = MainFrame
-Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.Parent = Frame
+Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.Font = Enum.Font.GothamBold
-Title.Text = "Mini Fisher v3"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
-Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
+Title.Text = "Trigger System v1"
+Title.TextColor3 = Color3.fromRGB(0, 255, 128)
+Title.TextSize = 16
 
--- Label Reel
-ReelLabel.Parent = MainFrame
-ReelLabel.BackgroundTransparency = 1
-ReelLabel.Position = UDim2.new(0, 10, 0, 40)
-ReelLabel.Size = UDim2.new(0, 180, 0, 20)
-ReelLabel.Font = Enum.Font.Gotham
-ReelLabel.Text = "Delay Reel (Detik):"
-ReelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-ReelLabel.TextXAlignment = Enum.TextXAlignment.Left
-ReelLabel.TextSize = 12
+-- Status Label
+Status.Parent = Frame
+Status.BackgroundTransparency = 1
+Status.Position = UDim2.new(0, 0, 0, 30)
+Status.Size = UDim2.new(1, 0, 0, 20)
+Status.Font = Enum.Font.Gotham
+Status.Text = "Status: IDLE"
+Status.TextColor3 = Color3.fromRGB(150, 150, 150)
+Status.TextSize = 12
 
--- Input Reel
-ReelInput.Parent = MainFrame
-ReelInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-ReelInput.Position = UDim2.new(0, 10, 0, 60)
-ReelInput.Size = UDim2.new(0, 180, 0, 30)
-ReelInput.Font = Enum.Font.GothamBold
-ReelInput.PlaceholderText = "0.1"
-ReelInput.Text = "0.1"
-ReelInput.TextColor3 = Color3.fromRGB(0, 255, 200)
-ReelInput.TextSize = 14
-Instance.new("UICorner", ReelInput).CornerRadius = UDim.new(0, 4)
+-- Toggle Button (Start/Stop)
+ToggleBtn.Parent = Frame
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 60)
+ToggleBtn.Size = UDim2.new(0, 200, 0, 35)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "START FISHING"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
-ReelInput.FocusLost:Connect(function()
-    local num = tonumber(ReelInput.Text)
-    if num then
-        getgenv().FishingConfig.DelayReel = num
+ToggleBtn.MouseButton1Click:Connect(function()
+    getgenv().FishConfig.Active = not getgenv().FishConfig.Active
+    if getgenv().FishConfig.Active then
+        ToggleBtn.Text = "STOP FISHING"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Status.Text = "Status: RUNNING"
+        Status.TextColor3 = Color3.fromRGB(0, 255, 0)
+        SmartFishingLoop()
     else
-        ReelInput.Text = tostring(getgenv().FishingConfig.DelayReel)
+        ToggleBtn.Text = "START FISHING"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        Status.Text = "Status: IDLE"
+        Status.TextColor3 = Color3.fromRGB(150, 150, 150)
     end
 end)
 
--- Label Bait
-BaitLabel.Parent = MainFrame
-BaitLabel.BackgroundTransparency = 1
-BaitLabel.Position = UDim2.new(0, 10, 0, 95)
-BaitLabel.Size = UDim2.new(0, 180, 0, 20)
-BaitLabel.Font = Enum.Font.Gotham
-BaitLabel.Text = "Delay Bait (Detik):"
-BaitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-BaitLabel.TextXAlignment = Enum.TextXAlignment.Left
-BaitLabel.TextSize = 12
+-- Trigger Mode Button
+TriggerBtn.Parent = Frame
+TriggerBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TriggerBtn.Position = UDim2.new(0, 10, 0, 105)
+TriggerBtn.Size = UDim2.new(0, 95, 0, 35)
+TriggerBtn.Font = Enum.Font.GothamBold
+TriggerBtn.Text = "Trigger: ON"
+TriggerBtn.TextColor3 = Color3.fromRGB(0, 255, 128)
+Instance.new("UICorner", TriggerBtn).CornerRadius = UDim.new(0, 6)
 
--- Input Bait
-BaitInput.Parent = MainFrame
-BaitInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-BaitInput.Position = UDim2.new(0, 10, 0, 115)
-BaitInput.Size = UDim2.new(0, 180, 0, 30)
-BaitInput.Font = Enum.Font.GothamBold
-BaitInput.PlaceholderText = "0.1"
-BaitInput.Text = "0.1"
-BaitInput.TextColor3 = Color3.fromRGB(0, 255, 200)
-BaitInput.TextSize = 14
-Instance.new("UICorner", BaitInput).CornerRadius = UDim.new(0, 4)
-
-BaitInput.FocusLost:Connect(function()
-    local num = tonumber(BaitInput.Text)
-    if num then
-        getgenv().FishingConfig.DelayBait = num
+TriggerBtn.MouseButton1Click:Connect(function()
+    getgenv().FishConfig.SmartTrigger = not getgenv().FishConfig.SmartTrigger
+    if getgenv().FishConfig.SmartTrigger then
+        TriggerBtn.Text = "Trigger: ON"
+        TriggerBtn.TextColor3 = Color3.fromRGB(0, 255, 128)
     else
-        BaitInput.Text = tostring(getgenv().FishingConfig.DelayBait)
+        TriggerBtn.Text = "Trigger: OFF"
+        TriggerBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
     end
 end)
 
--- Spam Button
-SpamBtn.Parent = MainFrame
-SpamBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-SpamBtn.Position = UDim2.new(0, 10, 0, 155)
-SpamBtn.Size = UDim2.new(0, 85, 0, 35)
+-- Spam Mode Button
+SpamBtn.Parent = Frame
+SpamBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SpamBtn.Position = UDim2.new(0, 115, 0, 105)
+SpamBtn.Size = UDim2.new(0, 95, 0, 35)
 SpamBtn.Font = Enum.Font.GothamBold
 SpamBtn.Text = "Spam: OFF"
-SpamBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-SpamBtn.TextSize = 12
-Instance.new("UICorner", SpamBtn).CornerRadius = UDim.new(0, 4)
+SpamBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+Instance.new("UICorner", SpamBtn).CornerRadius = UDim.new(0, 6)
 
 SpamBtn.MouseButton1Click:Connect(function()
-    getgenv().FishingConfig.SpamCatch = not getgenv().FishingConfig.SpamCatch
-    if getgenv().FishingConfig.SpamCatch then
+    getgenv().FishConfig.SpamMode = not getgenv().FishConfig.SpamMode
+    if getgenv().FishConfig.SpamMode then
         SpamBtn.Text = "Spam: ON"
-        SpamBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        SpamBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     else
         SpamBtn.Text = "Spam: OFF"
-        SpamBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+        SpamBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
     end
 end)
 
--- Start Button
-StartBtn.Parent = MainFrame
-StartBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-StartBtn.Position = UDim2.new(0, 105, 0, 155)
-StartBtn.Size = UDim2.new(0, 85, 0, 35)
-StartBtn.Font = Enum.Font.GothamBold
-StartBtn.Text = "START"
-StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-StartBtn.TextSize = 12
-Instance.new("UICorner", StartBtn).CornerRadius = UDim.new(0, 4)
-
-StartBtn.MouseButton1Click:Connect(function()
-    getgenv().FishingConfig.Active = not getgenv().FishingConfig.Active
-    if getgenv().FishingConfig.Active then
-        StartBtn.Text = "STOP"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        doFishing()
-    else
-        StartBtn.Text = "START"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-    end
-end)
-
--- Close Button (X)
-CloseBtn.Parent = MainFrame
+-- Close Button
+CloseBtn.Parent = Frame
 CloseBtn.BackgroundTransparency = 1
 CloseBtn.Position = UDim2.new(1, -25, 0, 0)
 CloseBtn.Size = UDim2.new(0, 25, 0, 30)
 CloseBtn.Font = Enum.Font.GothamBold
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-CloseBtn.TextSize = 14
 CloseBtn.MouseButton1Click:Connect(function()
-    getgenv().FishingConfig.Active = false
+    getgenv().FishConfig.Active = false
     ScreenGui:Destroy()
 end)
 
--- Footer Credit
-local Credit = Instance.new("TextLabel")
-Credit.Parent = MainFrame
-Credit.BackgroundTransparency = 1
-Credit.Position = UDim2.new(0, 0, 1, -25)
-Credit.Size = UDim2.new(1, 0, 0, 20)
-Credit.Font = Enum.Font.Gotham
-Credit.Text = "Simple UI by Gemini"
-Credit.TextColor3 = Color3.fromRGB(100, 100, 100)
-Credit.TextSize = 10
+-- Keterangan
+local Info = Instance.new("TextLabel")
+Info.Parent = Frame
+Info.BackgroundTransparency = 1
+Info.Position = UDim2.new(0, 10, 1, -45)
+Info.Size = UDim2.new(1, -20, 0, 40)
+Info.Font = Enum.Font.Gotham
+Info.Text = "Trigger ON: Kecepatan mengikuti respons server (No Delay)."
+Info.TextColor3 = Color3.fromRGB(100, 100, 100)
+Info.TextSize = 10
+Info.TextWrapped = true
