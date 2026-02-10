@@ -1,110 +1,177 @@
-getgenv().fishingStart = false
-local delayBait = 1.15   -- Delay saat melempar umpan (Charge)
-local delayReel = 0.56   -- Delay saat menarik ikan (Catch)
-local delayReset = 0.2 
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
+local Window = Fluent:CreateWindow({
+    Title = "Fishing Simple UI " .. Fluent.Version,
+    SubTitle = "by Gemini",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(500, 350),
+    Acrylic = true, 
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Fishing", Icon = "fish" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+-- =====================================================
+-- CONFIG & VARIABLES
+-- =====================================================
+local Options = Fluent.Options
+getgenv().fishingStart = false
+
+-- Default Delays
+local delayConfig = {
+    bait = 1.15,   -- Waktu charge
+    reel = 0.56,   -- Waktu tunggu ikan (minigame)
+    reset = 0.2    -- Waktu reset setelah catch
+}
+
+-- Services
 local rs = game:GetService("ReplicatedStorage")
 local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
--- Remote Definitions (Updated)
+-- Remote Definitions (Updated sesuai request)
 local ChargeRod    = net["RF/ChargeFishingRod"]
 local RequestGame  = net["RF/RequestFishingMinigameStarted"]
-local CompleteGame = net["RF/CatchFishCompleted"] -- Diubah ke RF dan Nama baru
+local CatchFish    = net["RF/CatchFishCompleted"] -- Menggantikan RE/FishingCompleted
 local CancelInput  = net["RF/CancelFishingInputs"]
 
 -- =====================================================
--- BYPASS & TRIGGER SYSTEM (MENIPU SISTEM)
+-- BYPASS / TRIGGER SYSTEM (Menipu Sistem)
 -- =====================================================
 local FishingBlocker = { Enabled = false }
 
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    -- Memblokir game asli agar tidak mengirim Cancel atau Complete sendiri
-    if FishingBlocker.Enabled and (self == CancelInput or self == CompleteGame) and not checkcaller() then
-        if method == "InvokeServer" then
-            return task.wait(9e9) -- Membuat script game asli 'tergantung'
+    
+    -- Memblokir game asli agar tidak mengirim sinyal Cancel/Complete yang bertabrakan dengan script
+    if FishingBlocker.Enabled and not checkcaller() then
+        if self == CancelInput or self == CatchFish or self == RequestGame then
+            if method == "InvokeServer" or method == "FireServer" then
+                -- "Menipu" script local game agar stuck/diam, sehingga script kita yang pegang kendali penuh
+                return task.wait(9e9) 
+            end
         end
     end
+
     return oldNamecall(self, ...)
 end)
 
 -- =====================================================
--- LOGIKA UTAMA
+-- LOGIKA AUTO FISHING
 -- =====================================================
-
-local function startFishing()
+local function AutoFishingLoop()
     while getgenv().fishingStart do
         pcall(function()
-            -- Step 1: Melempar Umpan
+            -- 1. Charge / Lempar Umpan
             ChargeRod:InvokeServer()
-            task.wait(delayBait) 
+            task.wait(Options.DelayBait.Value)
             
             if not getgenv().fishingStart then return end
-            
-            -- Step 2: Request Minigame
-            local args = { -1.115296483039856, 0, tick() }
+
+            -- 2. Request Minigame (Titik koordinat dummy)
+            local args = { -1.115, 0, tick() } -- Koordinat random aman
             RequestGame:InvokeServer(unpack(args))
             
-            -- Step 3: Menunggu ikan menggigit (Delay Reel)
-            task.wait(delayReel)
+            -- 3. Delay Reel (Pura-pura main minigame)
+            -- Semakin kecil delay ini, semakin instan (tapi resiko kick)
+            task.wait(Options.DelayReel.Value)
             
             if not getgenv().fishingStart then return end
+
+            -- 4. Catch Fish (Trigger Selesai)
+            CatchFish:InvokeServer()
             
-            -- Step 4: Trigger Catch (Menipu sistem seolah selesai)
-            CompleteGame:InvokeServer() 
-            
-            -- Step 5: Reset
-            task.wait(delayReset)
+            -- 5. Reset / Cooldown
+            task.wait(Options.DelayReset.Value)
             CancelInput:InvokeServer()
         end)
+        task.wait(0.1)
     end
 end
 
 -- =====================================================
--- UI SETUP (WIND UI)
+-- UI ELEMENTS
 -- =====================================================
 
--- [TAB: FISHING]
-TabFishing:Section({ Title = "Fishing Delays" })
-
-TabFishing:Input({
-    Title = "Delay Bait (Lempar)",
-    Value = tostring(delayBait),
-    Callback = function(text)
-        delayBait = tonumber(text) or 1.15
-    end
+Tabs.Main:AddParagraph({
+    Title = "Status",
+    Content = "Gunakan delay yang manusiawi agar tidak terkena disconnect."
 })
 
-TabFishing:Input({
-    Title = "Delay Reel (Tarik)",
-    Value = tostring(delayReel),
-    Callback = function(text)
-        delayReel = tonumber(text) or 0.56
-    end
-})
+local ToggleFishing = Tabs.Main:AddToggle("FishingToggle", {Title = "Activate Auto Fishing", Default = false })
 
-TabFishing:Section({ Title = "Main Toggle" })
-
-TabFishing:Toggle({
-    Title = "Activate Auto Fishing",
-    Value = false,
-    Callback = function(state)
-        getgenv().fishingStart = state
-        FishingBlocker.Enabled = state
-        
-        if state then
-            task.spawn(startFishing)
-            WindUI:Notify({Title = "Fishing", Content = "Script Started!", Duration = 2})
-        else
-            WindUI:Notify({Title = "Fishing", Content = "Script Stopped", Duration = 2})
-        end
-    end
-})
-
-TabFishing:Button({
-    Title = "Manual Unstuck",
-    Callback = function()
+ToggleFishing:OnChanged(function()
+    getgenv().fishingStart = Options.FishingToggle.Value
+    FishingBlocker.Enabled = Options.FishingToggle.Value
+    
+    if getgenv().fishingStart then
+        -- Reset state sebelum mulai
+        pcall(function() CancelInput:InvokeServer() end)
+        Fluent:Notify({Title = "Fishing", Content = "Script Started!", Duration = 3})
+        task.spawn(AutoFishingLoop)
+    else
+        Fluent:Notify({Title = "Fishing", Content = "Script Stopped", Duration = 3})
+        -- Paksa berhenti
         pcall(function() CancelInput:InvokeServer() end)
     end
+end)
+
+Tabs.Main:AddSection("Custom Delays")
+
+Tabs.Main:AddSlider("DelayBait", {
+    Title = "Delay Bait (Charge)",
+    Description = "Lama menahan joran sebelum lempar",
+    Default = 1.15,
+    Min = 0.1,
+    Max = 3.0,
+    Rounding = 2,
+})
+
+Tabs.Main:AddSlider("DelayReel", {
+    Title = "Delay Reel (Catch)",
+    Description = "Lama menunggu sebelum menarik ikan (Minigame)",
+    Default = 0.56,
+    Min = 0.05,
+    Max = 2.0,
+    Rounding = 2,
+})
+
+Tabs.Main:AddSlider("DelayReset", {
+    Title = "Delay Reset",
+    Description = "Jeda setelah menangkap ikan",
+    Default = 0.2,
+    Min = 0.1,
+    Max = 2.0,
+    Rounding = 2,
+})
+
+Tabs.Main:AddButton({
+    Title = "Fix / Unstuck Character",
+    Description = "Klik ini jika karakter diam tidak merespon",
+    Callback = function()
+        pcall(function() CancelInput:InvokeServer() end)
+        Fluent:Notify({Title = "System", Content = "Character Reset!", Duration = 2})
+    end
+})
+
+-- =====================================================
+-- FINALIZE
+-- =====================================================
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+
+Window:SelectTab(1)
+Fluent:Notify({
+    Title = "Gemini Script",
+    Content = "Script Loaded Successfully. Remote: CatchFishCompleted",
+    Duration = 5
 })
