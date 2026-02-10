@@ -11,8 +11,8 @@ local RunService = game:GetService("RunService")
 
 -- // CONFIGURATION \\ --
 local CONFIG = {
-    SpamIntensity = 5, -- Berapa kali kirim sinyal "Catch" sekaligus (Coba 3, 5, atau 10)
-    LoopSpeed = 0,     -- 0 = Secepat frame rate game
+    SpamIntensity = 100, -- Berapa kali kirim sinyal "Catch" sekaligus (Coba 3, 5, atau 10)
+    LoopSpeed = 0.01,     -- 0 = Secepat frame rate game
 }
 
 local AutoEnabled = false
