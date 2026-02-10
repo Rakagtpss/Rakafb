@@ -1,10 +1,10 @@
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "GOD MODE FISHING",
-    SubTitle = "Super Blatant / Instant",
+    Title = "FISHING GOD MODE",
+    SubTitle = "Burst Spam Logic",
     TabWidth = 160,
-    Size = UDim2.fromOffset(450, 300), -- Ukuran Kecil
+    Size = UDim2.fromOffset(500, 360),
     Acrylic = true, 
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
@@ -16,15 +16,16 @@ local Window = Fluent:CreateWindow({
 local Options = Fluent.Options
 getgenv().Config = {
     Active = false,
-    DelayCast = 0.05, -- Default sangat kecil (Hampir instan)
-    DelayReel = 0.0,  -- Instan catch
-    SpamMode = false  -- Fitur baru: Spam Request
+    CastTime = 0.95, -- Waktu terbang kail (harus pas)
+    SpamSpeed = 0.01 -- Kecepatan Spam (Semakin kecil = semakin brutal)
 }
 
--- Services & Remotes
+-- Services
 local RS = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local Net = RS.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
+-- Remotes
 local Remotes = {
     Charge   = Net["RF/ChargeFishingRod"],
     Request  = Net["RF/RequestFishingMinigameStarted"],
@@ -35,92 +36,98 @@ local Remotes = {
 local args = { -1.115296483039856, 0, 1763651451.636425 }
 
 -- ==========================================
--- LOGIC: INSTANT / GOD MODE
+-- IMPROVED LOGIC (BURST SPAM)
 -- ==========================================
-local function RunSuperBlatant()
+local function RunBurstFishing()
     task.spawn(function()
         while getgenv().Config.Active do
-            -- 1. LEMPAR (Charge)
+            -- 1. CHARGE ROD (Lempar)
             pcall(function() Remotes.Charge:InvokeServer() end)
             
-            -- [BYPASS LOGIKA AIR]
-            -- Kita hanya menunggu 1 frame (task.wait()) atau sesuai input user (0.0)
-            -- Ini mencoba memanipulasi server agar menerima request minigame SEGERA.
-            if getgenv().Config.DelayCast > 0 then
-                task.wait(getgenv().Config.DelayCast)
-            else
-                task.wait() -- Tunggu 1 frame minimal agar tidak crash
-            end
-            
+            -- [PHASE 1: MENUNGGU KAIL JATUH]
+            -- Kita tunggu sebentar agar kail terlihat terbang.
+            task.wait(getgenv().Config.CastTime)
             if not getgenv().Config.Active then break end
 
-            -- 2. PAKSA MINIGAME (Request)
-            -- Mencoba melewati pengecekan "InWater" dengan kecepatan tinggi
-            pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
+            -- [PHASE 2: BURST REQUEST (BYPASS !)]
+            -- Alih-alih kirim 1x, kita kirim 5-10x request dalam waktu singkat.
+            -- Ini menjamin kita kena "hit" tepat saat kail masuk air.
+            task.spawn(function()
+                for i = 1, 8 do 
+                    if not getgenv().Config.Active then break end
+                    pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
+                    task.wait(getgenv().Config.SpamSpeed)
+                end
+            end)
 
-            -- 3. INSTANT CATCH (Reel)
-            if getgenv().Config.DelayReel > 0 then
-                task.wait(getgenv().Config.DelayReel)
+            -- Tunggu sebentar biar request di atas masuk
+            task.wait(0.1) 
+            if not getgenv().Config.Active then break end
+
+            -- [PHASE 3: BURST CATCH (INSTANT WIN)]
+            -- Kita spam sinyal CatchFishCompleted biar server tidak bisa menolak.
+            for i = 1, 5 do
+                if not getgenv().Config.Active then break end
+                pcall(function() Remotes.Catch:InvokeServer() end)
+                task.wait(getgenv().Config.SpamSpeed) -- Sangat cepat
             end
             
-            -- 4. SELESAI
-            pcall(function() Remotes.Catch:InvokeServer() end)
-            
-            -- Reset instan untuk loop selanjutnya
+            -- Reset Input (Penting agar tidak nge-bug animasinya)
             pcall(function() Remotes.Cancel:InvokeServer() end)
             
-            -- Speed Limiter (Agar tidak disconnect)
-            task.wait(0.05) 
+            -- Cooldown kecil sebelum loop ulang
+            task.wait(0.05)
         end
     end)
 end
 
 -- ==========================================
--- UI SETTINGS
+-- UI
 -- ==========================================
 local Tabs = {
-    Main = Window:AddTab({ Title = "God Mode", Icon = "flash" }),
+    Main = Window:AddTab({ Title = "Burst Mode", Icon = "server" }),
 }
 
-local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "AKTIFKAN GOD MODE", Default = false })
+local Toggle = Tabs.Main:AddToggle("MyToggle", {Title = "Enable Burst Fishing", Default = false })
 
 Toggle:OnChanged(function()
     getgenv().Config.Active = Options.MyToggle.Value
     if getgenv().Config.Active then
-        RunSuperBlatant()
+        RunBurstFishing()
+        Fluent:Notify({Title = "Active", Content = "Burst Mode Started", Duration = 2})
     else
         pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end)
 
 Tabs.Main:AddParagraph({
-    Title = "Instruksi Blatant",
-    Content = "Set 'Delay ke Air' jadi 0 atau 0.05 untuk efek instan.\nJika kail nyangkut di udara, naikkan sedikit ke 0.2."
+    Title = "Cara Kerja Burst (Improved)",
+    Content = "Script ini melakukan 'Spamming' request tepat saat kail menyentuh air. \nIni jauh lebih akurat daripada metode delay biasa."
 })
 
--- Input Delay Cast (Bisa diset ke 0)
+-- Input Cast Time
 local InputCast = Tabs.Main:AddInput("InputCast", {
-    Title = "Delay ke Air (Bypass Air)",
-    Default = "0.05",
-    Placeholder = "0 untuk Instan",
+    Title = "Flight Time (Waktu Terbang)",
+    Default = "0.95",
+    Placeholder = "Coba 0.9 - 1.1",
     Numeric = true,
     Finished = true,
     Callback = function(Value)
         local num = tonumber(Value)
-        if num then getgenv().Config.DelayCast = num end
+        if num then getgenv().Config.CastTime = num end
     end
 })
 
--- Input Delay Reel (Bisa diset ke 0)
-local InputReel = Tabs.Main:AddInput("InputReel", {
-    Title = "Delay Reel (Instan Catch)",
-    Default = "0.0",
-    Placeholder = "0 untuk Instan",
+-- Input Spam Speed
+local InputSpam = Tabs.Main:AddInput("InputSpam", {
+    Title = "Spam Delay (ms)",
+    Default = "0.01",
+    Placeholder = "Semakin kecil semakin cepat",
     Numeric = true,
     Finished = true,
     Callback = function(Value)
         local num = tonumber(Value)
-        if num then getgenv().Config.DelayReel = num end
+        if num then getgenv().Config.SpamSpeed = num end
     end
 })
 
