@@ -1,18 +1,20 @@
 --[[
-    UPDATED FISHING SCRIPT - WINDUI VERSION
-    Fitur: Custom Delay, Auto Great, Instant/Blatant Mode, Anti-AFK
-    Updated Paths: sleitnick_net@0.2.0
+    FISCHING SCRIPT - FLUENT UI VERSION
+    Reason: Previous UI (WindUI) returned HTTP 402 (Payment Required).
+    New UI: Fluent (Stable & Free)
 ]]
 
--- 1. LOAD LIBRARY & SERVICES
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+-- 1. LOAD LIBRARY (FLUENT)
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- 2. SERVICES & REMOTES
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- 2. DEFINISI REMOTE (UPDATED PATHS)
--- Menggunakan WaitForChild untuk mencegah error jika game belum loading sempurna
+-- Path Remote Terbaru (Sesuai Request)
 local NetPath = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
 
 local Remotes = {
@@ -24,23 +26,21 @@ local Remotes = {
     Radar       = NetPath:WaitForChild("RF/UpdateFishingRadar")
 }
 
--- 3. VARIABLE SETTINGS
+-- 3. VARIABLES
 getgenv().fishingStart = false
 getgenv().autoGreat = false
 
--- Default Config (Bisa diubah lewat UI)
 local Config = {
-    Mode = "Instant", -- "Instant" atau "Blatan"
+    Mode = "Instant", 
+    Coordinates = { -1.115, 0, 1763.636 },
     Delays = {
-        Charge = 1.15, -- Waktu menunggu sebelum melempar kail lagi
-        Catch = 0.56,  -- Waktu menunggu ikan (di mode Instant)
-        Reset = 0.20   -- Waktu jeda setelah menangkap
-    },
-    Coordinates = { -1.115, 0, 1763.636 } -- Koordinat lemparan (Vector/Args)
+        Charge = 1.15,
+        Catch = 0.56,
+        Reset = 0.20
+    }
 }
 
--- 4. ANTI-STUN / BLOCKER SYSTEM
--- Mencegah karakter diam/stuck saat spam remote
+-- 4. ANTI-STUN LOGIC
 local BlockedRemotes = {
     [Remotes.Charge] = true,
     [Remotes.Request] = true,
@@ -51,208 +51,161 @@ local BlockedRemotes = {
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-    
-    -- Jika fishing aktif, kita block remote ini agar client tidak menunggu server (No Animation)
     if getgenv().fishingStart and BlockedRemotes[self] and not checkcaller() then
-        if method == "InvokeServer" then
-            return task.wait(9e9) -- Freeze thread game asli
-        elseif method == "FireServer" then
-            return nil
-        end
+        if method == "InvokeServer" then return task.wait(9e9) 
+        elseif method == "FireServer" then return nil end
     end
-    
     return oldNamecall(self, ...)
 end)
 
--- 5. FUNGSI UTAMA (LOGIC)
-
+-- 5. FISHING FUNCTIONS
 local function SetAutoGreat(bool)
-    pcall(function()
-        Remotes.AutoState:InvokeServer({bool})
-    end)
+    pcall(function() Remotes.AutoState:InvokeServer({bool}) end)
 end
 
--- Mode 1: Instant (Lebih aman, ada delay wajar)
 local function LoopInstant()
     if getgenv().autoGreat then SetAutoGreat(true) end
-    
     while getgenv().fishingStart do
-        -- 1. Charge
         pcall(function() Remotes.Charge:InvokeServer() end)
         task.wait(0.05)
         if not getgenv().fishingStart then break end
 
-        -- 2. Request Game
         pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end)
-        
-        -- Tunggu ikan (Custom Delay Catch)
         task.wait(Config.Delays.Catch) 
         if not getgenv().fishingStart then break end
 
-        -- 3. Catch
         pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.05)
-        
-        -- 4. Reset
         pcall(function() Remotes.Cancel:InvokeServer() end)
-        
-        -- Tunggu sebelum melempar lagi (Custom Delay Charge)
         task.wait(Config.Delays.Charge)
     end
 end
 
--- Mode 2: Blatant (Super Cepat / Spam)
 local function LoopBlatant()
     if getgenv().autoGreat then SetAutoGreat(true) end
-    
-    -- Reset awal biar ga nyangkut
     pcall(function() Remotes.Cancel:InvokeServer() end)
     task.wait(0.1)
 
     while getgenv().fishingStart do
-        -- Gunakan spawn agar tidak saling menunggu (Parallel)
-        task.spawn(function()
-            pcall(function() Remotes.Charge:InvokeServer() end)
-        end)
-        
-        task.spawn(function()
-            pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end)
-        end)
-        
-        task.wait(Config.Delays.Charge) -- Delay Casting
-        
+        task.spawn(function() pcall(function() Remotes.Charge:InvokeServer() end) end)
+        task.spawn(function() pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end) end)
+        task.wait(Config.Delays.Charge)
         pcall(function() Remotes.Catch:InvokeServer() end)
-        
-        task.wait(Config.Delays.Reset) -- Delay Reset Cepat
+        task.wait(Config.Delays.Reset)
         pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end
 
--- 6. PEMBUATAN UI (WINDUI)
-
-local Window = WindUI:CreateWindow({
-    Title = "Fisching Updated",
-    Icon = "fish",
-    Author = ".gg/windui",
-    Folder = "FischingScript",
-    Size = UDim2.fromOffset(580, 460),
-    Transparent = true,
+-- 6. UI CONSTRUCTION (FLUENT)
+local Window = Fluent:CreateWindow({
+    Title = "Fisching Script",
+    SubTitle = "by Gemini",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(500, 350),
+    Acrylic = true, 
     Theme = "Dark",
-    SideBarWidth = 170,
-    HasOutline = true,
+    MinimizeKey = Enum.KeyCode.LeftControl
 })
 
-local TabMain = Window:Tab({
-    Title = "Main Fishing",
-    Icon = "anchor"
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "home" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+-- MAIN TAB
+Tabs.Main:AddParagraph({
+    Title = "Fishing Control",
+    Content = "Select mode and enable fishing."
 })
 
--- SECTION: MODE SELECTION
-TabMain:Section({ Title = "Fishing Mode" })
-
-local DropdownMode = TabMain:Dropdown({
-    Title = "Select Mode",
-    Desc = "Pilih kecepatan fishing",
+Tabs.Main:AddDropdown("ModeSelector", {
+    Title = "Fishing Mode",
     Values = {"Instant", "Blatan"},
-    Value = "Instant",
+    Multi = false,
+    Default = "Instant",
     Callback = function(val)
         Config.Mode = val
     end
 })
 
--- SECTION: CUSTOM DELAYS
-TabMain:Section({ Title = "Custom Delays (Kecepatan)" })
+local ToggleFishing = Tabs.Main:AddToggle("EnableFishing", {Title = "Start Fishing", Default = false })
+ToggleFishing:OnChanged(function()
+    local state = Options.EnableFishing.Value
+    getgenv().fishingStart = state
+    
+    if state then
+        pcall(function() Remotes.Cancel:InvokeServer() end)
+        if Config.Mode == "Blatan" then
+            task.spawn(LoopBlatant)
+        else
+            task.spawn(LoopInstant)
+        end
+        Fluent:Notify({Title = "Started", Content = "Mode: " .. Config.Mode, Duration = 3})
+    else
+        if getgenv().autoGreat then SetAutoGreat(false) end
+        pcall(function() Remotes.Catch:InvokeServer() end)
+        task.wait(0.1)
+        pcall(function() Remotes.Cancel:InvokeServer() end)
+        Fluent:Notify({Title = "Stopped", Content = "Fishing stopped.", Duration = 3})
+    end
+end)
 
-TabMain:Input({
-    Title = "Delay Charge (Detik)",
-    Desc = "Jeda sebelum melempar kail",
-    Value = tostring(Config.Delays.Charge),
-    Placeholder = "Contoh: 1.15",
-    Callback = function(text)
-        local num = tonumber(text)
+Tabs.Main:AddToggle("AutoGreat", {Title = "Auto Perfect Catch", Default = false, Callback = function(state)
+    getgenv().autoGreat = state
+    if state and getgenv().fishingStart then SetAutoGreat(true) end
+end})
+
+Tabs.Main:AddButton({
+    Title = "Unstuck Character",
+    Description = "Fix if you can't move",
+    Callback = function()
+        pcall(function() Remotes.Cancel:InvokeServer() end)
+        pcall(function() Remotes.Catch:InvokeServer() end)
+        Fluent:Notify({Title = "Unstuck", Content = "Character reset sent.", Duration = 2})
+    end
+})
+
+-- SETTINGS TAB (CUSTOM DELAYS)
+Tabs.Settings:AddParagraph({
+    Title = "Custom Delays",
+    Content = "Adjust timing (in seconds). Only change if you know what you are doing."
+})
+
+local InputCharge = Tabs.Settings:AddInput("DelayCharge", {
+    Title = "Delay: Charge Rod",
+    Default = tostring(Config.Delays.Charge),
+    Placeholder = "1.15",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
         if num then Config.Delays.Charge = num end
     end
 })
 
-TabMain:Input({
-    Title = "Delay Catch (Detik)",
-    Desc = "Jeda menunggu ikan (Mode Instant)",
-    Value = tostring(Config.Delays.Catch),
-    Placeholder = "Contoh: 0.56",
-    Callback = function(text)
-        local num = tonumber(text)
+local InputCatch = Tabs.Settings:AddInput("DelayCatch", {
+    Title = "Delay: Catch Fish (Instant Mode)",
+    Default = tostring(Config.Delays.Catch),
+    Placeholder = "0.56",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
         if num then Config.Delays.Catch = num end
     end
 })
 
-TabMain:Input({
-    Title = "Delay Reset (Detik)",
-    Desc = "Jeda setelah ikan ditangkap",
-    Value = tostring(Config.Delays.Reset),
-    Placeholder = "Contoh: 0.2",
-    Callback = function(text)
-        local num = tonumber(text)
+local InputReset = Tabs.Settings:AddInput("DelayReset", {
+    Title = "Delay: Reset (Blatan Mode)",
+    Default = tostring(Config.Delays.Reset),
+    Placeholder = "0.20",
+    Numeric = true,
+    Finished = true,
+    Callback = function(Value)
+        local num = tonumber(Value)
         if num then Config.Delays.Reset = num end
-    end
-})
-
--- SECTION: AUTOMATION
-TabMain:Section({ Title = "Automation" })
-
-TabMain:Toggle({
-    Title = "Auto Great",
-    Desc = "Bar selalu 100% (Perfect Catch)",
-    Value = false,
-    Callback = function(state)
-        getgenv().autoGreat = state
-        if state and getgenv().fishingStart then
-            SetAutoGreat(true)
-        end
-    end
-})
-
-TabMain:Toggle({
-    Title = "Enable Auto Fishing",
-    Desc = "Mulai/Stop Script",
-    Value = false,
-    Callback = function(state)
-        getgenv().fishingStart = state
-        
-        if state then
-            WindUI:Notify({Title = "Fishing Started", Content = "Mode: " .. Config.Mode, Duration = 3})
-            
-            -- Unstuck dulu sebelum mulai
-            pcall(function() Remotes.Cancel:InvokeServer() end)
-            
-            if Config.Mode == "Blatan" then
-                task.spawn(LoopBlatant)
-            else
-                task.spawn(LoopInstant)
-            end
-        else
-            WindUI:Notify({Title = "Fishing Stopped", Content = "Script berhenti...", Duration = 3})
-            
-            -- Matikan Auto Great
-            if getgenv().autoGreat then SetAutoGreat(false) end
-            
-            -- Cancel fishing inputs
-            pcall(function() Remotes.Catch:InvokeServer() end)
-            task.wait(0.1)
-            pcall(function() Remotes.Cancel:InvokeServer() end)
-        end
-    end
-})
-
--- SECTION: EXTRAS
-TabMain:Section({ Title = "Tools" })
-
-TabMain:Button({
-    Title = "Unstuck Character",
-    Desc = "Klik jika karakter nge-bug/diam",
-    Callback = function()
-        pcall(function() Remotes.Cancel:InvokeServer() end)
-        pcall(function() Remotes.Catch:InvokeServer() end)
-        WindUI:Notify({Title = "Unstuck", Content = "Sinyal Reset Dikirim", Duration = 2})
     end
 })
 
@@ -264,8 +217,5 @@ task.spawn(function()
     end)
 end)
 
-WindUI:Notify({
-    Title = "Script Loaded",
-    Content = "Path Updated & UI Ready!",
-    Duration = 5
-})
+Window:SelectTab(1)
+Fluent:Notify({Title = "Script Loaded", Content = "Fluent UI Version Ready!", Duration = 5})
