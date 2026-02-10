@@ -1,131 +1,134 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
 
-local Window = OrionLib:MakeWindow({
-    Name = "Fishing Super Fast (Input Mode)", 
-    HidePremium = true, 
-    SaveConfig = true, 
-    ConfigFolder = "FishingConfig"
-})
+-- ==========================================
+-- CONFIG & VARIABLES
+-- ==========================================
+getgenv().FishingConfig = {
+    Active = false,
+    DelayBait = 0.15, -- Waktu tunggu sebelum bypass "!" (semakin kecil = instan)
+    DelayReel = 0.05  -- Waktu tunggu sebelum catch (semakin kecil = instan)
+}
 
--- Variables
-getgenv().fishingStart = false
-getgenv().baitDelay = 0.15 -- Default delay lempar ke minigame (Bypass !)
-getgenv().reelDelay = 0.05 -- Default delay catch (Fast Reel)
-
--- Services & Remotes
-local rs = game:GetService("ReplicatedStorage")
-local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
-
--- DEFINISI REMOTE BARU
-local ChargeRod    = net["RF/ChargeFishingRod"]
-local RequestGame  = net["RF/RequestFishingMinigameStarted"]
-local CompleteGame = net["RF/CatchFishCompleted"] -- UPDATED: Menggunakan RF sesuai request
-local CancelInput  = net["RF/CancelFishingInputs"]
-
--- Args Koordinat Default
+-- Args untuk Request Minigame (Sesuai script kamu sebelumnya)
 local args = { -1.115296483039856, 0, 1763651451.636425 }
 
--- Functions
-local function StartFishing()
+-- Services & Remotes
+local RS = game:GetService("ReplicatedStorage")
+local Net = RS.Packages["_Index"]["sleitnick_net@0.2.0"].net
+
+local Remotes = {
+    Charge   = Net["RF/ChargeFishingRod"],
+    Request  = Net["RF/RequestFishingMinigameStarted"],
+    Catch    = Net["RF/CatchFishCompleted"], -- UPDATED: Sesuai request (RF)
+    Cancel   = Net["RF/CancelFishingInputs"]
+}
+
+-- ==========================================
+-- LOGIC FUNCTION
+-- ==========================================
+local function RunFishingLoop()
     task.spawn(function()
-        while getgenv().fishingStart do
-            -- 1. Lempar Joran
-            pcall(function() ChargeRod:InvokeServer() end)
-            
-            -- 2. Logic Bypass "!" (Delay Bait)
-            -- Kita menunggu waktu yang ditentukan di Input Box, lalu memaksa minigame mulai
-            task.wait(getgenv().baitDelay)
-            
-            if not getgenv().fishingStart then break end
+        while true do
+            if not getgenv().FishingConfig.Active then
+                task.wait(0.5)
+                continue
+            end
 
-            -- 3. Force Start Minigame (Melewati animasi tanda seru)
-            pcall(function() RequestGame:InvokeServer(unpack(args)) end)
-
-            -- 4. Logic Fast Reel (Delay Reel)
-            -- Menunggu waktu sesingkat mungkin sebelum claim ikan
-            task.wait(getgenv().reelDelay)
+            -- 1. Lempar Kail (Cast)
+            pcall(function() Remotes.Charge:InvokeServer() end)
             
-            if not getgenv().fishingStart then break end
-
-            -- 5. Selesai (Catch) - Menggunakan InvokeServer untuk RF
-            pcall(function() CompleteGame:InvokeServer() end)
+            -- 2. BYPASS "!" (Delay Bait)
+            -- Kita menunggu sebentar lalu MEMAKSA minigame mulai tanpa menunggu server kasih tanda "!"
+            task.wait(getgenv().FishingConfig.DelayBait)
             
-            -- Sedikit jeda agar tidak crash/disconnect
-            task.wait(0.05)
+            if not getgenv().FishingConfig.Active then break end
+
+            -- 3. Force Start Minigame
+            pcall(function() Remotes.Request:InvokeServer(unpack(args)) end)
+
+            -- 4. FAST REEL (Delay Reel)
+            task.wait(getgenv().FishingConfig.DelayReel)
+            
+            if not getgenv().FishingConfig.Active then break end
+
+            -- 5. Catch Fish (Selesai)
+            pcall(function() Remotes.Catch:InvokeServer() end)
+            
+            -- Cooldown kecil biar aman
+            task.wait(0.1)
         end
     end)
 end
 
--- UI TABS
-local MainTab = Window:MakeTab({
-    Name = "Main Fishing",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
+-- ==========================================
+-- UI SETUP (COMPACT SIZE)
+-- ==========================================
+local Window = WindUI:CreateWindow({
+    Title = "Fast Fish", -- Judul pendek biar muat
+    Icon = "fish",
+    Author = ".lua",
+    Folder = "FishCompact",
+    Size = UDim2.fromOffset(400, 300), -- UKURAN KECIL (Compact)
+    Transparent = true,
+    Theme = "Dark",
+    SideBarWidth = 140,
+    HasOutline = true,
 })
 
--- SECTION: TOGGLE
-MainTab:AddSection({
-    Name = "Auto Fish Controls"
+local Tab = Window:Tab({
+    Title = "Main",
+    Icon = "anchor"
 })
 
-MainTab:AddToggle({
-    Name = "Aktifkan Auto Fish",
-    Default = false,
-    Callback = function(Value)
-        getgenv().fishingStart = Value
-        if Value then
-            StartFishing()
-            OrionLib:MakeNotification({
-                Name = "Started",
-                Content = "Fishing dimulai! (Bypass '!' Aktif)",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
+Tab:Section({ Title = "Controls" })
+
+Tab:Toggle({
+    Title = "Active Fishing",
+    Desc = "On/Off Auto Fish",
+    Value = false,
+    Callback = function(state)
+        getgenv().FishingConfig.Active = state
+        if state then
+            RunFishingLoop()
         else
-            -- Reset jika dimatikan
-            pcall(function() CancelInput:InvokeServer() end)
-            OrionLib:MakeNotification({
-                Name = "Stopped",
-                Content = "Fishing berhenti.",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
+            -- Reset Input jika dimatikan
+            pcall(function() Remotes.Cancel:InvokeServer() end)
         end
     end
 })
 
--- SECTION: INPUTS (NO SLIDERS)
-MainTab:AddSection({
-    Name = "Pengaturan Waktu (Ketik Angka)"
-})
+Tab:Section({ Title = "Delays (Input)" })
 
-MainTab:AddTextbox({
-    Name = "Delay Bait (Bypass '!')",
-    Default = "0.15",
-    TextDisappear = false,
-    Callback = function(Value)
-        local num = tonumber(Value)
+Tab:Input({
+    Title = "Delay Bait (Bypass !)",
+    Desc = "Detik (Cth: 0.1)",
+    Value = "0.15",
+    Placeholder = "Number...",
+    Callback = function(text)
+        local num = tonumber(text)
         if num then
-            getgenv().baitDelay = num
+            getgenv().FishingConfig.DelayBait = num
         end
     end
 })
 
-MainTab:AddParagraph("Info Delay Bait", "Semakin kecil angka (cth: 0.1), semakin cepat minigame dimulai tanpa menunggu tanda seru muncul.")
-
-MainTab:AddTextbox({
-    Name = "Delay Reel (Fast Catch)",
-    Default = "0.05",
-    TextDisappear = false,
-    Callback = function(Value)
-        local num = tonumber(Value)
+Tab:Input({
+    Title = "Delay Reel (Fast)",
+    Desc = "Detik (Cth: 0.05)",
+    Value = "0.05",
+    Placeholder = "Number...",
+    Callback = function(text)
+        local num = tonumber(text)
         if num then
-            getgenv().reelDelay = num
+            getgenv().FishingConfig.DelayReel = num
         end
     end
 })
 
-MainTab:AddParagraph("Info Delay Reel", "Isi 0 untuk instan catch. Jika disconnect, naikkan jadi 0.1 atau 0.2.")
-
--- INIT
-OrionLib:Init()
+-- Notifikasi
+WindUI:Notify({
+    Title = "Loaded",
+    Content = "Compact Script Ready!",
+    Duration = 2,
+    Icon = "check"
+})
