@@ -1,23 +1,23 @@
 -- =====================================================
--- 1. LOAD LIBRARY (FLUENT UI)
+-- 1. SETUP LIBRARY (FLUENT)
 -- =====================================================
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
 
 local Window = Fluent:CreateWindow({
-    Title = "Fishing Mini - Better Bypass",
-    SubTitle = "Compact",
-    TabWidth = 130,
-    Size = UDim2.fromOffset(420, 280),
+    Title = "Fishing GOD MODE",
+    SubTitle = "Instant Bite & Catch",
+    TabWidth = 140,
+    Size = UDim2.fromOffset(500, 320),
     Acrylic = true, 
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
 
 local Tabs = {
-    Main = Window:AddTab({ Title = "Fishing", Icon = "fish" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+    Main = Window:AddTab({ Title = "Auto Fish", Icon = "fish" }),
+    Settings = Window:AddTab({ Title = "Config", Icon = "settings" })
 }
 
 local Options = Fluent.Options
@@ -26,181 +26,197 @@ local Options = Fluent.Options
 -- 2. VARIABLES & REMOTES
 -- =====================================================
 getgenv().fishingStart = false
+getgenv().mode = "Legit" 
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local rs = game:GetService("ReplicatedStorage")
 local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
--- Remote Definitions
-local ChargeRod    = net["RF/ChargeFishingRod"]
-local RequestGame  = net["RF/RequestFishingMinigameStarted"]
-local CatchFish    = net["RF/CatchFishCompleted"] 
-local CancelInput  = net["RF/CancelFishingInputs"]
+-- Definisi Remote
+local Remotes = {
+    Charge = net["RF/ChargeFishingRod"],
+    Request = net["RF/RequestFishingMinigameStarted"],
+    Catch = net["RF/CatchFishCompleted"], 
+    Cancel = net["RF/CancelFishingInputs"]
+}
 
--- Default values
-local customDelay = {
-    bait = 1.15,
-    reel = 0.56,
-    reset = 0.2
+-- Config Default
+local Config = {
+    Bait = 1.15, -- Waktu lempar (Legit)
+    Reel = 0.56, -- Waktu tunggu (Legit)
+    Reset = 0.25 
 }
 
 -- =====================================================
--- 3. IMPROVED BYPASS SYSTEM (SMART HOOK)
+-- 3. BYPASS & ANTI-LAG (OPTIMIZED)
 -- =====================================================
-local FishingBlocker = { Enabled = false }
-
--- Daftar Remote yang akan di-blokir aksesnya dari script game asli
-local BlockedRemotes = {
-    [CancelInput] = true,
-    [CatchFish] = true,
-    [RequestGame] = true,
-    [ChargeRod] = true -- Opsional: blokir charge asli juga agar tidak double
+local BypassConfig = { Enabled = false }
+local BlacklistRemotes = {
+    [Remotes.Cancel] = true,
+    [Remotes.Charge] = true,
+    [Remotes.Request] = true, 
+    [Remotes.Catch] = true
 }
 
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     
-    -- Cek: Apakah blocker aktif? Apakah pemanggil BUKAN script kita? Apakah remote ada di daftar blacklist?
-    if FishingBlocker.Enabled and not checkcaller() and BlockedRemotes[self] then
-        
-        -- HANDLING 1: FireServer (One-way)
-        -- Langsung drop requestnya. Jangan ditahan (wait) agar memori tidak bocor.
-        if method == "FireServer" then
-            return nil 
-        end
-        
-        -- HANDLING 2: InvokeServer (Two-way / Menunggu balasan)
-        -- Kita bekukan script game aslinya agar dia diam selamanya di baris ini.
-        if method == "InvokeServer" then
-            return task.wait(9e9) 
-        end
-        
+    if BypassConfig.Enabled and not checkcaller() and BlacklistRemotes[self] then
+        if method == "FireServer" then return nil end
+        if method == "InvokeServer" then return task.wait(9e9) end
     end
 
     return oldNamecall(self, ...)
 end)
 
 -- =====================================================
--- 4. LOGIKA UTAMA
+-- 4. UTILITY & ARGS
 -- =====================================================
-local function AutoFishingLoop()
-    while getgenv().fishingStart do
-        pcall(function()
-            -- 1. Charge Rod
-            ChargeRod:InvokeServer()
-            task.wait(customDelay.bait)
-            
-            if not getgenv().fishingStart then return end
-
-            -- 2. Request Minigame
-            local args = { -1.115, 0, tick() } 
-            RequestGame:InvokeServer(unpack(args))
-            
-            -- 3. Delay Reel (Tunggu Ikan)
-            task.wait(customDelay.reel)
-            
-            if not getgenv().fishingStart then return end
-
-            -- 4. Catch Fish
-            CatchFish:InvokeServer()
-            
-            -- 5. Reset
-            task.wait(customDelay.reset)
-            CancelInput:InvokeServer()
-        end)
-        task.wait(0.05)
+local function HasRod()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool and (tool.Name:find("Rod") or tool:FindFirstChild("Bobber") or tool:FindFirstChild("Cast")) then
+        return true
     end
+    return false
+end
+
+local function GetArgs()
+    -- Menggunakan koordinat statis untuk respon server tercepat
+    return { -1.115, 0, tick() }
 end
 
 -- =====================================================
--- 5. USER INTERFACE (COMPACT)
+-- 5. LOGIKA "INSTANT BITE" (Bypass Waiting)
+-- =====================================================
+local StatusLabel
+
+local function UpdateStatus(text)
+    if StatusLabel then StatusLabel:SetTitle("Status: " .. text) end
+end
+
+local function AutoFishingLoop()
+    while getgenv().fishingStart do
+        pcall(function()
+            if not LocalPlayer.Character then return end
+            if not HasRod() then
+                UpdateStatus("Equip Rod First!")
+                task.wait(1)
+                return
+            end
+
+            -- [STEP 1] FAST CHARGE
+            -- Kita lempar Full Power (1.0)
+            Remotes.Charge:InvokeServer(1.0) 
+            
+            -- BYPASS DELAY LEMPAR
+            if getgenv().mode == "Instant" then
+                -- Kita hanya menunggu 1 frame agar server mendaftarkan bobber
+                -- JANGAN 0 detik, server butuh waktu 0.05s untuk spawn bobber
+                task.wait(0.05) 
+            else
+                task.wait(Config.Bait)
+            end
+            
+            if not getgenv().fishingStart then return end
+
+            -- [STEP 2] INSTANT BITE (FORCE REQUEST)
+            UpdateStatus("Bypassing Wait...")
+            
+            -- Ini adalah kunci mempercepat tanda "!"
+            -- Kita langsung minta minigame tanpa menunggu animasi bobber turun
+            Remotes.Request:InvokeServer(unpack(GetArgs()))
+            
+            -- [STEP 3] INSTANT CATCH
+            -- Langsung kirim sinyal selesai tanpa main minigame
+            Remotes.Catch:InvokeServer()
+            UpdateStatus("CAUGHT! ("..getgenv().mode..")")
+            
+            -- [STEP 4] FAST RESET
+            if getgenv().mode == "Instant" then
+                -- Reset input seketika
+                Remotes.Cancel:InvokeServer()
+                task.wait() -- Tunggu sekejap untuk hindari crash
+            else
+                task.wait(Config.Reset)
+                Remotes.Cancel:InvokeServer()
+            end
+        end)
+        
+        -- Speed Control Loop
+        if getgenv().mode == "Instant" then
+            task.wait() -- No Delay Loop
+        else
+            task.wait(0.1)
+        end
+    end
+    UpdateStatus("Stopped")
+end
+
+-- =====================================================
+-- 6. UI CONSTRUCTION
 -- =====================================================
 
-local ToggleFishing = Tabs.Main:AddToggle("FishingToggle", {Title = "Auto Fishing", Default = false })
+StatusLabel = Tabs.Main:AddParagraph({
+    Title = "Status: Idle",
+    Content = "Pilih Mode 'Instant' untuk Bypass Tanda '!'"
+})
 
-ToggleFishing:OnChanged(function()
+-- Mode Selector
+local DropdownMode = Tabs.Main:AddDropdown("ModeSelect", {
+    Title = "Fishing Mode",
+    Values = {"Legit", "Instant"},
+    Multi = false,
+    Default = 1,
+})
+
+DropdownMode:OnChanged(function(Value)
+    getgenv().mode = Value
+    if Value == "Instant" then
+        Fluent:Notify({Title = "GOD MODE", Content = "Warning: Sangat Cepat (Risk High)", Duration = 3})
+    end
+end)
+
+-- Toggle
+local ToggleFish = Tabs.Main:AddToggle("FishingToggle", {Title = "Enable Auto Fishing", Default = false })
+
+ToggleFish:OnChanged(function()
     getgenv().fishingStart = Options.FishingToggle.Value
-    FishingBlocker.Enabled = Options.FishingToggle.Value
+    BypassConfig.Enabled = Options.FishingToggle.Value
     
     if getgenv().fishingStart then
-        -- Reset state karakter sebelum mulai
-        pcall(function() CancelInput:InvokeServer() end)
-        Fluent:Notify({Title = "Fishing", Content = "Bypass Active & Started!", Duration = 1})
+        pcall(function() Remotes.Cancel:InvokeServer() end)
         task.spawn(AutoFishingLoop)
     else
-        Fluent:Notify({Title = "Fishing", Content = "Stopped", Duration = 1})
-        pcall(function() CancelInput:InvokeServer() end)
+        pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end)
 
-Tabs.Main:AddParagraph({
-    Title = "Delay Settings",
-    Content = "Masukkan angka (detik) di bawah:"
-})
+Tabs.Settings:AddSection("Settings (Legit Mode Only)")
 
--- Input 1: Delay Bait
-Tabs.Main:AddInput("InputBait", {
+Tabs.Settings:AddInput("InputBait", {
     Title = "Delay Bait",
     Default = "1.15",
-    Placeholder = "1.15",
-    Numeric = true, 
-    Finished = false, 
-    Callback = function(Value)
-        local num = tonumber(Value)
-        if num then customDelay.bait = num end
-    end
-})
-
--- Input 2: Delay Catch
-Tabs.Main:AddInput("InputReel", {
-    Title = "Delay Catch",
-    Default = "0.56",
-    Placeholder = "0.56",
     Numeric = true,
     Finished = false,
-    Callback = function(Value)
-        local num = tonumber(Value)
-        if num then customDelay.reel = num end
-    end
+    Callback = function(v) Config.Bait = tonumber(v) or 1.15 end
 })
 
--- Input 3: Delay Reset
-Tabs.Main:AddInput("InputReset", {
-    Title = "Delay Reset",
-    Default = "0.2",
-    Placeholder = "0.2",
-    Numeric = true,
-    Finished = false,
-    Callback = function(Value)
-        local num = tonumber(Value)
-        if num then customDelay.reset = num end
-    end
-})
-
-Tabs.Main:AddButton({
+Tabs.Settings:AddButton({
     Title = "Unstuck Character",
     Callback = function()
-        pcall(function() CancelInput:InvokeServer() end)
+        pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 })
 
--- Anti AFK Sederhana agar tidak disconnect
-task.spawn(function()
-    local vu = game:GetService("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:Connect(function()
-        vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        task.wait(1)
-        vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-    end)
-end)
-
 -- =====================================================
--- 6. FINALIZE
+-- 7. FINALIZE
 -- =====================================================
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({})
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-
 Window:SelectTab(1)
