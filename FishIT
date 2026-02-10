@@ -1,158 +1,250 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-
-local Window = Fluent:CreateWindow({
-    Title = "Auto Fishing " .. Fluent.Version,
-    SubTitle = "by Gemini",
-    TabWidth = 160,
-    Size = UDim2.fromOffset(580, 460),
-    Acrylic = true, 
-    Theme = "Dark",
-    MinimizeKey = Enum.KeyCode.LeftControl 
-})
-
--- ===========================
--- VARIABLES
--- ===========================
-getgenv().fishingStart = false
-getgenv().spamCatch = false
-getgenv().delayReel = 0.1
-getgenv().delayBait = 0.1
+-- ==========================================
+-- SCRIPT CONFIG & VARIABLES
+-- ==========================================
+getgenv().FishingConfig = {
+    Active = false,
+    SpamCatch = false,
+    DelayReel = 0.1, -- Default
+    DelayBait = 0.1, -- Default
+    Args = { -1.115296483039856, 0, 1763651451.636425 }
+}
 
 local rs = game:GetService("ReplicatedStorage")
 local net = rs:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0").net
-
--- Arguments
-local args = { -1.115296483039856, 0, 1763651451.636425 }
+local players = game:GetService("Players")
+local lp = players.LocalPlayer
 
 -- Remote Definitions
 local ChargeRod    = net["RF/ChargeFishingRod"]
 local RequestGame  = net["RF/RequestFishingMinigameStarted"]
-local CompleteGame = net["RF/CatchFishCompleted"] -- Target Update
+local CompleteGame = net["RF/CatchFishCompleted"]
 local CancelInput  = net["RF/CancelFishingInputs"]
 
--- ===========================
--- LOGIC
--- ===========================
-
-local function executeCatch()
-    if getgenv().spamCatch then
-        -- SPAM MODE (5x Trigger)
-        for i = 1, 5 do
-            task.spawn(function()
-                pcall(function() CompleteGame:InvokeServer() end)
-            end)
-        end
-    else
-        -- NORMAL MODE (1x Trigger)
-        pcall(function() CompleteGame:InvokeServer() end)
-    end
-end
-
-local function startFishingLoop()
+-- ==========================================
+-- FISHING LOGIC
+-- ==========================================
+local function doFishing()
     task.spawn(function()
-        while getgenv().fishingStart do
-            -- 1. Charge
+        while getgenv().FishingConfig.Active do
+            -- 1. Charge Rod
             pcall(function() ChargeRod:InvokeServer() end)
             task.wait(0.05)
-            if not getgenv().fishingStart then break end
+            if not getgenv().FishingConfig.Active then break end
 
             -- 2. Request Game
-            pcall(function() RequestGame:InvokeServer(unpack(args)) end)
+            pcall(function() RequestGame:InvokeServer(unpack(getgenv().FishingConfig.Args)) end)
 
-            -- 3. Delay Reel
-            task.wait(getgenv().delayReel)
-            if not getgenv().fishingStart then break end
+            -- 3. Custom Delay Reel (Input User)
+            task.wait(getgenv().FishingConfig.DelayReel)
+            if not getgenv().FishingConfig.Active then break end
 
-            -- 4. Catch (Spam or Normal)
-            executeCatch()
+            -- 4. Catch Execution
+            if getgenv().FishingConfig.SpamCatch then
+                -- SPAM MODE: 5x Invoke tanpa tunggu
+                for i = 1, 5 do
+                    task.spawn(function()
+                        pcall(function() CompleteGame:InvokeServer() end)
+                    end)
+                end
+            else
+                -- NORMAL MODE
+                pcall(function() CompleteGame:InvokeServer() end)
+            end
 
-            -- 5. Delay Bait
-            task.wait(getgenv().delayBait)
+            -- 5. Custom Delay Bait (Input User)
+            task.wait(getgenv().FishingConfig.DelayBait)
             
-            -- 6. Cancel Input (Safety)
+            -- 6. Cancel Input
             pcall(function() CancelInput:InvokeServer() end)
             
-            task.wait(0.01)
+            task.wait(0.02)
         end
+        -- Saat stop, pastikan cancel dipanggil
+        pcall(function() CancelInput:InvokeServer() end)
     end)
 end
 
--- ===========================
--- UI ELEMENTS
--- ===========================
+-- ==========================================
+-- MINI UI (CUSTOM & DRAGGABLE)
+-- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
 
-local Tabs = {
-    Main = Window:AddTab({ Title = "Fishing", Icon = "fish" }),
-    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
-}
+-- Input Fields
+local ReelInput = Instance.new("TextBox")
+local BaitInput = Instance.new("TextBox")
+local ReelLabel = Instance.new("TextLabel")
+local BaitLabel = Instance.new("TextLabel")
 
-local Options = Fluent.Options
+-- Buttons
+local SpamBtn = Instance.new("TextButton")
+local StartBtn = Instance.new("TextButton")
+local CloseBtn = Instance.new("TextButton")
 
-Tabs.Main:AddToggle("AutoFish", {
-    Title = "Active Auto Fishing",
-    Default = false
-}):OnChanged(function()
-    getgenv().fishingStart = Options.AutoFish.Value
-    if getgenv().fishingStart then
-        startFishingLoop()
-        Fluent:Notify({
-            Title = "Fishing Started",
-            Content = "Auto fishing sedang berjalan.",
-            Duration = 3
-        })
+-- Protect UI
+if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
+ScreenGui.Parent = game:GetService("CoreGui")
+ScreenGui.Name = "MiniFishUI"
+
+-- Main Frame Styling
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -100) -- Tengah Layar
+MainFrame.Size = UDim2.new(0, 200, 0, 230) -- Ukuran Kecil (200x230 pixel)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Bisa digeser
+
+UICorner.Parent = MainFrame
+UICorner.CornerRadius = UDim.new(0, 8)
+
+UIStroke.Parent = MainFrame
+UIStroke.Color = Color3.fromRGB(60, 60, 60)
+UIStroke.Thickness = 2
+
+-- Title
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Mini Fisher v3"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 8)
+
+-- Label Reel
+ReelLabel.Parent = MainFrame
+ReelLabel.BackgroundTransparency = 1
+ReelLabel.Position = UDim2.new(0, 10, 0, 40)
+ReelLabel.Size = UDim2.new(0, 180, 0, 20)
+ReelLabel.Font = Enum.Font.Gotham
+ReelLabel.Text = "Delay Reel (Detik):"
+ReelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+ReelLabel.TextXAlignment = Enum.TextXAlignment.Left
+ReelLabel.TextSize = 12
+
+-- Input Reel
+ReelInput.Parent = MainFrame
+ReelInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ReelInput.Position = UDim2.new(0, 10, 0, 60)
+ReelInput.Size = UDim2.new(0, 180, 0, 30)
+ReelInput.Font = Enum.Font.GothamBold
+ReelInput.PlaceholderText = "0.1"
+ReelInput.Text = "0.1"
+ReelInput.TextColor3 = Color3.fromRGB(0, 255, 200)
+ReelInput.TextSize = 14
+Instance.new("UICorner", ReelInput).CornerRadius = UDim.new(0, 4)
+
+ReelInput.FocusLost:Connect(function()
+    local num = tonumber(ReelInput.Text)
+    if num then
+        getgenv().FishingConfig.DelayReel = num
     else
-        pcall(function() CancelInput:InvokeServer() end)
-        Fluent:Notify({
-            Title = "Fishing Stopped",
-            Content = "Auto fishing dimatikan.",
-            Duration = 3
-        })
+        ReelInput.Text = tostring(getgenv().FishingConfig.DelayReel)
     end
 end)
 
-Tabs.Main:AddToggle("SpamMode", {
-    Title = "Spam Catch Mode (Brutal)",
-    Description = "Mengirim sinyal tangkap berkali-kali (Risiko Ping Naik)",
-    Default = false
-}):OnChanged(function()
-    getgenv().spamCatch = Options.SpamMode.Value
+-- Label Bait
+BaitLabel.Parent = MainFrame
+BaitLabel.BackgroundTransparency = 1
+BaitLabel.Position = UDim2.new(0, 10, 0, 95)
+BaitLabel.Size = UDim2.new(0, 180, 0, 20)
+BaitLabel.Font = Enum.Font.Gotham
+BaitLabel.Text = "Delay Bait (Detik):"
+BaitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+BaitLabel.TextXAlignment = Enum.TextXAlignment.Left
+BaitLabel.TextSize = 12
+
+-- Input Bait
+BaitInput.Parent = MainFrame
+BaitInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+BaitInput.Position = UDim2.new(0, 10, 0, 115)
+BaitInput.Size = UDim2.new(0, 180, 0, 30)
+BaitInput.Font = Enum.Font.GothamBold
+BaitInput.PlaceholderText = "0.1"
+BaitInput.Text = "0.1"
+BaitInput.TextColor3 = Color3.fromRGB(0, 255, 200)
+BaitInput.TextSize = 14
+Instance.new("UICorner", BaitInput).CornerRadius = UDim.new(0, 4)
+
+BaitInput.FocusLost:Connect(function()
+    local num = tonumber(BaitInput.Text)
+    if num then
+        getgenv().FishingConfig.DelayBait = num
+    else
+        BaitInput.Text = tostring(getgenv().FishingConfig.DelayBait)
+    end
 end)
 
-Tabs.Main:AddSlider("SliderReel", {
-    Title = "Delay Reel (Tunggu Ikan)",
-    Description = "Waktu tunggu sebelum menarik kail",
-    Default = 0.1,
-    Min = 0,
-    Max = 2,
-    Rounding = 2,
-    Callback = function(Value)
-        getgenv().delayReel = Value
-    end
-})
+-- Spam Button
+SpamBtn.Parent = MainFrame
+SpamBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SpamBtn.Position = UDim2.new(0, 10, 0, 155)
+SpamBtn.Size = UDim2.new(0, 85, 0, 35)
+SpamBtn.Font = Enum.Font.GothamBold
+SpamBtn.Text = "Spam: OFF"
+SpamBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+SpamBtn.TextSize = 12
+Instance.new("UICorner", SpamBtn).CornerRadius = UDim.new(0, 4)
 
-Tabs.Main:AddSlider("SliderBait", {
-    Title = "Delay Bait (Jeda Lempar)",
-    Description = "Waktu jeda sebelum melempar kembali",
-    Default = 0.1,
-    Min = 0,
-    Max = 2,
-    Rounding = 2,
-    Callback = function(Value)
-        getgenv().delayBait = Value
+SpamBtn.MouseButton1Click:Connect(function()
+    getgenv().FishingConfig.SpamCatch = not getgenv().FishingConfig.SpamCatch
+    if getgenv().FishingConfig.SpamCatch then
+        SpamBtn.Text = "Spam: ON"
+        SpamBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+    else
+        SpamBtn.Text = "Spam: OFF"
+        SpamBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
-})
+end)
 
-Tabs.Main:AddButton({
-    Title = "Unstuck Character",
-    Description = "Klik jika karakter nge-bug",
-    Callback = function()
-        pcall(function() CancelInput:InvokeServer() end)
-        if game.Players.LocalPlayer.Character then
-            game.Players.LocalPlayer.Character.Humanoid.Health = 0
-        end
+-- Start Button
+StartBtn.Parent = MainFrame
+StartBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+StartBtn.Position = UDim2.new(0, 105, 0, 155)
+StartBtn.Size = UDim2.new(0, 85, 0, 35)
+StartBtn.Font = Enum.Font.GothamBold
+StartBtn.Text = "START"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.TextSize = 12
+Instance.new("UICorner", StartBtn).CornerRadius = UDim.new(0, 4)
+
+StartBtn.MouseButton1Click:Connect(function()
+    getgenv().FishingConfig.Active = not getgenv().FishingConfig.Active
+    if getgenv().FishingConfig.Active then
+        StartBtn.Text = "STOP"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        doFishing()
+    else
+        StartBtn.Text = "START"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
     end
-})
+end)
 
-Window:SelectTab(1)
+-- Close Button (X)
+CloseBtn.Parent = MainFrame
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Position = UDim2.new(1, -25, 0, 0)
+CloseBtn.Size = UDim2.new(0, 25, 0, 30)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.TextSize = 14
+CloseBtn.MouseButton1Click:Connect(function()
+    getgenv().FishingConfig.Active = false
+    ScreenGui:Destroy()
+end)
+
+-- Footer Credit
+local Credit = Instance.new("TextLabel")
+Credit.Parent = MainFrame
+Credit.BackgroundTransparency = 1
+Credit.Position = UDim2.new(0, 0, 1, -25)
+Credit.Size = UDim2.new(1, 0, 0, 20)
+Credit.Font = Enum.Font.Gotham
+Credit.Text = "Simple UI by Gemini"
+Credit.TextColor3 = Color3.fromRGB(100, 100, 100)
+Credit.TextSize = 10
