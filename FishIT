@@ -1,8 +1,7 @@
 --[[
-    FISCHING SCRIPT - CLASSICA UI VERSION
-    Style: Classic Dark Theme (Native GUI)
-    Fix: 100% Anti HTTP 402/404 Errors
-    Updated Paths: sleitnick_net@0.2.0
+    FISCHING SCRIPT - CLASSICA UI V2 (FIXED)
+    Fix: Error "TextColor3 got nil" (Menggunakan Safe Color Mode)
+    Status: No Key, No Loadstring, Anti-402
 ]]
 
 local Services = {
@@ -21,19 +20,24 @@ local LocalPlayer = Services.Players.LocalPlayer
 -- =====================================================
 getgenv().fishingStart = false
 getgenv().autoGreat = false
-getgenv().mode = "Instant" -- Options: "Instant", "Blatan"
+getgenv().mode = "Instant" 
 
 local Config = {
     Coordinates = { -1.115, 0, 1763.636 },
     Delays = {
-        Charge = 1.15, -- Delay sebelum melempar (Fishing)
-        Catch = 0.56,  -- Delay menunggu ikan (Catch)
-        Reset = 0.20   -- Delay reset (Blatan mode)
+        Charge = 1.15,
+        Catch = 0.56,
+        Reset = 0.20
     }
 }
 
+-- FUNGSI WARNA AMAN (Anti Error Nil)
+local function SafeColor(r, g, b)
+    return Color3.new(r/255, g/255, b/255)
+end
+
 -- =====================================================
--- 2. REMOTE PATHS (UPDATED)
+-- 2. REMOTE PATHS
 -- =====================================================
 local NetPath = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
 
@@ -46,7 +50,7 @@ local Remotes = {
 }
 
 -- =====================================================
--- 3. BYPASS & LOGIC
+-- 3. LOGIC & BYPASS
 -- =====================================================
 local BlockedRemotes = {
     [Remotes.Charge] = true,
@@ -69,7 +73,7 @@ local function SetAutoGreat(bool)
     pcall(function() Remotes.AutoState:InvokeServer({bool}) end)
 end
 
--- Mode Instant (Safe & Fast)
+-- Mode Instant
 local function LoopInstant()
     if getgenv().autoGreat then SetAutoGreat(true) end
     while getgenv().fishingStart do
@@ -78,17 +82,17 @@ local function LoopInstant()
         if not getgenv().fishingStart then break end
 
         pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end)
-        task.wait(Config.Delays.Catch) -- Custom Delay Catch
+        task.wait(Config.Delays.Catch)
         if not getgenv().fishingStart then break end
 
         pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.05)
         pcall(function() Remotes.Cancel:InvokeServer() end)
-        task.wait(Config.Delays.Charge) -- Custom Delay Charge
+        task.wait(Config.Delays.Charge)
     end
 end
 
--- Mode Blatan (Spam/Brutal)
+-- Mode Blatan
 local function LoopBlatant()
     if getgenv().autoGreat then SetAutoGreat(true) end
     pcall(function() Remotes.Cancel:InvokeServer() end)
@@ -104,10 +108,9 @@ local function LoopBlatant()
 end
 
 -- =====================================================
--- 4. CLASSICA UI CONSTRUCTION
+-- 4. CLASSICA UI (MANUAL BUILD)
 -- =====================================================
 
--- Cleanup Old UI
 if Services.CoreGui:FindFirstChild("ClassicaFishing") then 
     Services.CoreGui.ClassicaFishing:Destroy() 
 end
@@ -117,12 +120,11 @@ ScreenGui.Name = "ClassicaFishing"
 ScreenGui.Parent = Services.CoreGui
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Main Frame (Classic Style)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.BackgroundColor3 = SafeColor(35, 35, 35)
+MainFrame.BorderColor3 = SafeColor(0, 0, 0)
 MainFrame.BorderSizePixel = 2
 MainFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
 MainFrame.Size = UDim2.new(0, 250, 0, 320)
@@ -131,9 +133,8 @@ MainFrame.Draggable = true
 
 -- Header
 local Header = Instance.new("Frame")
-Header.Name = "Header"
 Header.Parent = MainFrame
-Header.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Header.BackgroundColor3 = SafeColor(20, 20, 20)
 Header.BorderSizePixel = 0
 Header.Size = UDim2.new(1, 0, 0, 30)
 
@@ -142,11 +143,10 @@ TitleLabel.Parent = Header
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Size = UDim2.new(1, 0, 1, 0)
 TitleLabel.Font = Enum.Font.Code
-TitleLabel.Text = "CLASSICA FISHING"
-TitleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TitleLabel.Text = "CLASSICA FISHING V2"
+TitleLabel.TextColor3 = SafeColor(200, 200, 200)
 TitleLabel.TextSize = 14
 
--- Close Button (Visual Only)
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = Header
 CloseBtn.BackgroundTransparency = 1
@@ -154,36 +154,44 @@ CloseBtn.Position = UDim2.new(1, -25, 0, 0)
 CloseBtn.Size = UDim2.new(0, 25, 0, 30)
 CloseBtn.Font = Enum.Font.Code
 CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextColor3 = SafeColor(255, 50, 50)
 CloseBtn.TextSize = 14
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
--- Container
 local Container = Instance.new("Frame")
 Container.Parent = MainFrame
 Container.BackgroundTransparency = 1
 Container.Position = UDim2.new(0, 10, 0, 40)
 Container.Size = UDim2.new(1, -20, 1, -50)
 
--- Helper Function for UI Elements
+-- Status Label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Parent = Container
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 0, -5)
+StatusLabel.Font = Enum.Font.Code
+StatusLabel.Text = "STATUS: IDLE"
+StatusLabel.TextColor3 = SafeColor(150, 150, 150)
+StatusLabel.TextSize = 12
+
+-- Helper Create Button
 local function CreateButton(text, order, callback)
     local Btn = Instance.new("TextButton")
     Btn.Parent = Container
-    Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    Btn.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    Btn.BackgroundColor3 = SafeColor(50, 50, 50)
+    Btn.BorderColor3 = SafeColor(0, 0, 0)
     Btn.Position = UDim2.new(0, 0, 0, (order - 1) * 35)
     Btn.Size = UDim2.new(1, 0, 0, 30)
     Btn.Font = Enum.Font.Code
     Btn.Text = text
-    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.TextColor3 = SafeColor(255, 255, 255)
     Btn.TextSize = 12
-    
     Btn.MouseButton1Click:Connect(callback)
     return Btn
 end
 
+-- Helper Create Input
 local function CreateInput(text, default, order, callback)
     local Label = Instance.new("TextLabel")
     Label.Parent = Container
@@ -192,43 +200,30 @@ local function CreateInput(text, default, order, callback)
     Label.Size = UDim2.new(0.6, 0, 0, 25)
     Label.Font = Enum.Font.Code
     Label.Text = text
-    Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Label.TextColor3 = SafeColor(200, 200, 200)
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.TextSize = 12
 
     local Box = Instance.new("TextBox")
     Box.Parent = Container
-    Box.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    Box.BorderColor3 = Color3.fromRGB(100, 100, 100)
+    Box.BackgroundColor3 = SafeColor(20, 20, 20)
+    Box.BorderColor3 = SafeColor(100, 100, 100)
     Box.Position = UDim2.new(0.65, 0, 0, (order * 35) + 5)
     Box.Size = UDim2.new(0.35, 0, 0, 25)
     Box.Font = Enum.Font.Code
     Box.Text = tostring(default)
-    Box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Box.TextColor3 = SafeColor(255, 255, 255)
     Box.TextSize = 12
     
-    Box.FocusLost:Connect(function()
-        callback(Box.Text)
-    end)
+    Box.FocusLost:Connect(function() callback(Box.Text) end)
 end
 
--- UI ELEMENTS
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Parent = Container
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 0, -5)
-StatusLabel.Font = Enum.Font.Code
-StatusLabel.Text = "STATUS: IDLE"
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-StatusLabel.TextSize = 12
-
--- 1. Start Button
+-- 1. START BUTTON
 local StartBtn = CreateButton("START FISHING", 2, function()
     getgenv().fishingStart = not getgenv().fishingStart
     if getgenv().fishingStart then
         StatusLabel.Text = "STATUS: RUNNING (".. getgenv().mode ..")"
-        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        StatusLabel.TextColor3 = SafeColor(0, 255, 0)
         
         pcall(function() Remotes.Cancel:InvokeServer() end)
         if getgenv().mode == "Blatan" then
@@ -238,69 +233,54 @@ local StartBtn = CreateButton("START FISHING", 2, function()
         end
     else
         StatusLabel.Text = "STATUS: IDLE"
-        StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        StatusLabel.TextColor3 = SafeColor(150, 150, 150)
         pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.1)
         pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end)
 
--- 2. Mode Button
-local ModeBtn = CreateButton("MODE: INSTANT", 3, function()
+-- 2. MODE BUTTON
+local ModeBtn = CreateButton("MODE: INSTANT", 3, function() end)
+ModeBtn.MouseButton1Click:Connect(function()
     if getgenv().mode == "Instant" then
         getgenv().mode = "Blatan"
     else
         getgenv().mode = "Instant"
     end
-    -- Update Text Button (self)
-    -- Kita perlu referensi ke tombol ini, tapi karena di dalam callback, kita gunakan trik sederhana
-    -- Namun karena CreateButton tidak return self di dalam callback, kita update text tombol ModeBtn di bawah
-end)
--- Override callback di atas biar text berubah
-ModeBtn.MouseButton1Click:Connect(function()
     ModeBtn.Text = "MODE: " .. string.upper(getgenv().mode)
 end)
 
--- 3. Unstuck Button
+-- 3. UNSTUCK BUTTON
 CreateButton("UNSTUCK CHARACTER", 4, function()
     pcall(function() Remotes.Cancel:InvokeServer() end)
     pcall(function() Remotes.Catch:InvokeServer() end)
     StatusLabel.Text = "STATUS: UNSTUCK SENT"
 end)
 
--- 4. Auto Great Button
-local AutoGreatBtn = CreateButton("AUTO GREAT: OFF", 5, function()
+-- 4. AUTO GREAT BUTTON
+local AutoGreatBtn = CreateButton("AUTO GREAT: OFF", 5, function() end)
+AutoGreatBtn.MouseButton1Click:Connect(function()
     getgenv().autoGreat = not getgenv().autoGreat
     if getgenv().autoGreat and getgenv().fishingStart then
         SetAutoGreat(true)
     end
-end)
-AutoGreatBtn.MouseButton1Click:Connect(function()
     AutoGreatBtn.Text = "AUTO GREAT: " .. (getgenv().autoGreat and "ON" or "OFF")
 end)
 
--- Inputs (Custom Delays)
-CreateInput("Delay Charge:", Config.Delays.Charge, 5, function(text)
-    local n = tonumber(text)
-    if n then Config.Delays.Charge = n end
-end)
-
-CreateInput("Delay Catch:", Config.Delays.Catch, 6, function(text)
-    local n = tonumber(text)
-    if n then Config.Delays.Catch = n end
-end)
-
-CreateInput("Delay Reset:", Config.Delays.Reset, 7, function(text)
-    local n = tonumber(text)
-    if n then Config.Delays.Reset = n end
-end)
+-- INPUTS
+CreateInput("Delay Charge:", Config.Delays.Charge, 5, function(t) local n=tonumber(t) if n then Config.Delays.Charge=n end end)
+CreateInput("Delay Catch:", Config.Delays.Catch, 6, function(t) local n=tonumber(t) if n then Config.Delays.Catch=n end end)
+CreateInput("Delay Reset:", Config.Delays.Reset, 7, function(t) local n=tonumber(t) if n then Config.Delays.Reset=n end end)
 
 -- Anti AFK
 task.spawn(function()
-    LocalPlayer.Idled:Connect(function()
-        Services.VirtualUser:CaptureController()
-        Services.VirtualUser:ClickButton2(Vector2.new())
+    pcall(function()
+        LocalPlayer.Idled:Connect(function()
+            Services.VirtualUser:CaptureController()
+            Services.VirtualUser:ClickButton2(Vector2.new())
+        end)
     end)
 end)
 
-print("Classica UI Loaded Successfully")
+print("Classica UI V2 Loaded")
