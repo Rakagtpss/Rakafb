@@ -1,31 +1,42 @@
 --[[
-    FISCHING SCRIPT - NATIVE UI VERSION (NO LOADSTRING)
-    Fix: HTTP 402 Error (Karena script ini tidak download UI dari link luar)
-    UI: Simple Built-in Roblox GUI
+    FISCHING SCRIPT - CLASSICA UI VERSION
+    Style: Classic Dark Theme (Native GUI)
+    Fix: 100% Anti HTTP 402/404 Errors
+    Updated Paths: sleitnick_net@0.2.0
 ]]
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local VirtualUser = game:GetService("VirtualUser")
-local CoreGui = game:GetService("CoreGui")
+local Services = {
+    Players = game:GetService("Players"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+    RunService = game:GetService("RunService"),
+    VirtualUser = game:GetService("VirtualUser"),
+    CoreGui = game:GetService("CoreGui"),
+    UserInputService = game:GetService("UserInputService")
+}
 
+local LocalPlayer = Services.Players.LocalPlayer
+
+-- =====================================================
 -- 1. CONFIG & VARIABLES
+-- =====================================================
 getgenv().fishingStart = false
 getgenv().autoGreat = false
-getgenv().mode = "Instant" -- "Instant" or "Blatan"
+getgenv().mode = "Instant" -- Options: "Instant", "Blatan"
 
 local Config = {
     Coordinates = { -1.115, 0, 1763.636 },
     Delays = {
-        Charge = 1.15,
-        Catch = 0.56,
-        Reset = 0.20
+        Charge = 1.15, -- Delay sebelum melempar (Fishing)
+        Catch = 0.56,  -- Delay menunggu ikan (Catch)
+        Reset = 0.20   -- Delay reset (Blatan mode)
     }
 }
 
--- 2. REMOTE PATHS
-local NetPath = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+-- =====================================================
+-- 2. REMOTE PATHS (UPDATED)
+-- =====================================================
+local NetPath = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+
 local Remotes = {
     Charge      = NetPath:WaitForChild("RF/ChargeFishingRod"),
     Catch       = NetPath:WaitForChild("RF/CatchFishCompleted"),
@@ -34,7 +45,9 @@ local Remotes = {
     AutoState   = NetPath:WaitForChild("RF/UpdateAutoFishingState"),
 }
 
--- 3. ANTI STUN / BYPASS
+-- =====================================================
+-- 3. BYPASS & LOGIC
+-- =====================================================
 local BlockedRemotes = {
     [Remotes.Charge] = true,
     [Remotes.Request] = true,
@@ -52,11 +65,11 @@ oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     return oldNamecall(self, ...)
 end)
 
--- 4. LOGIC FUNGSI
 local function SetAutoGreat(bool)
     pcall(function() Remotes.AutoState:InvokeServer({bool}) end)
 end
 
+-- Mode Instant (Safe & Fast)
 local function LoopInstant()
     if getgenv().autoGreat then SetAutoGreat(true) end
     while getgenv().fishingStart do
@@ -65,16 +78,17 @@ local function LoopInstant()
         if not getgenv().fishingStart then break end
 
         pcall(function() Remotes.Request:InvokeServer(unpack(Config.Coordinates)) end)
-        task.wait(Config.Delays.Catch) 
+        task.wait(Config.Delays.Catch) -- Custom Delay Catch
         if not getgenv().fishingStart then break end
 
         pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.05)
         pcall(function() Remotes.Cancel:InvokeServer() end)
-        task.wait(Config.Delays.Charge)
+        task.wait(Config.Delays.Charge) -- Custom Delay Charge
     end
 end
 
+-- Mode Blatan (Spam/Brutal)
 local function LoopBlatant()
     if getgenv().autoGreat then SetAutoGreat(true) end
     pcall(function() Remotes.Cancel:InvokeServer() end)
@@ -89,125 +103,133 @@ local function LoopBlatant()
     end
 end
 
--- 5. BUILD UI (MANUAL CONSTRUCTION)
--- Hapus UI lama jika ada
-if CoreGui:FindFirstChild("FischUI") then CoreGui.FischUI:Destroy() end
+-- =====================================================
+-- 4. CLASSICA UI CONSTRUCTION
+-- =====================================================
+
+-- Cleanup Old UI
+if Services.CoreGui:FindFirstChild("ClassicaFishing") then 
+    Services.CoreGui.ClassicaFishing:Destroy() 
+end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FischUI"
-ScreenGui.Parent = CoreGui
+ScreenGui.Name = "ClassicaFishing"
+ScreenGui.Parent = Services.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
+-- Main Frame (Classic Style)
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 300, 0, 350)
-MainFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+MainFrame.BorderSizePixel = 2
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -150)
+MainFrame.Size = UDim2.new(0, 250, 0, 320)
 MainFrame.Active = true
-MainFrame.Draggable = true -- Bisa digeser
+MainFrame.Draggable = true
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+-- Header
+local Header = Instance.new("Frame")
+Header.Name = "Header"
+Header.Parent = MainFrame
+Header.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Header.BorderSizePixel = 0
+Header.Size = UDim2.new(1, 0, 0, 30)
 
--- Title
-local Title = Instance.new("TextLabel")
-Title.Text = "Fisching Native UI"
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
-Title.Parent = MainFrame
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Parent = Header
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Size = UDim2.new(1, 0, 1, 0)
+TitleLabel.Font = Enum.Font.Code
+TitleLabel.Text = "CLASSICA FISHING"
+TitleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TitleLabel.TextSize = 14
 
--- Status Label
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Text = "Status: STOPPED"
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 0, 40)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 14
-StatusLabel.Parent = MainFrame
+-- Close Button (Visual Only)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = Header
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Position = UDim2.new(1, -25, 0, 0)
+CloseBtn.Size = UDim2.new(0, 25, 0, 30)
+CloseBtn.Font = Enum.Font.Code
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextSize = 14
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
 
--- Toggle Button
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Text = "START FISHING"
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0, 70)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-ToggleBtn.TextColor3 = Color3.white
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.TextSize = 16
-ToggleBtn.Parent = MainFrame
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 8)
+-- Container
+local Container = Instance.new("Frame")
+Container.Parent = MainFrame
+Container.BackgroundTransparency = 1
+Container.Position = UDim2.new(0, 10, 0, 40)
+Container.Size = UDim2.new(1, -20, 1, -50)
 
--- Mode Button
-local ModeBtn = Instance.new("TextButton")
-ModeBtn.Text = "Mode: Instant"
-ModeBtn.Size = UDim2.new(0.8, 0, 0, 30)
-ModeBtn.Position = UDim2.new(0.1, 0, 0, 120)
-ModeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-ModeBtn.TextColor3 = Color3.white
-ModeBtn.Font = Enum.Font.Gotham
-ModeBtn.TextSize = 14
-ModeBtn.Parent = MainFrame
-Instance.new("UICorner", ModeBtn).CornerRadius = UDim.new(0, 6)
-
--- Inputs (Charge, Catch, Reset)
-local function createInput(name, yPos, defaultKey)
-    local Label = Instance.new("TextLabel")
-    Label.Text = name
-    Label.Size = UDim2.new(0.4, 0, 0, 25)
-    Label.Position = UDim2.new(0.1, 0, 0, yPos)
-    Label.BackgroundTransparency = 1
-    Label.TextColor3 = Color3.white
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = MainFrame
+-- Helper Function for UI Elements
+local function CreateButton(text, order, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Parent = Container
+    Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Btn.BorderColor3 = Color3.fromRGB(0, 0, 0)
+    Btn.Position = UDim2.new(0, 0, 0, (order - 1) * 35)
+    Btn.Size = UDim2.new(1, 0, 0, 30)
+    Btn.Font = Enum.Font.Code
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.TextSize = 12
     
+    Btn.MouseButton1Click:Connect(callback)
+    return Btn
+end
+
+local function CreateInput(text, default, order, callback)
+    local Label = Instance.new("TextLabel")
+    Label.Parent = Container
+    Label.BackgroundTransparency = 1
+    Label.Position = UDim2.new(0, 0, 0, (order * 35) + 5)
+    Label.Size = UDim2.new(0.6, 0, 0, 25)
+    Label.Font = Enum.Font.Code
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.TextSize = 12
+
     local Box = Instance.new("TextBox")
-    Box.Text = tostring(Config.Delays[defaultKey])
-    Box.Size = UDim2.new(0.3, 0, 0, 25)
-    Box.Position = UDim2.new(0.6, 0, 0, yPos)
-    Box.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    Box.TextColor3 = Color3.white
-    Box.Parent = MainFrame
-    Instance.new("UICorner", Box).CornerRadius = UDim.new(0, 4)
+    Box.Parent = Container
+    Box.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Box.BorderColor3 = Color3.fromRGB(100, 100, 100)
+    Box.Position = UDim2.new(0.65, 0, 0, (order * 35) + 5)
+    Box.Size = UDim2.new(0.35, 0, 0, 25)
+    Box.Font = Enum.Font.Code
+    Box.Text = tostring(default)
+    Box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Box.TextSize = 12
     
     Box.FocusLost:Connect(function()
-        local num = tonumber(Box.Text)
-        if num then Config.Delays[defaultKey] = num end
+        callback(Box.Text)
     end)
 end
 
-createInput("Charge Delay:", 170, "Charge")
-createInput("Catch Delay:", 205, "Catch")
-createInput("Reset Delay:", 240, "Reset")
+-- UI ELEMENTS
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Parent = Container
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 0, -5)
+StatusLabel.Font = Enum.Font.Code
+StatusLabel.Text = "STATUS: IDLE"
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.TextSize = 12
 
--- Unstuck Button
-local UnstuckBtn = Instance.new("TextButton")
-UnstuckBtn.Text = "Unstuck Character"
-UnstuckBtn.Size = UDim2.new(0.8, 0, 0, 30)
-UnstuckBtn.Position = UDim2.new(0.1, 0, 0, 290)
-UnstuckBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-UnstuckBtn.TextColor3 = Color3.white
-UnstuckBtn.Parent = MainFrame
-Instance.new("UICorner", UnstuckBtn).CornerRadius = UDim.new(0, 6)
-
--- 6. UI LOGIC CONNECTIONS
-
-ToggleBtn.MouseButton1Click:Connect(function()
+-- 1. Start Button
+local StartBtn = CreateButton("START FISHING", 2, function()
     getgenv().fishingStart = not getgenv().fishingStart
-    
     if getgenv().fishingStart then
-        ToggleBtn.Text = "STOP FISHING"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-        StatusLabel.Text = "Status: RUNNING (" .. getgenv().mode .. ")"
-        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        StatusLabel.Text = "STATUS: RUNNING (".. getgenv().mode ..")"
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
         
-        -- Start Logic
         pcall(function() Remotes.Cancel:InvokeServer() end)
         if getgenv().mode == "Blatan" then
             task.spawn(LoopBlatant)
@@ -215,37 +237,70 @@ ToggleBtn.MouseButton1Click:Connect(function()
             task.spawn(LoopInstant)
         end
     else
-        ToggleBtn.Text = "START FISHING"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        StatusLabel.Text = "Status: STOPPED"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        
-        -- Stop Logic
+        StatusLabel.Text = "STATUS: IDLE"
+        StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
         pcall(function() Remotes.Catch:InvokeServer() end)
         task.wait(0.1)
         pcall(function() Remotes.Cancel:InvokeServer() end)
     end
 end)
 
-ModeBtn.MouseButton1Click:Connect(function()
+-- 2. Mode Button
+local ModeBtn = CreateButton("MODE: INSTANT", 3, function()
     if getgenv().mode == "Instant" then
         getgenv().mode = "Blatan"
     else
         getgenv().mode = "Instant"
     end
-    ModeBtn.Text = "Mode: " .. getgenv().mode
+    -- Update Text Button (self)
+    -- Kita perlu referensi ke tombol ini, tapi karena di dalam callback, kita gunakan trik sederhana
+    -- Namun karena CreateButton tidak return self di dalam callback, kita update text tombol ModeBtn di bawah
+end)
+-- Override callback di atas biar text berubah
+ModeBtn.MouseButton1Click:Connect(function()
+    ModeBtn.Text = "MODE: " .. string.upper(getgenv().mode)
 end)
 
-UnstuckBtn.MouseButton1Click:Connect(function()
+-- 3. Unstuck Button
+CreateButton("UNSTUCK CHARACTER", 4, function()
     pcall(function() Remotes.Cancel:InvokeServer() end)
     pcall(function() Remotes.Catch:InvokeServer() end)
-    StatusLabel.Text = "Status: Unstuck Sent"
+    StatusLabel.Text = "STATUS: UNSTUCK SENT"
+end)
+
+-- 4. Auto Great Button
+local AutoGreatBtn = CreateButton("AUTO GREAT: OFF", 5, function()
+    getgenv().autoGreat = not getgenv().autoGreat
+    if getgenv().autoGreat and getgenv().fishingStart then
+        SetAutoGreat(true)
+    end
+end)
+AutoGreatBtn.MouseButton1Click:Connect(function()
+    AutoGreatBtn.Text = "AUTO GREAT: " .. (getgenv().autoGreat and "ON" or "OFF")
+end)
+
+-- Inputs (Custom Delays)
+CreateInput("Delay Charge:", Config.Delays.Charge, 5, function(text)
+    local n = tonumber(text)
+    if n then Config.Delays.Charge = n end
+end)
+
+CreateInput("Delay Catch:", Config.Delays.Catch, 6, function(text)
+    local n = tonumber(text)
+    if n then Config.Delays.Catch = n end
+end)
+
+CreateInput("Delay Reset:", Config.Delays.Reset, 7, function(text)
+    local n = tonumber(text)
+    if n then Config.Delays.Reset = n end
 end)
 
 -- Anti AFK
 task.spawn(function()
-    Players.LocalPlayer.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
+    LocalPlayer.Idled:Connect(function()
+        Services.VirtualUser:CaptureController()
+        Services.VirtualUser:ClickButton2(Vector2.new())
     end)
 end)
+
+print("Classica UI Loaded Successfully")
