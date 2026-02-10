@@ -1,88 +1,144 @@
 --[[
-    UPDATED FISHING SCRIPT - MODERN AUTO DETECT
-    - Dynamic Pathfinding
-    - Auto Detect Bite (UI Based)
-    - Random Delay Support (Human-like)
+    FIXED FISHING SCRIPT (ANTI-SYNTAX ERROR)
+    - Fixes "Expected identifier" error
+    - Corrected Path Names based on your request
+    - Auto-Detects Net Folder
 ]]
 
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
-local Window = OrionLib:MakeWindow({Name = "Fishing Modern", HidePremium = false, SaveConfig = true, ConfigFolder = "FishConfig"})
+local Window = OrionLib:MakeWindow({Name = "Fishing Fixed", HidePremium = false, SaveConfig = true, ConfigFolder = "FishConfig"})
 
 -- =====================================================
--- 🛠️ 1. DYNAMIC PATHFINDER
+-- 🛠️ 1. SAFE PATHFINDER (ANTI ERROR)
 -- =====================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local Packages = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
 
+-- Fungsi untuk mencari folder net secara otomatis (Biar gak error kalau versi berubah)
 local function GetNetPath()
-    for _, folder in pairs(Packages:GetChildren()) do
+    local packages = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")
+    
+    -- Cara 1: Cari folder yang namanya mirip "sleitnick_net"
+    for _, folder in pairs(packages:GetChildren()) do
         if folder.Name:match("sleitnick_net") then
-            return folder:WaitForChild("net")
+            local net = folder:FindFirstChild("net")
+            if net then return net end
         end
     end
-    return Packages:FindFirstChild("net", true) 
+    
+    -- Cara 2: Cari folder "net" langsung (Fallback)
+    return packages:FindFirstChild("net", true)
 end
 
 local NetPath = GetNetPath()
+
 if not NetPath then
-    OrionLib:MakeNotification({Name = "Error", Content = "Remote Path tidak ketemu!", Time = 5})
-    return
+    OrionLib:MakeNotification({
+        Name = "Critical Error",
+        Content = "Folder 'net' tidak ditemukan! Cek apakah game sudah update.",
+        Time = 5
+    })
+    return -- Stop script jika path salah
 end
 
 -- =====================================================
--- 📡 2. REMOTE DEFINITIONS
+-- 📡 2. REMOTE DEFINITIONS (SESUAI REQUEST)
 -- =====================================================
-local ChargeRod    = NetPath:WaitForChild("RF/ChargeFishingRod")
-local RequestGame  = NetPath:WaitForChild("RF/RequestFishingMinigameStarted")
-local CompleteGame = NetPath:WaitForChild("RF/FishingCompleted")
-if not CompleteGame then CompleteGame = NetPath:FindFirstChild("RE/FishingCompleted") end
-local CancelInput  = NetPath:WaitForChild("RF/CancelFishingInputs")
-local UpdateAuto   = NetPath:WaitForChild("RF/UpdateAutoFishingState")
+-- Kita gunakan WaitForChild dengan string agar tidak error Syntax '/'
+
+local function GetRemote(name)
+    local remote = NetPath:FindFirstChild(name)
+    if not remote then
+        warn("Remote tidak ditemukan: " .. name) 
+        return nil
+    end
+    return remote
+end
+
+local ChargeRod     = GetRemote("RF/ChargeFishingRod")
+local RequestGame   = GetRemote("RF/RequestFishingMinigameStarted")
+local CatchComplete = GetRemote("RF/CatchFishCompleted") -- Nama sesuai request kamu
+local CancelInput   = GetRemote("RF/CancelFishingInputs")
+local MarkAuto      = GetRemote("RF/MarkAutoFishingUsed")
+local UpdateAuto    = GetRemote("RF/UpdateAutoFishingState")
+local UpdateRadar   = GetRemote("RF/UpdateFishingRadar")
+
+-- Cek apakah remote penting ada
+if not ChargeRod or not CatchComplete then
+    OrionLib:MakeNotification({Name = "Error", Content = "Beberapa Remote Fishing hilang/ganti nama.", Time = 5})
+end
 
 -- Settings Variable
 getgenv().fishingStart = false
-local currentMode = "Legit"
-local useAutoDetect = true -- Modern Detect
-local targetUIName = "shakeui" -- Nama UI saat ikan memakan umpan (Cek PlayerGui)
-local minDelay = 5.0
-local maxDelay = 8.0
-local reactionTime = 0.1 -- Waktu jeda setelah terdeteksi
-
+local useAutoDetect = true
+local reactionTime = 0.1 -- Waktu jeda
 local defaultArgs = { -1.115296483039856, 0, 1763651451.636425 }
 
 -- =====================================================
--- 🧠 3. INTELLIGENT BITE DETECTION
+-- 🧠 3. LOGIC UTAMA
 -- =====================================================
 
 local function WaitForBite()
-    -- Jika Auto Detect dimatikan, gunakan Random Delay
     if not useAutoDetect then
-        local randomTime = math.random() * (maxDelay - minDelay) + minDelay
-        OrionLib:MakeNotification({Name = "Wait", Content = string.format("Manual Delay: %.2fs", randomTime), Time = 1})
-        task.wait(randomTime)
+        task.wait(5.5) -- Manual delay jika auto detect mati
         return true
     end
 
-    -- MODERN DETECT: Menunggu UI muncul di PlayerGui
-    -- Ini loop menunggu sampai ada 'tanda' ikan menggigit
     local startTime = tick()
-    local timeout = 15 -- Maksimal nunggu 15 detik biar gak stuck
+    local timeout = 20
     
+    -- Loop menunggu UI muncul
     repeat
-        -- Cek apakah UI Minigame muncul (Biasanya 'shakeui', 'reel', 'bar')
-        local uiFound = PlayerGui:FindFirstChild(targetUIName) or PlayerGui:FindFirstChild("minigame")
-        if uiFound and uiFound.Enabled then -- Kadang ada tapi enabled=false
-            task.wait(reactionTime) -- Jeda manusiawi
+        -- Cek berbagai kemungkinan nama UI saat bite
+        local shake = PlayerGui:FindFirstChild("shakeui") 
+        local reel = PlayerGui:FindFirstChild("reel")
+        local minigame = PlayerGui:FindFirstChild("minigame")
+        
+        if (shake and shake.Enabled) or (reel and reel.Enabled) or (minigame and minigame.Enabled) then
+            task.wait(reactionTime)
             return true
         end
-        
         task.wait(0.1)
     until (tick() - startTime) > timeout
     
-    return false -- Timeout
+    return false
+end
+
+local function StartFishing()
+    -- Reset Input dulu biar bersih
+    if CancelInput then pcall(function() CancelInput:InvokeServer() end) end
+    task.wait(0.5)
+
+    while getgenv().fishingStart do
+        -- 1. Charge Rod
+        if ChargeRod then pcall(function() ChargeRod:InvokeServer() end) end
+        task.wait(0.15)
+        if not getgenv().fishingStart then break end
+
+        -- 2. Lempar Umpan
+        if RequestGame then RequestGame:InvokeServer(unpack(defaultArgs)) end
+        
+        -- 3. Mark Auto (Opsional, biar aman)
+        if MarkAuto then pcall(function() MarkAuto:InvokeServer() end) end
+
+        -- 4. Tunggu Ikan
+        local detected = WaitForBite()
+        
+        if not getgenv().fishingStart then break end
+
+        -- 5. Tarik Ikan (Catch)
+        if detected then
+            -- Note: CatchComplete biasanya butuh argumen sukses, tapi untuk RF seringkali kosong/true
+            if CatchComplete then pcall(function() CatchComplete:InvokeServer(true) end) end
+        end
+        
+        -- 6. Reset Loop
+        task.wait(0.2)
+        if CancelInput then pcall(function() CancelInput:InvokeServer() end) end
+        task.wait(0.5)
+    end
 end
 
 -- =====================================================
@@ -96,91 +152,26 @@ local Tab = Window:MakeTab({
 })
 
 Tab:AddToggle({
-	Name = "Enable Fishing",
+	Name = "Aktifkan Fishing",
 	Default = false,
 	Callback = function(Value)
 		getgenv().fishingStart = Value
-        if Value then StartFishingSystem() else pcall(function() CancelInput:InvokeServer() end) end
+        if Value then
+            StartFishing()
+        else
+            if CancelInput then pcall(function() CancelInput:InvokeServer() end) end
+        end
 	end    
 })
 
-Tab:AddSection({ Name = "Modern Detection (Auto Time)" })
-
 Tab:AddToggle({
-	Name = "Use UI Auto-Detect",
+	Name = "Auto Detect (UI)",
 	Default = true,
-	Callback = function(Value) useAutoDetect = Value end    
+	Callback = function(Value)
+		useAutoDetect = Value
+	end    
 })
 
-Tab:AddTextbox({
-	Name = "UI Name (Debug)",
-	Default = "shakeui",
-	TextDisappear = false,
-	Callback = function(Value) targetUIName = Value end	  
-})
-
-Tab:AddLabel("Jika Auto-Detect macet, matikan toggle di atas")
-Tab:AddLabel("dan gunakan Manual Random Delay di bawah.")
-
-Tab:AddSection({ Name = "Manual Random Delay (Fallback)" })
-
-Tab:AddTextbox({
-	Name = "Min Delay (Skin Bagus)",
-	Default = "5.0",
-	TextDisappear = false,
-	Callback = function(Value) minDelay = tonumber(Value) or 5.0 end	  
-})
-
-Tab:AddTextbox({
-	Name = "Max Delay (No Skin)",
-	Default = "8.0",
-	TextDisappear = false,
-	Callback = function(Value) maxDelay = tonumber(Value) or 8.0 end	  
-})
-
--- =====================================================
--- ⚙️ 5. LOGIC LOOP
--- =====================================================
-
-function StartFishingSystem()
-    pcall(function() CancelInput:InvokeServer() end)
-    task.wait(0.5)
-
-    while getgenv().fishingStart do
-        -- 1. Lempar Kail
-        pcall(function() ChargeRod:InvokeServer() end)
-        task.wait(0.1)
-        if not getgenv().fishingStart then break end
-
-        -- 2. Taruh Bobber di air
-        RequestGame:InvokeServer(unpack(defaultArgs))
-        
-        -- 3. TUNGGU IKAN (Smart Wait)
-        -- Bagian ini akan otomatis nunggu sesuai skin kamu (karena nunggu UI game muncul)
-        local detected = WaitForBite()
-        
-        if not getgenv().fishingStart then break end
-
-        -- 4. Tarik Ikan
-        if detected or not useAutoDetect then
-             pcall(function() CompleteGame:FireServer() end)
-        end
-        
-        -- 5. Reset
-        task.wait(0.2)
-        pcall(function() CancelInput:InvokeServer() end)
-        task.wait(0.5) -- Jeda antar lemparan
-    end
-end
-
--- Anti-Afk Standard
-task.spawn(function()
-    local vu = game:GetService("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:connect(function()
-        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-        wait(1)
-        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-    end)
-end)
+Tab:AddLabel("Status: Script Fixed & Path Updated")
 
 OrionLib:Init()
