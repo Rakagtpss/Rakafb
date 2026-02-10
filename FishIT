@@ -1,17 +1,40 @@
+--[[
+    FISHING ULTIMATE SCRIPT
+    Features: Legit/Blatant Mode, Auto Cast Fix, Bypass V3, Anti-AFK
+]]
+
+-- 1. LOAD LIBRARY
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
 local Window = Fluent:CreateWindow({
-    Title = "Fishing FIX - Debugger",
-    SubTitle = "Jika tidak mancing, coba ini",
-    TabWidth = 140,
+    Title = "Fishing ULTIMATE",
+    SubTitle = "Legit & Blatant",
+    TabWidth = 130,
     Size = UDim2.fromOffset(500, 350),
-    Theme = "Dark"
+    Acrylic = true, 
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
 })
 
-local Tabs = { Main = Window:AddTab({ Title = "Fix Fishing", Icon = "tool" }) }
-local Options = Fluent.Options
-local net = game:GetService("ReplicatedStorage").Packages["_Index"]["sleitnick_net@0.2.0"].net
+local Tabs = {
+    Main = Window:AddTab({ Title = "Auto Fish", Icon = "fish" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
 
--- Remote
+local Options = Fluent.Options
+
+-- 2. VARIABLES & SERVICES
+getgenv().fishingStart = false
+getgenv().mode = "Legit" -- Default
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local rs = game:GetService("ReplicatedStorage")
+local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
+
+-- 3. REMOTE DEFINITIONS
 local Remotes = {
     Charge = net["RF/ChargeFishingRod"],
     Request = net["RF/RequestFishingMinigameStarted"],
@@ -19,91 +42,217 @@ local Remotes = {
     Cancel = net["RF/CancelFishingInputs"]
 }
 
-getgenv().fishingStart = false
-local LocalPlayer = game:GetService("Players").LocalPlayer
+-- Config Delay (Default Legit)
+local Config = {
+    Bait = 1.15, 
+    Reel = 0.56,
+    Reset = 0.25
+}
 
--- LOGIKA BARU: Cek & Lempar
-local function AttemptCast()
-    -- Cara 1: Kirim Power 1.0
-    Remotes.Charge:InvokeServer(1.0)
+-- 4. BYPASS SYSTEM (GHOST HOOK V3)
+local Bypass = { Enabled = false }
+local Blacklist = {
+    [Remotes.Cancel] = true,
+    [Remotes.Charge] = true,
+    [Remotes.Request] = true,
+    [Remotes.Catch] = true
+}
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
     
-    -- Cara 2: Kirim tanpa argumen (Fallback)
-    task.delay(0.1, function()
-        Remotes.Charge:InvokeServer()
-    end)
+    if Bypass.Enabled and not checkcaller() and Blacklist[self] then
+        if method == "FireServer" then return nil end
+        if method == "InvokeServer" then return task.wait(9e9) end
+    end
+
+    return oldNamecall(self, ...)
+end)
+
+-- 5. UTILITY FUNCTIONS
+local function HasRod()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool and (tool.Name:find("Rod") or tool:FindFirstChild("Bobber") or tool:FindFirstChild("Cast")) then
+        return true
+    end
+    return false
 end
 
-local function StartLoop()
+-- Generator Argumen (Randomizer)
+local function GetArgs()
+    if getgenv().mode == "Blatant" then
+        return { -1.115, 0, tick() } -- Statis (Cepat)
+    else
+        -- Random dikit biar aman
+        return { -1.115 + (math.random(-5, 5)/1000), 0, tick() }
+    end
+end
+
+-- 6. MAIN LOGIC LOOP
+local StatusLabel
+
+local function UpdateStatus(text)
+    if StatusLabel then StatusLabel:SetTitle("Status: " .. text) end
+end
+
+local function AutoFishingLoop()
     while getgenv().fishingStart do
         pcall(function()
             if not LocalPlayer.Character then return end
             
-            local Tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
-            if not Tool then
-                Fluent:Notify({Title = "Error", Content = "PEGANG PANCINGAN DULU!", Duration = 2})
-                task.wait(2)
+            -- Cek Rod
+            if not HasRod() then
+                UpdateStatus("Equip Rod First!")
+                task.wait(1)
                 return
             end
 
-            -- 1. LEMPAR (Dual Method)
-            AttemptCast()
+            -- [STEP 1] CHARGE (LEMPAR)
+            UpdateStatus("Casting...")
+            Remotes.Charge:InvokeServer(1.0) -- Force Power 1.0 (FIXED)
             
-            -- Tunggu bobber muncul (Wajib ada delay minimal)
-            task.wait(Options.DelayBait.Value) 
+            -- Delay Logic
+            if getgenv().mode == "Blatant" then
+                -- Tunggu minimal 0.1s agar server spawn bobber
+                task.wait(0.1) 
+            else
+                task.wait(Config.Bait)
+            end
             
             if not getgenv().fishingStart then return end
 
-            -- 2. TARIK (Bypass "!")
-            -- Koordinat statis paling stabil
-            Remotes.Request:InvokeServer(-1.115, 0, tick()) 
+            -- [STEP 2] REQUEST (BYPASS "!")
+            UpdateStatus("Waiting Fish...")
+            Remotes.Request:InvokeServer(unpack(GetArgs()))
             
-            -- 3. TANGKAP
-            -- Delay Reel
-            task.wait(Options.DelayReel.Value)
+            -- [STEP 3] REEL & CATCH
+            if getgenv().mode == "Blatant" then
+                -- Langsung tarik tanpa tunggu
+                task.wait(0.05) 
+            else
+                UpdateStatus("Reeling ("..Config.Reel.."s)...")
+                task.wait(Config.Reel)
+            end
+            
+            if not getgenv().fishingStart then return end
+
+            -- Execute Catch
             Remotes.Catch:InvokeServer()
+            UpdateStatus("CAUGHT! ("..getgenv().mode..")")
             
-            -- 4. RESET
-            task.wait(Options.DelayReset.Value)
-            Remotes.Cancel:InvokeServer()
+            -- [STEP 4] RESET
+            if getgenv().mode == "Blatant" then
+                Remotes.Cancel:InvokeServer()
+                task.wait() -- Instant reset
+            else
+                task.wait(Config.Reset)
+                Remotes.Cancel:InvokeServer()
+            end
         end)
-        task.wait(0.1)
+        
+        -- Loop Speed Control
+        if getgenv().mode == "Blatant" then
+            task.wait()
+        else
+            task.wait(0.1)
+        end
     end
+    UpdateStatus("Idle / Stopped")
 end
 
--- UI
-Tabs.Main:AddToggle("ToggleFish", {Title = "Activate Fix Loop", Default = false }):OnChanged(function(v)
-    getgenv().fishingStart = v
-    if v then task.spawn(StartLoop) else pcall(function() Remotes.Cancel:InvokeServer() end) end
+-- 7. UI CONSTRUCTION
+StatusLabel = Tabs.Main:AddParagraph({
+    Title = "Status: Idle",
+    Content = "Pilih Mode & Start."
+})
+
+-- Mode Selector
+local Dropdown = Tabs.Main:AddDropdown("ModeSelect", {
+    Title = "Fishing Mode",
+    Values = {"Legit", "Blatant"},
+    Multi = false,
+    Default = 1,
+})
+
+Dropdown:OnChanged(function(Value)
+    getgenv().mode = Value
+    if Value == "Blatant" then
+        Fluent:Notify({Title = "WARNING", Content = "Blatant Mode High Risk!", Duration = 3})
+    end
 end)
 
-Tabs.Main:AddSection("Pengaturan Delay (Aman)")
+-- Toggle Utama
+local Toggle = Tabs.Main:AddToggle("FishingToggle", {Title = "Enable Auto Fishing", Default = false })
 
-Tabs.Main:AddInput("DelayBait", {
-    Title = "Delay Charge (Lempar)",
-    Description = "Kalau tidak melempar, NAIKKAN angka ini",
-    Default = "1.2", -- Default aman
-    Numeric = true,
-    Callback = function(v) end
-})
-
-Tabs.Main:AddInput("DelayReel", {
-    Title = "Delay Reel (Tarik)",
-    Default = "0.1", -- Semi-Instant
-    Numeric = true,
-    Callback = function(v) end
-})
-
-Tabs.Main:AddInput("DelayReset", {
-    Title = "Delay Reset",
-    Default = "0.5",
-    Numeric = true,
-    Callback = function(v) end
-})
-
-Tabs.Main:AddButton({
-    Title = "Tes Manual: Lempar Sekali",
-    Callback = function()
-        AttemptCast()
-        Fluent:Notify({Title = "Test", Content = "Mencoba melempar...", Duration = 1})
+Toggle:OnChanged(function()
+    getgenv().fishingStart = Options.FishingToggle.Value
+    Bypass.Enabled = Options.FishingToggle.Value
+    
+    if getgenv().fishingStart then
+        pcall(function() Remotes.Cancel:InvokeServer() end) -- Reset input
+        task.spawn(AutoFishingLoop)
+    else
+        pcall(function() Remotes.Cancel:InvokeServer() end)
     end
+end)
+
+-- Settings (Hanya untuk Legit)
+Tabs.Settings:AddSection("Legit Mode Delays")
+
+Tabs.Settings:AddInput("InputBait", {
+    Title = "Delay Charge",
+    Default = "1.15",
+    Numeric = true,
+    Finished = false,
+    Callback = function(v) Config.Bait = tonumber(v) or 1.15 end
+})
+
+Tabs.Settings:AddInput("InputReel", {
+    Title = "Delay Reel",
+    Default = "0.56",
+    Numeric = true,
+    Finished = false,
+    Callback = function(v) Config.Reel = tonumber(v) or 0.56 end
+})
+
+Tabs.Settings:AddInput("InputReset", {
+    Title = "Delay Reset",
+    Default = "0.25",
+    Numeric = true,
+    Finished = false,
+    Callback = function(v) Config.Reset = tonumber(v) or 0.25 end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Unstuck Character",
+    Callback = function()
+        pcall(function() Remotes.Cancel:InvokeServer() end)
+        Fluent:Notify({Title = "System", Content = "Character Unstuck!", Duration = 2})
+    end
+})
+
+-- Anti AFK
+task.spawn(function()
+    local vu = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
+end)
+
+-- 8. FINALIZE
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Gemini Script",
+    Content = "Script Loaded Completely.",
+    Duration = 5
 })
