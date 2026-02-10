@@ -1,243 +1,214 @@
 -- ==========================================
--- SMART TRIGGER CONFIG
+-- CONFIG & VARIABLES
 -- ==========================================
-getgenv().FishConfig = {
-    Active = false,
-    SmartTrigger = true, -- Jika TRUE, delay manual diabaikan (mengikuti respon server)
-    ManualDelay = 0.1,   -- Dipakai jika SmartTrigger dimatikan
-    SpamMode = false,    -- Mode brutal
-    ShowLogs = true      -- Tampilkan notifikasi status
+getgenv().TriggerConfig = {
+    Active = false,        -- Status Auto Fish
+    DetectSign = true,     -- TRUE = Tunggu tanda "!", FALSE = Main Barbar (Bypass waktu)
+    ReactionTime = 0.0,    -- Delay tambahan setelah "!" muncul (0 = Instan)
+    SpamCatch = false,     -- Spam klik saat menangkap (opsional)
 }
 
 -- Services
+local players = game:GetService("Players")
+local lp = players.LocalPlayer
+local runService = game:GetService("RunService")
 local rs = game:GetService("ReplicatedStorage")
 local net = rs:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0").net
-local runService = game:GetService("RunService")
-local coreGui = game:GetService("CoreGui")
 
--- Remote Definitions
+-- Remotes
 local ChargeRod    = net["RF/ChargeFishingRod"]
 local RequestGame  = net["RF/RequestFishingMinigameStarted"]
 local CompleteGame = net["RF/CatchFishCompleted"]
 local CancelInput  = net["RF/CancelFishingInputs"]
 
--- Arguments
-local args = { -1.115296483039856, 0, 1763651451.636425 }
-
 -- ==========================================
--- TRIGGER LOGIC
+-- LOGIC: RANDOM ARGS GENERATOR
 -- ==========================================
-local function Log(msg, color)
-    if not getgenv().FishConfig.ShowLogs then return end
-    print("[Trigger System]: " .. msg)
-    -- Visual indicator bisa ditambahkan disini
+-- Fungsi ini membuat args acak setiap kali dipanggil
+local function getRandomArgs()
+    -- Arg 1: Float Random antara -10 sampai 10 (Meniru koordinat X/Y)
+    local val1 = math.random(-10, 10) + math.random() 
+    
+    -- Arg 2: Integer Random 0-100 (Biasanya power atau status)
+    local val2 = math.random(0, 100)
+    
+    -- Arg 3: Angka Besar Random (Meniru Timestamp/Key unik)
+    local val3 = math.random(100000000, 2000000000) + math.random()
+    
+    return { val1, val2, val3 }
 end
 
-local function executeCatch()
-    if getgenv().FishConfig.SpamMode then
-        for i = 1, 5 do
-            task.spawn(function()
-                CompleteGame:InvokeServer()
-            end)
-        end
-    else
-        CompleteGame:InvokeServer()
+-- ==========================================
+-- LOGIC: "!" DETECTOR
+-- ==========================================
+local function WaitForExclamation()
+    if not getgenv().TriggerConfig.DetectSign then 
+        task.wait(2.5) -- Estimasi waktu tunggu manual jika deteksi mati
+        return 
     end
-end
 
-local function SmartFishingLoop()
-    task.spawn(function()
-        while getgenv().FishConfig.Active do
-            
-            -- STEP 1: CHARGE (LEMPAR)
-            -- Trigger System: Kita tunggu server membalas InvokeServer sebelum lanjut
-            -- Ini memastikan kita tidak meminta minigame sebelum kail terlempar
-            Log("1. Melempar Kail (Charging)...")
-            local success, err = pcall(function()
-                ChargeRod:InvokeServer()
-            end)
+    local signFound = false
+    local connection
+    local startTime = tick()
 
-            if not success then 
-                Log("Gagal Charge, mengulang...", Color3.new(1,0,0))
-                task.wait(1)
-                continue 
+    -- Fungsi Cek GUI
+    local function check(obj)
+        if obj:IsA("BillboardGui") or obj:IsA("ScreenGui") or obj:IsA("TextLabel") or obj:IsA("ImageLabel") then
+            -- Cek apakah objek bernama "!" atau text-nya "!" atau "shake"
+            if (obj.Name == "!" or obj.Name == "Exclamation" or obj.Name:lower():find("shake")) or 
+               (obj:IsA("TextLabel") and obj.Text == "!") then
+                if obj.Visible or obj.Enabled then
+                    signFound = true
+                end
             end
+        end
+    end
 
-            -- Jika pakai Delay Manual (Bukan Trigger)
-            if not getgenv().FishConfig.SmartTrigger then
-                task.wait(getgenv().FishConfig.ManualDelay)
-            end
-
-            if not getgenv().FishConfig.Active then break end
-
-            -- STEP 2: REQUEST MINIGAME (UMPAN DIMAKAN)
-            Log("2. Trigger Minigame...")
-            local reqSuccess = pcall(function()
-                RequestGame:InvokeServer(unpack(args))
-            end)
-
-            -- STEP 3: EXECUTE CATCH (TANGKAP)
-            -- Di sistem trigger, kita langsung sikat begitu request minigame terkirim
-            if reqSuccess then
-                Log("3. Sinyal Diterima! MENANGKAP!")
-                executeCatch()
-            end
-            
-            -- STEP 4: RESET/COOLDOWN
-            -- Tunggu sebentar biar server tidak kick karena spam request
-            pcall(function() CancelInput:InvokeServer() end)
-            
-            -- Smart Wait: Hanya tunggu 1 frame jika Trigger aktif (Kecepatan Maksimal)
-            if getgenv().FishConfig.SmartTrigger then
-                runService.Heartbeat:Wait() 
-            else
-                task.wait(getgenv().FishConfig.ManualDelay)
-            end
+    -- Listener: Memantau Character dan PlayerGui
+    connection = runService.Heartbeat:Connect(function()
+        -- 1. Scan PlayerGui
+        for _, gui in pairs(lp.PlayerGui:GetChildren()) do
+            check(gui)
+            for _, v in pairs(gui:GetDescendants()) do check(v) end
+        end
+        -- 2. Scan Character
+        if lp.Character then
+            for _, v in pairs(lp.Character:GetDescendants()) do check(v) end
         end
         
-        -- Cleanup saat stop
+        -- Timeout 20 detik
+        if tick() - startTime > 20 then signFound = true end
+    end)
+
+    repeat 
+        task.wait() 
+        if not getgenv().TriggerConfig.Active then break end
+    until signFound or (not getgenv().TriggerConfig.Active)
+
+    if connection then connection:Disconnect() end
+end
+
+-- ==========================================
+-- MAIN LOOP
+-- ==========================================
+local function StartLoop()
+    task.spawn(function()
+        while getgenv().TriggerConfig.Active do
+            -- 1. LEMPAR KAIL
+            pcall(function() ChargeRod:InvokeServer() end)
+            
+            -- 2. TUNGGU "!" (Auto Detect)
+            WaitForExclamation()
+
+            if not getgenv().TriggerConfig.Active then break end
+
+            -- 3. REQUEST MINIGAME (DENGAN RANDOM ARGS)
+            task.wait(getgenv().TriggerConfig.ReactionTime)
+            
+            pcall(function() 
+                -- Generate Random Args disini
+                local dynamicArgs = getRandomArgs()
+                RequestGame:InvokeServer(unpack(dynamicArgs)) 
+            end)
+
+            -- 4. TANGKAP (COMPLETE)
+            if getgenv().TriggerConfig.SpamCatch then
+                for i=1,3 do task.spawn(function() CompleteGame:InvokeServer() end) end
+            else
+                CompleteGame:InvokeServer()
+            end
+            
+            -- 5. RESET
+            pcall(function() CancelInput:InvokeServer() end)
+            task.wait(0.2)
+        end
         pcall(function() CancelInput:InvokeServer() end)
     end)
 end
 
 -- ==========================================
--- UI SIMPLE (TRIGGER CONTROL)
+-- UI CONTROLLER (SIMPLE)
 -- ==========================================
-if coreGui:FindFirstChild("TriggerFishUI") then coreGui.TriggerFishUI:Destroy() end
-
 local ScreenGui = Instance.new("ScreenGui")
 local Frame = Instance.new("Frame")
 local Title = Instance.new("TextLabel")
-local Status = Instance.new("TextLabel")
 local ToggleBtn = Instance.new("TextButton")
-local TriggerBtn = Instance.new("TextButton")
-local SpamBtn = Instance.new("TextButton")
-local CloseBtn = Instance.new("TextButton")
-local UIStroke = Instance.new("UIStroke")
+local ModeBtn = Instance.new("TextButton")
+local StatusLbl = Instance.new("TextLabel")
 local UICorner = Instance.new("UICorner")
+local UIStroke = Instance.new("UIStroke")
 
+if game:GetService("CoreGui"):FindFirstChild("RandomFishUI") then 
+    game:GetService("CoreGui").RandomFishUI:Destroy() 
+end
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
-ScreenGui.Name = "TriggerFishUI"
-ScreenGui.Parent = coreGui
 
--- Frame Setup
+ScreenGui.Name = "RandomFishUI"
+ScreenGui.Parent = game:GetService("CoreGui")
+
 Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-Frame.Position = UDim2.new(0.5, -110, 0.5, -100)
-Frame.Size = UDim2.new(0, 220, 0, 200)
-Frame.Active = true
-Frame.Draggable = true
-
-UICorner.Parent = Frame; UICorner.CornerRadius = UDim.new(0, 10)
-UIStroke.Parent = Frame; UIStroke.Color = Color3.fromRGB(0, 255, 128); UIStroke.Thickness = 2
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+Frame.Position = UDim2.new(0.5, -100, 0.5, -100)
+Frame.Size = UDim2.new(0, 200, 0, 200)
+Frame.Active = true; Frame.Draggable = true
+UICorner.Parent = Frame; UIStroke.Parent = Frame
+UIStroke.Color = Color3.fromRGB(255, 100, 255); UIStroke.Thickness = 2
 
 Title.Parent = Frame
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "Trigger System v1"
-Title.TextColor3 = Color3.fromRGB(0, 255, 128)
-Title.TextSize = 16
+Title.Size = UDim2.new(1,0,0,30)
+Title.Text = "Random Args Fishing"
+Title.TextColor3 = Color3.fromRGB(255, 100, 255)
+Title.Font = Enum.Font.GothamBold; Title.TextSize = 16
 
--- Status Label
-Status.Parent = Frame
-Status.BackgroundTransparency = 1
-Status.Position = UDim2.new(0, 0, 0, 30)
-Status.Size = UDim2.new(1, 0, 0, 20)
-Status.Font = Enum.Font.Gotham
-Status.Text = "Status: IDLE"
-Status.TextColor3 = Color3.fromRGB(150, 150, 150)
-Status.TextSize = 12
-
--- Toggle Button (Start/Stop)
+-- Toggle Start/Stop
 ToggleBtn.Parent = Frame
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 60)
-ToggleBtn.Size = UDim2.new(0, 200, 0, 35)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ToggleBtn.Position = UDim2.new(0,10,0,40)
+ToggleBtn.Size = UDim2.new(0,180,0,40)
+ToggleBtn.Text = "START"
+ToggleBtn.TextColor3 = Color3.White
 ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Text = "START FISHING"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", ToggleBtn)
 
 ToggleBtn.MouseButton1Click:Connect(function()
-    getgenv().FishConfig.Active = not getgenv().FishConfig.Active
-    if getgenv().FishConfig.Active then
-        ToggleBtn.Text = "STOP FISHING"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        Status.Text = "Status: RUNNING"
-        Status.TextColor3 = Color3.fromRGB(0, 255, 0)
-        SmartFishingLoop()
+    getgenv().TriggerConfig.Active = not getgenv().TriggerConfig.Active
+    if getgenv().TriggerConfig.Active then
+        ToggleBtn.Text = "STOP"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+        StartLoop()
     else
-        ToggleBtn.Text = "START FISHING"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        Status.Text = "Status: IDLE"
-        Status.TextColor3 = Color3.fromRGB(150, 150, 150)
+        ToggleBtn.Text = "START"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
     end
 end)
 
--- Trigger Mode Button
-TriggerBtn.Parent = Frame
-TriggerBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-TriggerBtn.Position = UDim2.new(0, 10, 0, 105)
-TriggerBtn.Size = UDim2.new(0, 95, 0, 35)
-TriggerBtn.Font = Enum.Font.GothamBold
-TriggerBtn.Text = "Trigger: ON"
-TriggerBtn.TextColor3 = Color3.fromRGB(0, 255, 128)
-Instance.new("UICorner", TriggerBtn).CornerRadius = UDim.new(0, 6)
+-- Toggle Detection Mode
+ModeBtn.Parent = Frame
+ModeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+ModeBtn.Position = UDim2.new(0,10,0,90)
+ModeBtn.Size = UDim2.new(0,180,0,30)
+ModeBtn.Text = "Mode: DETECT (!)"
+ModeBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
+ModeBtn.Font = Enum.Font.Gotham
+Instance.new("UICorner", ModeBtn)
 
-TriggerBtn.MouseButton1Click:Connect(function()
-    getgenv().FishConfig.SmartTrigger = not getgenv().FishConfig.SmartTrigger
-    if getgenv().FishConfig.SmartTrigger then
-        TriggerBtn.Text = "Trigger: ON"
-        TriggerBtn.TextColor3 = Color3.fromRGB(0, 255, 128)
+ModeBtn.MouseButton1Click:Connect(function()
+    getgenv().TriggerConfig.DetectSign = not getgenv().TriggerConfig.DetectSign
+    if getgenv().TriggerConfig.DetectSign then
+        ModeBtn.Text = "Mode: DETECT (!)"
+        ModeBtn.TextColor3 = Color3.fromRGB(0, 255, 0)
     else
-        TriggerBtn.Text = "Trigger: OFF"
-        TriggerBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+        ModeBtn.Text = "Mode: BYPASS (Timer)"
+        ModeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     end
 end)
 
--- Spam Mode Button
-SpamBtn.Parent = Frame
-SpamBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-SpamBtn.Position = UDim2.new(0, 115, 0, 105)
-SpamBtn.Size = UDim2.new(0, 95, 0, 35)
-SpamBtn.Font = Enum.Font.GothamBold
-SpamBtn.Text = "Spam: OFF"
-SpamBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-Instance.new("UICorner", SpamBtn).CornerRadius = UDim.new(0, 6)
-
-SpamBtn.MouseButton1Click:Connect(function()
-    getgenv().FishConfig.SpamMode = not getgenv().FishConfig.SpamMode
-    if getgenv().FishConfig.SpamMode then
-        SpamBtn.Text = "Spam: ON"
-        SpamBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    else
-        SpamBtn.Text = "Spam: OFF"
-        SpamBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
-    end
-end)
-
--- Close Button
-CloseBtn.Parent = Frame
-CloseBtn.BackgroundTransparency = 1
-CloseBtn.Position = UDim2.new(1, -25, 0, 0)
-CloseBtn.Size = UDim2.new(0, 25, 0, 30)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-CloseBtn.MouseButton1Click:Connect(function()
-    getgenv().FishConfig.Active = false
-    ScreenGui:Destroy()
-end)
-
--- Keterangan
-local Info = Instance.new("TextLabel")
-Info.Parent = Frame
-Info.BackgroundTransparency = 1
-Info.Position = UDim2.new(0, 10, 1, -45)
-Info.Size = UDim2.new(1, -20, 0, 40)
-Info.Font = Enum.Font.Gotham
-Info.Text = "Trigger ON: Kecepatan mengikuti respons server (No Delay)."
-Info.TextColor3 = Color3.fromRGB(100, 100, 100)
-Info.TextSize = 10
-Info.TextWrapped = true
+StatusLbl.Parent = Frame
+StatusLbl.BackgroundTransparency = 1
+StatusLbl.Position = UDim2.new(0,10,0,130)
+StatusLbl.Size = UDim2.new(0,180,0,60)
+StatusLbl.Text = "Fitur Baru: Args (Data Posisi) diacak setiap lemparan untuk menghindari deteksi sistem."
+StatusLbl.TextColor3 = Color3.fromRGB(150,150,150)
+StatusLbl.TextSize = 10
+StatusLbl.TextWrapped = true
