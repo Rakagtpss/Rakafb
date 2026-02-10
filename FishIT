@@ -1,328 +1,110 @@
--- =====================================================
--- 🎣 AUTO FISHING SCRIPT - MODIFIED VERSION
--- =====================================================
-
 getgenv().fishingStart = false
-local instant = false
-local superInstant = true 
+local delayBait = 1.15   -- Delay saat melempar umpan (Charge)
+local delayReel = 0.56   -- Delay saat menarik ikan (Catch)
+local delayReset = 0.2 
 
--- ⚙️ KONFIGURASI DELAY (Dapat diubah via UI)
-local Config = {
-    delayReel = 0.56,      -- Delay untuk reel/catch
-    delayBait = 1.15,      -- Delay untuk bait/charge
-    delayReset = 0.2,      -- Delay reset
-    autoGreat = false
-}
-
-local args = { -1.115296483039856, 0, 1763651451.636425 }
-
--- =====================================================
--- 📡 REMOTE DEFINITIONS
--- =====================================================
 local rs = game:GetService("ReplicatedStorage")
 local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
 
+-- Remote Definitions (Updated)
 local ChargeRod    = net["RF/ChargeFishingRod"]
 local RequestGame  = net["RF/RequestFishingMinigameStarted"]
-local CatchFishCompleted = net["RF/CatchFishCompleted"]  -- ✅ CHANGED FROM RE/FishingCompleted
+local CompleteGame = net["RF/CatchFishCompleted"] -- Diubah ke RF dan Nama baru
 local CancelInput  = net["RF/CancelFishingInputs"]
-local AutoFishState = net["RF/UpdateAutoFishingState"]
 
 -- =====================================================
--- 🛡️ FISHING BLOCKER & HOOK
+-- BYPASS & TRIGGER SYSTEM (MENIPU SISTEM)
 -- =====================================================
-local FishingBlocker = {
-    Enabled = false,
-    AutoGreat = false,
-}
-
-local BLOCKED_REMOTES = {
-    [ChargeRod]    = true,
-    [RequestGame]  = true,
-    [CatchFishCompleted] = true,  -- ✅ Updated
-    [CancelInput]  = true,
-}
+local FishingBlocker = { Enabled = false }
 
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-
-    if FishingBlocker.Enabled and BLOCKED_REMOTES[self] and not checkcaller() then
+    -- Memblokir game asli agar tidak mengirim Cancel atau Complete sendiri
+    if FishingBlocker.Enabled and (self == CancelInput or self == CompleteGame) and not checkcaller() then
         if method == "InvokeServer" then
-            return task.wait(9e9) -- Infinite yield untuk block game script
-        elseif method == "FireServer" then
-            return nil
+            return task.wait(9e9) -- Membuat script game asli 'tergantung'
         end
     end
-
     return oldNamecall(self, ...)
 end)
 
 -- =====================================================
--- ⚡ LIGHTWEIGHT SPAWN LIMITER
--- =====================================================
-local MAX_PARALLEL = 4
-local active = 0
-
-local function lightSpawn(fn)
-    if active >= MAX_PARALLEL then
-        return
-    end
-
-    active = active + 1
-    task.spawn(function()
-        pcall(fn)
-        active = active - 1
-    end)
-end
-
--- =====================================================
--- 🎯 CUSTOM TRIGGER - MENIPU SISTEM
--- =====================================================
-local function triggerCatchFishCompleted()
-    -- Metode 1: Invoke Server (untuk RF remote)
-    pcall(function()
-        CatchFishCompleted:InvokeServer()
-    end)
-    
-    -- Metode 2: Jika ternyata perlu FireServer
-    -- pcall(function()
-    --     CatchFishCompleted:FireServer()
-    -- end)
-end
-
--- =====================================================
--- 🎣 FISHING LOOPS
+-- LOGIKA UTAMA
 -- =====================================================
 
-local function enableAutoGreat()
-    if Config.autoGreat then
-        pcall(function()
-            AutoFishState:InvokeServer(true)
-        end)
-    end
-end
-
--- Mode: Instant (Original)
-local function startFishingLoop()
-    local _Cancel = CancelInput
-    local _Charge = ChargeRod
-    
-    enableAutoGreat()
-    
+local function startFishing()
     while getgenv().fishingStart do
-        pcall(function() _Charge:InvokeServer() end) 
-        task.wait(0.055)
-        
-        if not getgenv().fishingStart then break end
-        
         pcall(function()
+            -- Step 1: Melempar Umpan
+            ChargeRod:InvokeServer()
+            task.wait(delayBait) 
+            
+            if not getgenv().fishingStart then return end
+            
+            -- Step 2: Request Minigame
+            local args = { -1.115296483039856, 0, tick() }
             RequestGame:InvokeServer(unpack(args))
+            
+            -- Step 3: Menunggu ikan menggigit (Delay Reel)
+            task.wait(delayReel)
+            
+            if not getgenv().fishingStart then return end
+            
+            -- Step 4: Trigger Catch (Menipu sistem seolah selesai)
+            CompleteGame:InvokeServer() 
+            
+            -- Step 5: Reset
+            task.wait(delayReset)
+            CancelInput:InvokeServer()
         end)
-        
-        task.wait(Config.delayReel)  -- ✅ Custom delay reel
-        
-        if not getgenv().fishingStart then break end 
-        
-        triggerCatchFishCompleted()  -- ✅ Trigger custom
-        task.wait(0.05)
-        
-        pcall(function() _Cancel:InvokeServer() end)
     end
-end
-
--- Mode: Blatan/Super Instant
-local function startFishingSuperInstantLoop()
-    warn("🚀 LOOPING FAST MODE ACTIVATED")
-    
-    local _Charge = ChargeRod
-    local _Request = RequestGame
-    local _Cancel = CancelInput
-    
-    enableAutoGreat()
-    
-    pcall(function() _Cancel:InvokeServer() end)
-    task.wait(0.055)
-    
-    while getgenv().fishingStart do
-        lightSpawn(function()
-            _Charge:InvokeServer()
-        end)
-        
-        lightSpawn(function()
-            _Request:InvokeServer(unpack(args))
-        end)
-        
-        task.wait(Config.delayBait)  -- ✅ Custom delay bait
-        
-        triggerCatchFishCompleted()  -- ✅ Trigger custom
-        
-        task.wait(Config.delayReset)  -- ✅ Custom reset delay
-        
-        pcall(function() _Cancel:InvokeServer() end)
-    end
-end
-
-local function resetCharacter()
-    triggerCatchFishCompleted()
-    task.wait(0.05) 
-    pcall(function() CancelInput:InvokeServer() end)
 end
 
 -- =====================================================
--- 🖥️ SIMPLE UI INTEGRATION
+-- UI SETUP (WIND UI)
 -- =====================================================
 
-TabFishing:Section({ Title = "🎣 Fishing Mode" })
+-- [TAB: FISHING]
+TabFishing:Section({ Title = "Fishing Delays" })
 
-TabFishing:Dropdown({
-    Title = "Mode Fishing",
-    Desc = "Pilih mode fishing",
-    Values = {"Instant", "Blatan"},
-    Value = "Instant",
-    Callback = function(option)
-        instant = (option == "Instant")
-        superInstant = (option == "Blatan")
-        
-        -- Toggle visibility
-        setElementVisible("Delay Reel", instant)
-        setElementVisible("Delay Bait", superInstant)
-        setElementVisible("Reset Delay", superInstant)
-    end
-})
-
-TabFishing:Section({ Title = "⚙️ Custom Delays" })
-
--- Delay Reel (untuk mode Instant)
 TabFishing:Input({
-    Title = "Delay Reel",
-    Value = "0.56",
+    Title = "Delay Bait (Lempar)",
+    Value = tostring(delayBait),
     Callback = function(text)
-        local num = tonumber(text:match("^%d*%.?%d+$"))
-        if not num then
-            Config.delayReel = 0.56
-            return "0.56"
-        end
-        Config.delayReel = math.clamp(num, 0.1, 3)
-        return tostring(Config.delayReel)
+        delayBait = tonumber(text) or 1.15
     end
 })
 
--- Delay Bait (untuk mode Blatan)
 TabFishing:Input({
-    Title = "Delay Bait",
-    Value = "1.15",
+    Title = "Delay Reel (Tarik)",
+    Value = tostring(delayReel),
     Callback = function(text)
-        local num = tonumber(text:match("^%d*%.?%d+$"))
-        if not num then
-            Config.delayBait = 1.15
-            return "1.15"
-        end
-        Config.delayBait = math.clamp(num, 0, 3)
-        return tostring(Config.delayBait)
+        delayReel = tonumber(text) or 0.56
     end
 })
 
--- Reset Delay (untuk mode Blatan)
-TabFishing:Input({
-    Title = "Reset Delay",
-    Value = "0.2",
-    Callback = function(text)
-        local num = tonumber(text:match("^%d*%.?%d+$"))
-        if not num then
-            Config.delayReset = 0.2
-            return "0.2"
-        end
-        Config.delayReset = math.clamp(num, 0, 2)
-        return tostring(Config.delayReset)
-    end
-})
-
-TabFishing:Section({ Title = "🎯 Features" })
+TabFishing:Section({ Title = "Main Toggle" })
 
 TabFishing:Toggle({
-    Title = "Auto Great",
-    Desc = "Aktifkan sebelum start fishing",
-    Icon = "check",
-    Value = false,
-    Callback = function(state)
-        Config.autoGreat = state
-        FishingBlocker.AutoGreat = state
-    end
-})
-
-TabFishing:Section({ Title = "▶️ Control" })
-
-TabFishing:Toggle({
-    Title = "Start Fishing",
-    Icon = "fish",
+    Title = "Activate Auto Fishing",
     Value = false,
     Callback = function(state)
         getgenv().fishingStart = state
         FishingBlocker.Enabled = state
         
         if state then
-            -- Reset state
-            pcall(function()
-                CancelInput:InvokeServer()
-            end)
-            
-            -- Start loop based on mode
-            if superInstant then
-                task.spawn(startFishingSuperInstantLoop)
-            else
-                task.spawn(startFishingLoop)
-            end
-            
-            WindUI:Notify({
-                Title = "🎣 Fishing", 
-                Content = "Auto fishing dimulai!", 
-                Duration = 2
-            })
+            task.spawn(startFishing)
+            WindUI:Notify({Title = "Fishing", Content = "Script Started!", Duration = 2})
         else
-            -- Stop auto great if enabled
-            if Config.autoGreat then
-                pcall(function()
-                    AutoFishState:InvokeServer(false)
-                end)
-            end
-            
-            -- Reset
-            triggerCatchFishCompleted()
-            pcall(function()
-                CancelInput:InvokeServer()
-            end)
-            
-            WindUI:Notify({
-                Title = "🎣 Fishing", 
-                Content = "Auto fishing dihentikan", 
-                Duration = 2
-            })
+            WindUI:Notify({Title = "Fishing", Content = "Script Stopped", Duration = 2})
         end
     end
 })
 
 TabFishing:Button({
-    Title = "🔧 Unstuck",
-    Icon = "person-standing",
+    Title = "Manual Unstuck",
     Callback = function()
-        task.spawn(function()
-            resetCharacter()
-            WindUI:Notify({
-                Title = "Unstuck",
-                Content = "Karakter sudah di-reset",
-                Duration = 2
-            })
-        end)
+        pcall(function() CancelInput:InvokeServer() end)
     end
 })
-
--- Initialize visibility
-task.delay(1, function()
-    setElementVisible("Delay Reel", instant)
-    setElementVisible("Delay Bait", superInstant)
-    setElementVisible("Reset Delay", superInstant)
-end)
-
-print("✅ Auto Fishing Script Loaded - Modified Version")
-print("📡 Using RF/CatchFishCompleted remote")
