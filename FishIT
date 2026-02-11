@@ -25,7 +25,7 @@ local function GetHum() local c = Player.Character; return c and c:FindFirstChil
 -- // KONFIGURASI VISUAL (MODERN DARK TRANSPARENT)
 local UI_THEME = {
     Width = 400,
-    Height = 320, -- Sedikit dipertinggi untuk menu baru
+    Height = 320, 
     
     Color = Color3.fromRGB(12, 12, 14),        
     SidebarColor = Color3.fromRGB(8, 8, 8), 
@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "Update Loaded: Safe Mining", nil, 4)
+Notify("SERAPHIN", "Safe Mode & Crafting Loaded", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -624,7 +624,7 @@ local States = {
     AutoCoral=false,
     AutoFarmRelic=false, 
     AutoCrystal=false, 
-    AutoLava=false, -- [NEW]
+    AutoLava=false,
     Busy=false,
     HasTank=false,
     RelicSel="Blacktide", 
@@ -1926,53 +1926,96 @@ task.spawn(function()
 end)
 
 -- ====================================================
--- [NEW LOGIC] UNIFIED CRYSTAL/LAVA MINING (SAFE MODE)
+-- [REVISED V5] UNIFIED SAFE MINING (TWEEN + DELAY + UNEQUIP)
 -- ====================================================
 task.spawn(function()
-    local EquipRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
     local MiningReturnCFrame = nil
     
-    -- Helper: Cek apakah crystal valid (ada visual/prompt)
-    local function isActiveCrystal(crystal)
-        for _, v in ipairs(crystal:GetDescendants()) do
-            if v:IsA("PointLight") or v:IsA("Highlight") or v:IsA("MeshPart") or v:IsA("SpecialMesh") or v:IsA("ProximityPrompt") then
+    -- Definisi Remote
+    local PkgNet = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+    local EquipHotbar = PkgNet:WaitForChild("RE/EquipToolFromHotbar")
+    local UnequipHotbar = PkgNet:WaitForChild("RE/UnequipToolFromHotbar")
+    local MineRemote = PkgNet:FindFirstChild("RE/PickaxeMining")
+
+    -- [FIX 1] Fungsi Equip Pintar
+    local function SmartEquipPickaxe()
+        local char = Player.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        if not char or not hum then return false end
+        
+        local backpack = Player.Backpack
+        for _, tool in pairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and (string.find(string.lower(tool.Name), "pickaxe") or string.find(string.lower(tool.Name), "drill")) then
+                hum:EquipTool(tool)
                 return true
             end
         end
         return false
     end
 
-    -- Helper: Mining Logic Generik
+    -- [FIX 2] TWEEN MOVEMENT (Gerak Halus - Anti Speed Hack)
+    local MOVE_SPEED = 65 -- Dikurangi agar lebih aman (seperti lari cepat)
+    local function SafeTravel(targetCFrame)
+        local hrp = GetRoot()
+        if not hrp then return end
+        
+        local dist = (hrp.Position - targetCFrame.Position).Magnitude
+        local duration = dist / MOVE_SPEED
+        if duration < 0.6 then duration = 0.6 end -- Minimal durasi agar tidak instan
+        
+        -- Bekukan gravitasi
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        
+        local ti = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+        local tween = Services.TweenService:Create(hrp, ti, {CFrame = targetCFrame})
+        tween:Play()
+        tween.Completed:Wait()
+        
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+
+    -- Helper: Cek visual/prompt crystal
+    local function isActiveCrystal(crystal)
+        for _, v in ipairs(crystal:GetDescendants()) do
+            if v:IsA("ProximityPrompt") and v.Enabled then return true end
+        end
+        return false
+    end
+
+    -- Helper: Logika Mining Utama
     local function PerformMining(folder, toggleStateName)
         if not folder then return end
-        
         local hrp = GetRoot()
         if not hrp then return end
 
-        -- 1. Scan Active Crystals
         local activeCrystals = {}
         for _, crystal in ipairs(folder:GetChildren()) do
-            if isActiveCrystal(crystal) then
-                table.insert(activeCrystals, crystal)
-            end
+            if isActiveCrystal(crystal) then table.insert(activeCrystals, crystal) end
         end
 
         if #activeCrystals > 0 then
-            -- 2. Save Position (Sekali saja saat mulai loop)
+            -- 1. Save Posisi Awal
             if not MiningReturnCFrame then
                 MiningReturnCFrame = hrp.CFrame
-                Notify("MINING", "Safe Mode: Position Saved", nil)
+                Notify("MINING", "Safe Mode: Scanning...", nil)
             end
 
-            -- 3. Equip Pickaxe (Slot 2 - Biasanya Pickaxe)
-            pcall(function() EquipRemote:FireServer(2) end)
-            task.wait(0.6) -- Delay equip agar server register
+            -- 2. UNEQUIP DULU (WAJIB)
+            pcall(function() UnequipHotbar:FireServer() end)
+            task.wait(0.5) 
 
-            -- 4. Loop Mining (Safe Delay)
+            -- 3. EQUIP PICKAXE
+            local hasPickaxe = SmartEquipPickaxe()
+            if not hasPickaxe then
+                Notify("ERROR", "No Pickaxe Found!", Color3.fromRGB(255,0,0))
+                return 
+            end
+            task.wait(0.8) -- Delay equip agak lama biar aman
+
+            -- 4. LOOP MINING
             for _, crystal in ipairs(activeCrystals) do
-                if not States[toggleStateName] then break end -- Break jika dimatikan
+                if not States[toggleStateName] then break end
                 
-                -- Cari CFrame Target
                 local cf = nil
                 if crystal:IsA("Model") and crystal.PrimaryPart then
                     cf = crystal.PrimaryPart.CFrame
@@ -1984,60 +2027,63 @@ task.spawn(function()
                 end
 
                 if cf then
-                    -- TELEPORT AMAN (Ada jarak & delay)
-                    hrp.CFrame = cf 
-                    task.wait(0.4) -- Delay "Safe" agar tidak terdeteksi teleport spam
+                    -- TWEEN KE CRYSTAL
+                    SafeTravel(cf) 
+                    task.wait(0.3) -- Stabilisasi
 
-                    -- INTERACT (Proximity)
+                    -- EKSEKUSI MINING
+                    pcall(function()
+                        if MineRemote then MineRemote:FireServer() end
+                    end)
+
                     for _, v in ipairs(crystal:GetDescendants()) do
                         if v:IsA("ProximityPrompt") and v.Enabled then
-                            fireproximityprompt(v, v.HoldDuration)
-                            task.wait(0.15) -- Sedikit delay setelah interact
+                            fireproximityprompt(v)
                         end
                     end
+                    
+                    -- [FIX 3] DELAY MINING (Anti-Mining Detected)
+                    task.wait(1.5) 
                 end
             end
             
-            -- 5. Return Position
+            -- 5. KEMBALI KE SPOT
             if States[toggleStateName] and MiningReturnCFrame then
-                hrp.CFrame = MiningReturnCFrame
+                SafeTravel(MiningReturnCFrame)
                 task.wait(0.5)
             end
 
-            -- 6. Equip Rod (Slot 1)
-            pcall(function() EquipRemote:FireServer(1) end)
-            task.wait(1) -- Delay sebelum loop ulang
+            -- 6. UNEQUIP -> EQUIP ROD
+            pcall(function() 
+                UnequipHotbar:FireServer()
+                task.wait(0.5)
+                EquipHotbar:FireServer(1) 
+            end)
+            
+            task.wait(2) 
         else
-            -- Idle jika tidak ada crystal
-             if MiningReturnCFrame and (hrp.Position - MiningReturnCFrame.Position).Magnitude > 10 then
-                 hrp.CFrame = MiningReturnCFrame
+            -- IDLE
+             if MiningReturnCFrame and (hrp.Position - MiningReturnCFrame.Position).Magnitude > 20 then
+                 SafeTravel(MiningReturnCFrame)
              end
         end
     end
 
+    -- Main Loop
     while true do
         if States.AutoCrystal then
-            -- Path Cave Crystal
             local Islands = Services.Workspace:FindFirstChild("Islands")
             local CryFolder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
-            
-            if CryFolder then
-                PerformMining(CryFolder, "AutoCrystal")
-            end
+            if CryFolder then PerformMining(CryFolder, "AutoCrystal") end
             task.wait(1) 
             
         elseif States.AutoLava then
-            -- Path Lava Crystal
             local Islands = Services.Workspace:FindFirstChild("Islands")
             local LavaFolder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
-            
-            if LavaFolder then
-                 PerformMining(LavaFolder, "AutoLava")
-            end
+            if LavaFolder then PerformMining(LavaFolder, "AutoLava") end
             task.wait(1)
             
         else
-            -- Jika kedua fitur mati, reset saved position
             MiningReturnCFrame = nil
             task.wait(2)
         end
