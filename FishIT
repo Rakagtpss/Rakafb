@@ -1,133 +1,205 @@
--- FULL FIXED MINI INVENTORY GUID UI
+-- ==========================================
+-- SMART AUTO-EQUIP UI (Targeted Inventory Scan)
+-- ==========================================
 
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local RS = game:GetService("ReplicatedStorage")
-local lp = Players.LocalPlayer
 
--- LOAD InventoryController
-local InventoryController
-pcall(function()
-    InventoryController = require(RS.Controllers.InventoryController)
-end)
+-- Path ke RemoteEvent Equip
+local Event = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+    :WaitForChild("RE/EquipItem")
 
-if not InventoryController then
-    warn("InventoryController tidak ditemukan")
-    return
+-- Mencegah duplikasi UI
+if CoreGui:FindFirstChild("SmartEquipUI") then
+    CoreGui.SmartEquipUI:Destroy()
 end
 
--- AUTO DETECT INVENTORY
-local inventory =
-    InventoryController.Inventory
-    or (InventoryController.State and InventoryController.State.Inventory)
+-- Membuat ScreenGui Utama
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SmartEquipUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = (pcall(function() return CoreGui.Name end) and CoreGui) or Players.LocalPlayer:WaitForChild("PlayerGui")
 
-if not inventory then
-    warn("Inventory tidak ditemukan di InventoryController")
-    return
-end
+-- Membuat Frame (Background)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 240, 0, 140)
+MainFrame.Position = UDim2.new(0.5, -120, 0.5, -70)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
--- LOAD ItemUtility (optional)
-local ItemUtility
-pcall(function()
-    ItemUtility = require(RS.Shared.ItemUtility)
-end)
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 8)
+UICornerMain.Parent = MainFrame
 
--- UI
-local gui = Instance.new("ScreenGui", lp.PlayerGui)
-gui.Name = "FixedInventoryGUIDUI"
-gui.ResetOnSpawn = false
+-- Title Label
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = " 🎯 Smart Auto-Equip"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = MainFrame
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.fromOffset(340, 420)
-frame.Position = UDim2.fromScale(0.33, 0.25)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
+local UICornerTitle = Instance.new("UICorner")
+UICornerTitle.CornerRadius = UDim.new(0, 8)
+UICornerTitle.Parent = Title
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0,8)
+local TitleBlocker = Instance.new("Frame")
+TitleBlocker.Size = UDim2.new(1, 0, 0, 10)
+TitleBlocker.Position = UDim2.new(0, 0, 1, -10)
+TitleBlocker.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+TitleBlocker.BorderSizePixel = 0
+TitleBlocker.Parent = Title
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,30)
-title.BackgroundTransparency = 1
-title.Text = "Inventory GUID Scanner"
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
+-- Input: Nama Item
+local ItemNameInput = Instance.new("TextBox")
+ItemNameInput.Size = UDim2.new(0, 200, 0, 30)
+ItemNameInput.Position = UDim2.new(0.5, -100, 0, 45)
+ItemNameInput.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ItemNameInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+ItemNameInput.Font = Enum.Font.Gotham
+ItemNameInput.TextSize = 13
+ItemNameInput.Text = "Gears"
+ItemNameInput.PlaceholderText = "Ketik Nama Item..."
+ItemNameInput.ClearTextOnFocus = false
+ItemNameInput.Parent = MainFrame
 
-local search = Instance.new("TextBox", frame)
-search.Size = UDim2.new(1,-16,0,30)
-search.Position = UDim2.new(0,8,0,34)
-search.PlaceholderText = "Search item..."
-search.BackgroundColor3 = Color3.fromRGB(35,35,35)
-search.TextColor3 = Color3.new(1,1,1)
-search.ClearTextOnFocus = false
-search.Font = Enum.Font.Gotham
-search.TextSize = 13
+local UICornerItem = Instance.new("UICorner")
+UICornerItem.CornerRadius = UDim.new(0, 4)
+UICornerItem.Parent = ItemNameInput
 
-local list = Instance.new("ScrollingFrame", frame)
-list.Position = UDim2.new(0,8,0,72)
-list.Size = UDim2.new(1,-16,1,-80)
-list.CanvasSize = UDim2.new()
-list.ScrollBarImageTransparency = 0.3
-list.BackgroundTransparency = 1
+-- Tombol Equip
+local EquipBtn = Instance.new("TextButton")
+EquipBtn.Size = UDim2.new(0, 200, 0, 40)
+EquipBtn.Position = UDim2.new(0.5, -100, 0, 85)
+EquipBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 0) -- Warna Orange
+EquipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+EquipBtn.Text = "Cari & Equip!"
+EquipBtn.Font = Enum.Font.GothamBold
+EquipBtn.TextSize = 14
+EquipBtn.AutoButtonColor = true
+EquipBtn.Parent = MainFrame
 
-local layout = Instance.new("UIListLayout", list)
-layout.Padding = UDim.new(0,6)
+local UICornerBtn = Instance.new("UICorner")
+UICornerBtn.CornerRadius = UDim.new(0, 6)
+UICornerBtn.Parent = EquipBtn
 
--- RENDER FUNCTION
-local function render(filter)
-    list:ClearAllChildren()
-    layout.Parent = list
+-- ==========================================
+-- FUNGSI PENCARIAN UUID (Anti-Crash)
+-- ==========================================
+local function FindItemUUID(targetName)
+    local InvController
+    pcall(function()
+        InvController = require(ReplicatedStorage.Controllers.InventoryController)
+    end)
+    
+    if not InvController then return nil end
 
-    for category, items in pairs(inventory) do
-        for guid, itemData in pairs(items) do
-            local name = itemData.Name or "Unknown"
+    local foundUUID = nil
+    local visited = {}
+    -- Regex untuk format UUID (contoh: 749cf3d4-2548-4ad6-80ae-98af016726f9)
+    local uuidPattern = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
 
-            if ItemUtility then
-                pcall(function()
-                    if ItemUtility.GetItemName then
-                        name = ItemUtility:GetItemName(itemData)
+    local function scanTable(t, depth)
+        if depth > 4 or visited[t] then return end
+        visited[t] = true
+        
+        for k, v in pairs(t) do
+            -- Cek jika kuncinya adalah UUID (Sering terjadi di database inventory)
+            if type(k) == "string" and string.match(k, uuidPattern) and type(v) == "table" then
+                for _, val in pairs(v) do
+                    if type(val) == "string" and val == targetName then
+                        foundUUID = k
+                        return
                     end
-                end)
+                end
             end
-
-            if not filter or string.find(
-                string.lower(name),
-                string.lower(filter)
-            ) then
-                local btn = Instance.new("TextButton", list)
-                btn.Size = UDim2.new(1,0,0,42)
-                btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-                btn.TextColor3 = Color3.new(1,1,1)
-                btn.Font = Enum.Font.Gotham
-                btn.TextSize = 12
-                btn.TextWrapped = true
-                btn.TextXAlignment = Left
-                btn.Text =
-                    name ..
-                    "\n[" .. tostring(category) .. "]\n" ..
-                    guid
-
-                btn.MouseButton1Click:Connect(function()
-                    if setclipboard then
-                        setclipboard(guid)
+            
+            -- Cek jika UUID dan Nama berada dalam tabel yang sama
+            if type(v) == "table" then
+                local hasName = false
+                local tempUUID = nil
+                for _, val in pairs(v) do
+                    if type(val) == "string" then
+                        if val == targetName then hasName = true end
+                        if string.match(val, uuidPattern) then tempUUID = val end
                     end
-                    warn("GUID copied:", guid)
+                end
+                if hasName and tempUUID then
+                    foundUUID = tempUUID
+                    return
+                end
+                scanTable(v, depth + 1)
+            end
+            
+            if foundUUID then return end
+        end
+    end
+
+    -- 1. Scan tabel utama di InventoryController
+    scanTable(InvController, 1)
+    
+    -- 2. Scan data yang disembunyikan dalam fungsi (Upvalues)
+    if not foundUUID then
+        for _, func in pairs(InvController) do
+            if type(func) == "function" then
+                pcall(function()
+                    local upvalues = debug.getupvalues(func)
+                    for _, upval in pairs(upvalues) do
+                        if type(upval) == "table" then
+                            scanTable(upval, 1)
+                            if foundUUID then return end
+                        end
+                    end
                 end)
             end
         end
     end
 
-    task.wait()
-    list.CanvasSize = UDim2.new(
-        0,0,0,
-        layout.AbsoluteContentSize.Y + 10
-    )
+    return foundUUID
 end
 
-render()
+-- ==========================================
+-- FUNGSI TOMBOL KLIK
+-- ==========================================
+EquipBtn.MouseButton1Click:Connect(function()
+    local itemName = ItemNameInput.Text
+    if itemName == "" then return end
 
-search:GetPropertyChangedSignal("Text"):Connect(function()
-    render(search.Text)
+    EquipBtn.Text = "Mencari data..."
+    EquipBtn.BackgroundColor3 = Color3.fromRGB(150, 80, 0)
+    
+    -- Memulai pencarian UUID asli
+    local realUUID = FindItemUUID(itemName)
+    
+    if realUUID then
+        print("✅ Ditemukan: " .. itemName .. " | UUID: " .. realUUID)
+        EquipBtn.Text = "Mengirim ke server..."
+        
+        -- Menembak server menggunakan data asli!
+        local args = {realUUID, itemName}
+        Event:FireServer(unpack(args))
+        
+        task.wait(0.3)
+        EquipBtn.Text = "Berhasil Equip!"
+        EquipBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69) -- Hijau
+    else
+        print("❌ Gagal menemukan UUID untuk: " .. itemName)
+        EquipBtn.Text = "Item tidak ditemukan!"
+        EquipBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69) -- Merah
+    end
+    
+    -- Kembalikan tombol seperti semula
+    task.wait(1.5)
+    EquipBtn.Text = "Cari & Equip!"
+    EquipBtn.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
 end)
