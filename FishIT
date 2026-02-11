@@ -1,32 +1,36 @@
 -- ==========================================
--- ULTIMATE AUTO-SCAN INVENTORY UI
+-- GEAR CATALOG & AUTO-EQUIP UI
 -- ==========================================
 
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
--- Path ke RemoteEvent Equip
+-- Path Penting
 local Event = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
     :WaitForChild("net")
     :WaitForChild("RE/EquipItem")
 
+local GearsFolder = ReplicatedStorage:WaitForChild("Modules")
+    :WaitForChild("ModelDownloader")
+    :WaitForChild("Collection")
+    :WaitForChild("Gears")
+
 -- Mencegah duplikasi UI
-if CoreGui:FindFirstChild("AutoScanInventoryUI") then
-    CoreGui.AutoScanInventoryUI:Destroy()
+if CoreGui:FindFirstChild("GearCatalogUI") then
+    CoreGui.GearCatalogUI:Destroy()
 end
 
--- 1. Membuat ScreenGui Utama
+-- 1. Membuat UI Utama
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AutoScanInventoryUI"
+ScreenGui.Name = "GearCatalogUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = (pcall(function() return CoreGui.Name end) and CoreGui) or Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- 2. Membuat Frame (Background)
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 260, 0, 350) -- Dibuat lebih tinggi untuk daftar item
+MainFrame.Size = UDim2.new(0, 260, 0, 350)
 MainFrame.Position = UDim2.new(0.5, -130, 0.5, -175)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
@@ -38,12 +42,12 @@ local UICornerMain = Instance.new("UICorner")
 UICornerMain.CornerRadius = UDim.new(0, 8)
 UICornerMain.Parent = MainFrame
 
--- 3. Title Label
+-- Title
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Text = " 🎒 Inventory Scanner"
+Title.Text = " ⚙️ Gears Catalog"
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -60,30 +64,14 @@ TitleBlocker.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 TitleBlocker.BorderSizePixel = 0
 TitleBlocker.Parent = Title
 
--- 4. Tombol Scan
-local ScanBtn = Instance.new("TextButton")
-ScanBtn.Size = UDim2.new(0, 240, 0, 35)
-ScanBtn.Position = UDim2.new(0.5, -120, 0, 45)
-ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215) -- Warna Biru
-ScanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ScanBtn.Text = "🔍 Scan Data Inventory"
-ScanBtn.Font = Enum.Font.GothamBold
-ScanBtn.TextSize = 13
-ScanBtn.AutoButtonColor = true
-ScanBtn.Parent = MainFrame
-
-local UICornerScanBtn = Instance.new("UICorner")
-UICornerScanBtn.CornerRadius = UDim.new(0, 6)
-UICornerScanBtn.Parent = ScanBtn
-
--- 5. Scrolling Frame (Tempat daftar item muncul)
+-- Scrolling Frame (Daftar Gear)
 local ItemList = Instance.new("ScrollingFrame")
-ItemList.Size = UDim2.new(0, 240, 0, 250)
-ItemList.Position = UDim2.new(0.5, -120, 0, 90)
+ItemList.Size = UDim2.new(1, -10, 1, -45)
+ItemList.Position = UDim2.new(0, 5, 0, 40)
 ItemList.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 ItemList.BorderSizePixel = 0
 ItemList.ScrollBarThickness = 6
-ItemList.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Otomatis memanjang ke bawah
+ItemList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 ItemList.CanvasSize = UDim2.new(0, 0, 0, 0)
 ItemList.Parent = MainFrame
 
@@ -103,134 +91,100 @@ UIPadding.PaddingRight = UDim.new(0, 5)
 UIPadding.Parent = ItemList
 
 -- ==========================================
--- FUNGSI ENGINE SCANNER
+-- FUNGSI PENCARI UUID DI INVENTORY
 -- ==========================================
-local function ScanInventoryData()
-    local foundItems = {} -- Menyimpan format: { ["UUID"] = "Nama Item" }
+local function GetOwnedUUID(targetName)
+    local InvController
+    pcall(function()
+        InvController = require(ReplicatedStorage.Controllers.InventoryController)
+    end)
+    if not InvController then return nil end
+
+    local foundUUID = nil
     local visited = {}
     local uuidPattern = "^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$"
 
-    local function traverse(t, depth)
-        if depth > 5 or visited[t] then return end
+    local function scan(t, depth)
+        if depth > 4 or visited[t] then return end
         visited[t] = true
-        
         for k, v in pairs(t) do
-            -- Jika Value adalah tabel, kita gali lebih dalam
+            if type(k) == "string" and string.match(k, uuidPattern) and type(v) == "table" then
+                for _, val in pairs(v) do
+                    if type(val) == "string" and val == targetName then
+                        foundUUID = k return
+                    end
+                end
+            end
             if type(v) == "table" then
-                local tempUUID = nil
-                local tempName = nil
-                
-                -- Cek isi tabel ini
-                for subK, subV in pairs(v) do
-                    if type(subV) == "string" then
-                        if string.match(subV, uuidPattern) then
-                            tempUUID = subV
-                        elseif string.len(subV) > 2 and not string.match(subV, "^http") then
-                            -- Asumsikan string yang bukan link dan lumayan panjang adalah nama
-                            tempName = subV
-                        end
+                local hasName, tempUUID = false, nil
+                for _, val in pairs(v) do
+                    if type(val) == "string" then
+                        if val == targetName then hasName = true end
+                        if string.match(val, uuidPattern) then tempUUID = val end
                     end
                 end
-                
-                -- Jika menemukan pasangan UUID dan Nama, simpan!
-                if tempUUID and tempName then
-                    foundItems[tempUUID] = tempName
-                end
-                
-                traverse(v, depth + 1)
+                if hasName and tempUUID then foundUUID = tempUUID return end
+                scan(v, depth + 1)
             end
+            if foundUUID then return end
         end
     end
 
-    -- Akses controller
-    local success, InvController = pcall(function()
-        return require(ReplicatedStorage.Controllers.InventoryController)
-    end)
-
-    if success and InvController then
-        -- 1. Scan isi utama
-        traverse(InvController, 1)
-        
-        -- 2. Scan fungsi yang tersembunyi (Upvalues)
-        for _, func in pairs(InvController) do
-            if type(func) == "function" then
-                pcall(function()
-                    for _, upval in pairs(debug.getupvalues(func)) do
-                        if type(upval) == "table" then
-                            traverse(upval, 1)
-                        end
-                    end
-                end)
-            end
-        end
-    end
-    
-    return foundItems
+    scan(InvController, 1)
+    return foundUUID
 end
 
 -- ==========================================
--- FUNGSI UPDATE UI
+-- MEMUAT SEMUA GEAR DARI FOLDER SERVER
 -- ==========================================
-ScanBtn.MouseButton1Click:Connect(function()
-    ScanBtn.Text = "⏳ Sedang Memindai..."
-    ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 150)
+local gears = GearsFolder:GetChildren()
+table.sort(gears, function(a, b) return a.Name < b.Name end) -- Urutkan Sesuai Abjad
+
+for _, gearItem in ipairs(gears) do
+    local itemName = gearItem.Name
     
-    -- Hapus isi daftar lama
-    for _, child in pairs(ItemList:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
+    local ItemBtn = Instance.new("TextButton")
+    ItemBtn.Size = UDim2.new(1, 0, 0, 35)
+    ItemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ItemBtn.Text = " " .. itemName
+    ItemBtn.Font = Enum.Font.GothamSemibold
+    ItemBtn.TextSize = 13
+    ItemBtn.TextXAlignment = Enum.TextXAlignment.Left
+    ItemBtn.AutoButtonColor = true
+    ItemBtn.Parent = ItemList
     
-    -- Jalankan scanner
-    local items = ScanInventoryData()
-    local count = 0
+    local UICornerItemBtn = Instance.new("UICorner")
+    UICornerItemBtn.CornerRadius = UDim.new(0, 4)
+    UICornerItemBtn.Parent = ItemBtn
     
-    -- Buat tombol untuk setiap item yang ditemukan
-    for uuid, name in pairs(items) do
-        count = count + 1
+    -- Fungsi Saat Tombol Diklik
+    ItemBtn.MouseButton1Click:Connect(function()
+        ItemBtn.Text = " 🔍 Mengecek Tas..."
+        ItemBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0) -- Kuning
         
-        local ItemBtn = Instance.new("TextButton")
-        ItemBtn.Size = UDim2.new(1, 0, 0, 35)
-        ItemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-        ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        ItemBtn.Text = " " .. name
-        ItemBtn.Font = Enum.Font.GothamSemibold
-        ItemBtn.TextSize = 13
-        ItemBtn.TextXAlignment = Enum.TextXAlignment.Left
-        ItemBtn.AutoButtonColor = true
-        ItemBtn.Parent = ItemList
+        -- Cek apakah player benar-benar punya item ini
+        local realUUID = GetOwnedUUID(itemName)
         
-        local UICornerItemBtn = Instance.new("UICorner")
-        UICornerItemBtn.CornerRadius = UDim.new(0, 4)
-        UICornerItemBtn.Parent = ItemBtn
-        
-        -- Fungsi klik pada item di daftar
-        ItemBtn.MouseButton1Click:Connect(function()
+        if realUUID then
             ItemBtn.Text = " ⏳ Equipping..."
-            ItemBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69) -- Merah saat equip
-            ItemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            ItemBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215) -- Biru
             
-            -- Tembak server menggunakan UUID asli yang sudah disimpan
-            local args = {uuid, name}
+            -- Tembak server
+            local args = {realUUID, itemName}
             Event:FireServer(unpack(args))
             
-            task.wait(0.5)
-            ItemBtn.Text = " " .. name
-            ItemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-            ItemBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-        end)
-    end
-    
-    -- Selesai Scan
-    task.wait(0.5)
-    if count > 0 then
-        ScanBtn.Text = "✅ Ditemukan " .. count .. " Item!"
-        ScanBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
-    else
-        ScanBtn.Text = "❌ Inventory Kosong/Gagal"
-        ScanBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    end
-    
-    task.wait(2)
-    ScanBtn.Text = "🔍 Scan Data Inventory"
-    ScanBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-end)
+            task.wait(0.3)
+            ItemBtn.Text = " ✅ Terpasang!"
+            ItemBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69) -- Hijau
+        else
+            ItemBtn.Text = " ❌ Kamu Tidak Punya Ini!"
+            ItemBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69) -- Merah
+        end
+        
+        -- Kembalikan tombol seperti semula
+        task.wait(1.5)
+        ItemBtn.Text = " " .. itemName
+        ItemBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    end)
+end
