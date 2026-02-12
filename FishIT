@@ -1941,13 +1941,15 @@ local function isActiveCrystal(crystal)
     return false
 end
 
+-- [UPDATED] SAFE MINING FUNCTION
 local function SmartMining(folder, toggleState)
     if not folder then return false end
     
     local hrp = GetRoot()
+    -- Path Remote Equip sesuai request
     local EquipRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
     
-    -- Find active nodes
+    -- Cari node yang aktif
     local activeNodes = {}
     for _, node in ipairs(folder:GetChildren()) do
         if isActiveCrystal(node) then
@@ -1956,34 +1958,55 @@ local function SmartMining(folder, toggleState)
     end
 
     if #activeNodes > 0 then
-        -- 1. Equip Pickaxe
-        pcall(function() EquipRemote:FireServer(2) end)
-        task.wait(0.6) -- Delay Equip Safe
+        -- [STEP 1] Save Lokasi Awal sebelum mining
+        local SafeReturnPos = hrp.CFrame
+        Notify("MINING", "Posisi Disimpan, Mengganti ke Pickaxe...", nil)
 
-        for _, node in ipairs(activeNodes) do
+        -- [STEP 2] Equip Pickaxe (Slot 2)
+        local argsPickaxe = { 2 }
+        EquipRemote:FireServer(unpack(argsPickaxe))
+        task.wait(1.2) -- Delay animasi equip agar server membaca kita memegang pickaxe
+
+        -- [STEP 3] Loop Mining Satu per Satu
+        for i, node in ipairs(activeNodes) do
             if not States[toggleState] then break end
             
-            -- Get position
+            -- Ambil posisi target
             local cf = nil
             if node:IsA("Model") and node.PrimaryPart then cf = node.PrimaryPart.CFrame
             elseif node:IsA("BasePart") then cf = node.CFrame
             else local p = node:FindFirstChildWhichIsA("BasePart", true); if p then cf = p.CFrame end end
 
             if cf then
-                -- 2. Safe Teleport
+                -- Teleport ke Crystal
                 hrp.CFrame = cf
-                task.wait(0.5) -- Delay movement
+                
+                -- [SAFETY] Delay Stabilisasi (PENTING AGAR TIDAK TERDETEKSI)
+                task.wait(0.8) 
 
-                -- 3. Interact
+                -- Interact / Mining
                 for _, v in ipairs(node:GetDescendants()) do
                     if v:IsA("ProximityPrompt") and v.Enabled then
                         fireproximityprompt(v, v.HoldDuration)
-                        task.wait(0.2)
                     end
                 end
+                
+                -- [REQUEST] Delay dari Crystal 1 ke Crystal 2
+                -- Dibuat 2 detik agar terlihat natural dan cooldown teleport aman
+                Notify("MINING", "Menunggu cooldown ("..i.."/"..#activeNodes..")...", Color3.fromRGB(255, 200, 0), 1)
+                task.wait(2) 
             end
-            task.wait(0.2)
         end
+        
+        -- [STEP 4] Balik ke Posisi Save
+        hrp.CFrame = SafeReturnPos
+        task.wait(0.8) -- Delay sebentar setelah teleport balik
+
+        -- [STEP 5] Equip Rod (Slot 1)
+        Notify("MINING", "Selesai, Kembali Memancing...", Color3.fromRGB(0, 255, 100))
+        local argsRod = { 1 }
+        EquipRemote:FireServer(unpack(argsRod))
+        
         return true
     end
     return false
@@ -1993,33 +2016,16 @@ end
 task.spawn(function()
     local Islands = Services.Workspace:FindFirstChild("Islands")
     local CryFolder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
-    local ReturnCFrame = nil
     
     while true do
         if States.AutoCrystal and CryFolder then
-            local hrp = GetRoot()
-            if hrp then
-                if not ReturnCFrame then ReturnCFrame = hrp.CFrame end
-                
-                local didMine = SmartMining(CryFolder, "AutoCrystal")
-                
-                if didMine then
-                    if States.AutoCrystal and ReturnCFrame then
-                        hrp.CFrame = ReturnCFrame
-                        task.wait(0.5)
-                        -- Equip Rod Back
-                        Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-                    end
-                else
-                     -- Idle Safe
-                    if ReturnCFrame and (hrp.Position - ReturnCFrame.Position).Magnitude > 10 then
-                         hrp.CFrame = ReturnCFrame
-                    end
-                end
-            end
-            task.wait(1.5)
+            -- Fungsi SmartMining sekarang sudah menangani:
+            -- Save Pos -> Pickaxe -> Teleport & Mine (Safe) -> Return Pos -> Rod
+            SmartMining(CryFolder, "AutoCrystal")
+            
+            -- Interval pengecekan ulang (Tunggu spawn berikutnya)
+            task.wait(2)
         else
-            ReturnCFrame = nil
             task.wait(2)
         end
     end
@@ -2029,32 +2035,16 @@ end)
 task.spawn(function()
     local Islands = Services.Workspace:FindFirstChild("Islands")
     local LavaFolder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
-    local ReturnCFrame = nil
     
     while true do
         if States.AutoLava and LavaFolder then
-            local hrp = GetRoot()
-            if hrp then
-                if not ReturnCFrame then ReturnCFrame = hrp.CFrame end
-                
-                local didMine = SmartMining(LavaFolder, "AutoLava")
-                
-                if didMine then
-                    if States.AutoLava and ReturnCFrame then
-                        hrp.CFrame = ReturnCFrame
-                        task.wait(0.5)
-                        -- Equip Rod Back
-                        Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-                    end
-                else
-                    if ReturnCFrame and (hrp.Position - ReturnCFrame.Position).Magnitude > 10 then
-                         hrp.CFrame = ReturnCFrame
-                    end
-                end
-            end
-            task.wait(1.5)
+            -- Fungsi SmartMining sekarang sudah menangani:
+            -- Save Pos -> Pickaxe -> Teleport & Mine (Safe) -> Return Pos -> Rod
+            SmartMining(LavaFolder, "AutoLava")
+            
+            -- Interval pengecekan ulang
+            task.wait(2)
         else
-            ReturnCFrame = nil
             task.wait(2)
         end
     end
