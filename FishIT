@@ -1,5 +1,3 @@
-perbaiki mining di dalam script ini karena terdeteksi speed hack dan pada saat mining Crystal ke Crystal lainnya dibuat delay 
-
 -- [[ SERAPHIN MINI UI - ANTI-SUSPENSION EDITION ]]
 -- Version: Mini V3.0 (Tween Travel & Natural Mining)
 
@@ -475,3 +473,4 @@ task.spawn(function()
         SmartWait(2.0, 3.5)
     end
 end)
+
