@@ -1,5 +1,5 @@
--- [[ SERAPHIN MINI UI - FINAL SAFE (SMOOTH TRAVEL & DELAY) ]]
--- Version: Mini V3.5 (Sine Easing + Mining Cooldown)
+-- [[ SERAPHIN MINI UI - ANTI-SUSPENSION EDITION v3.5 ]]
+-- Perbaikan: Safe Tween, Hold Duration Logic, Spawn Detector
 
 local Services = {
     Players = game:GetService("Players"),
@@ -18,9 +18,9 @@ local Camera = Services.Workspace.CurrentCamera
 -- // THEME CONFIG
 local UI = {
     Color = Color3.fromRGB(15, 15, 20),
-    Accent = Color3.fromRGB(100, 255, 100), -- Warna Hijau (Safe Status)
+    Accent = Color3.fromRGB(255, 180, 50),
     Text = Color3.fromRGB(240, 240, 240),
-    Size = UDim2.new(0, 220, 0, 300)
+    Size = UDim2.new(0, 220, 0, 320) -- Sedikit diperbesar
 }
 
 -- // CLEANUP OLD UI
@@ -53,7 +53,7 @@ Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
 local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
-Title.Text = "SERAPHIN <font color='#64ff64'>SAFE V2</font>"
+Title.Text = "SERAPHIN <font color='#ffb432'>FIXED</font>"
 Title.RichText = true
 Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 12
@@ -70,9 +70,20 @@ MiniBtn.TextSize = 14
 MiniBtn.TextColor3 = UI.Text
 MiniBtn.BackgroundTransparency = 1
 
+-- Console Output Label (Visual Feedback)
+local ConsoleLabel = Instance.new("TextLabel", MainFrame)
+ConsoleLabel.Size = UDim2.new(1, -20, 0, 20)
+ConsoleLabel.Position = UDim2.new(0, 10, 1, -25)
+ConsoleLabel.Text = "Status: Idle"
+ConsoleLabel.Font = Enum.Font.Code
+ConsoleLabel.TextSize = 10
+ConsoleLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+ConsoleLabel.BackgroundTransparency = 1
+ConsoleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
 -- Scroll Container
 local Scroll = Instance.new("ScrollingFrame", MainFrame)
-Scroll.Size = UDim2.new(1, -10, 1, -40)
+Scroll.Size = UDim2.new(1, -10, 1, -65) -- Adjusted size
 Scroll.Position = UDim2.new(0, 5, 0, 35)
 Scroll.BackgroundTransparency = 1
 Scroll.ScrollBarThickness = 2
@@ -84,6 +95,11 @@ UIList.Padding = UDim.new(0, 6)
 UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 -- // HELPER FUNCTIONS
+local function Log(msg)
+    print("[SERAPHIN]: " .. msg)
+    ConsoleLabel.Text = "> " .. msg
+end
+
 local function Drag(frame)
     local dragToggle, dragStart, startPos
     local function updateInput(input)
@@ -112,7 +128,8 @@ local States = {
     WoW = false,
     Noclip = false,
     IsMining = false,
-    AutoEquip = false
+    AutoEquip = false,
+    DetectSpawn = false
 }
 
 -- // TOGGLE CREATOR
@@ -181,23 +198,45 @@ OpenBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ====================================================
--- [CORE LOGIC] SAFE TRAVEL V2 (SINE EASING)
+-- [CORE LOGIC] SMART MINING & DETECTION REWORK
 -- ====================================================
 
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 
-local function GetActiveNodes(folder)
-    local activeList = {}
-    if not folder then return activeList end
-    for _, item in ipairs(folder:GetChildren()) do
-        if item:IsA("Model") or item:IsA("BasePart") then
-            local prompt = item:FindFirstChildWhichIsA("ProximityPrompt", true)
-            if prompt and prompt.Enabled then table.insert(activeList, item) end
+-- [SPAWN DETECTOR SYSTEM]
+local ConnectedFolders = {}
+local function SetupSpawnListener(folderName)
+    if ConnectedFolders[folderName] then return end -- Prevent double connect
+    
+    task.spawn(function()
+        local Islands = Services.Workspace:WaitForChild("Islands", 10)
+        if not Islands then return end
+        
+        -- Cari path spesifik folder crystal
+        local TargetFolder = nil
+        if folderName == "Crystal" then
+            TargetFolder = Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
+        elseif folderName == "Lava" then
+            TargetFolder = Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
         end
-    end
-    return activeList
+
+        if TargetFolder then
+            ConnectedFolders[folderName] = true
+            Log("Listening spawn for: " .. folderName)
+            
+            TargetFolder.ChildAdded:Connect(function(child)
+                if States.DetectSpawn then
+                    task.wait(0.5) -- Wait load
+                    if child:IsA("Model") or child:IsA("BasePart") then
+                        Log("[SPAWN] New Crystal detected at " .. folderName .. "!")
+                        print(">>> [SERAPHIN] NEW CRYSTAL SPAWNED: " .. child.Name .. " <<<")
+                    end
+                end
+            end)
+        end
+    end)
 end
 
 -- [AI DELAY]
@@ -206,8 +245,8 @@ local function SmartWait(min, max)
     task.wait(randomDelay)
 end
 
--- [SAFE MOVE V2: SMOOTH START/STOP]
--- Menggunakan EasingStyle.Sine (InOut) agar start pelan -> cepat -> pelan
+-- [SAFE MOVE REWORKED]
+-- Lebih lambat, lebih aman, menggunakan EasingStyle Sine agar tidak linear (robotik)
 local function SafeMove(targetCFrame)
     local hrp = GetRoot()
     if not hrp then return end
@@ -219,27 +258,28 @@ local function SafeMove(targetCFrame)
         return
     end
     
-    -- Speed diturunkan (160) agar tidak terdeteksi akselerasi tinggi
-    local speed = 160 
+    -- KECEPATAN DIKURANGI AGAR TIDAK SUSPICION
+    -- Sebelumnya 280, sekarang 195 (Lebih "Manusiawi")
+    local speed = 150
     local time = dist / speed
     
-    -- EasingStyle.Sine = Anti-Robotic Movement
+    -- Gunakan Sine InOut agar gerakan halus (Slow start - Fast - Slow stop)
     local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
     local tween = Services.TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
     
     States.Noclip = true 
-    -- Reset Velocity SEBELUM gerak (Penting!)
-    hrp.AssemblyLinearVelocity = Vector3.zero 
-    
     tween:Play()
     tween.Completed:Wait()
+    States.Noclip = false
     
-    States.Noclip = false 
-    -- Reset Velocity SESUDAH gerak
+    -- WAJIB: Stabilization Wait
+    -- Beri jeda 0.3 - 0.5 detik agar server 'melihat' kita diam di tempat sebelum interaksi
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
+    task.wait(math.random(35, 55)/100) -- Wait 0.35s - 0.55s
 end
 
+-- [FUNGSI EQUIP SYSTEM]
 local function ForceClearHand()
     local char = Player.Character
     if not char then return end
@@ -261,25 +301,28 @@ local function ForceEquipBag(keyword)
     return false
 end
 
+-- [MINING REWORKED]
 local function SmartMining(folder, toggleState)
-    local activeNodes = GetActiveNodes(folder)
-    if #activeNodes == 0 then return false end
-    
-    local hrp, char, hum = GetRoot(), GetChar(), GetHum()
-    if not hrp or not char or not hum then return false end
+    local activeList = {}
+    for _, item in ipairs(folder:GetChildren()) do
+        if item:IsA("Model") or item:IsA("BasePart") then
+            local prompt = item:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if prompt and prompt.Enabled then table.insert(activeList, item) end
+        end
+    end
 
+    if #activeList == 0 then return false end
+    
+    local hrp = GetRoot()
     local RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar")
 
-    -- LOCK STATE
     States.IsMining = true
     local SafeReturnPos = hrp.CFrame
     
-    -- [STEP 1] FORCE UNEQUIP AWAL
     ForceClearHand()
-    SmartWait(0.2, 0.4)
+    SmartWait(0.2, 0.3)
     
-    -- [STEP 2] MINING LOOP (NATURAL POS)
-    for i, node in ipairs(activeNodes) do
+    for i, node in ipairs(activeList) do
         if not States[toggleState] then break end
         
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
@@ -291,46 +334,42 @@ local function SmartMining(folder, toggleState)
             if targetPos then
                 hrp.Anchored = false
                 
-                -- Posisi: Menghadap crystal dari jarak 4 stud (Natural)
-                local approachPos = CFrame.lookAt(targetPos + Vector3.new(4, 1, 0), targetPos)
+                -- Posisi sedikit menjauh agar ProximityPrompt 'melihat' karakter datang
+                local approachPos = CFrame.lookAt(targetPos + Vector3.new(4, 2, 0), targetPos)
                 
-                -- TRAVEL (Sine Easing)
                 SafeMove(approachPos)
                 
-                -- Stabilisasi
-                hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.Anchored = true 
                 
-                -- [STEP 3] EQUIP PICKAXE
+                -- Equip Pickaxe
                 local equipped = ForceEquipBag("pick")
                 if not equipped then pcall(function() RemoteEquip:FireServer(2) end) end
                 
-                SmartWait(0.6, 0.9) 
+                -- Jeda sebelum interaksi (Anti-Instant Interaction)
+                SmartWait(0.4, 0.6)
                 
-                -- Eksekusi Mining
-                fireproximityprompt(prompt)
-                
-                -- Tunggu Animasi Mining
-                SmartWait(2.3, 2.6)
-                
-                -- Lepas Pickaxe
+                -- [INTERAKSI PERBAIKAN]
+                -- Mengecek HoldDuration agar tidak di-kick karena instant complete
+                if prompt.HoldDuration > 0 then
+                    Log("Mining... (" .. prompt.HoldDuration .. "s)")
+                    fireproximityprompt(prompt) -- Trigger awal
+                    task.wait(prompt.HoldDuration + 0.1) -- Tunggu sesuai durasi game
+                else
+                    fireproximityprompt(prompt)
+                end
+
+                -- Tunggu animasi/hasil mining selesai
+                SmartWait(2.5, 3.0)
                 ForceClearHand()
-                
-                -- [NEW] DELAY ANTAR CRYSTAL (Mencegah Instant Travel)
-                -- Ini jeda istirahat sebelum pindah ke batu selanjutnya
-                SmartWait(1.5, 2.5) 
             end
         end
     end
 
-    -- [STEP 4] SELESAI & KEMBALI
     hrp.Anchored = false
-    SafeMove(SafeReturnPos) -- Terbang pulang
+    SafeMove(SafeReturnPos)
     hrp.AssemblyLinearVelocity = Vector3.zero
     
     SmartWait(0.5, 0.7)
-    
-    -- Ambil Rod Kembali
     pcall(function() RemoteEquip:FireServer(1) end) 
     
     States.IsMining = false
@@ -342,6 +381,17 @@ end
 -- ====================================================
 
 CreateToggle("Auto Equip Rod", "AutoEquip", nil) 
+
+-- Tambahan Toggle untuk Print Console
+CreateToggle("Print Spawn Console", "DetectSpawn", function(val)
+    if val then
+        Log("Spawn Detector Active")
+        SetupSpawnListener("Crystal")
+        SetupSpawnListener("Lava")
+    else
+        Log("Spawn Detector OFF")
+    end
+end)
 
 CreateToggle("Auto Crystal (Safe)", "AutoCrystal", function(val)
     if val then States.WoW = true else States.WoW = false end
@@ -373,7 +423,6 @@ CreateToggle("Noclip", "Noclip", nil)
 
 -- [LOGIC LOOPS]
 
--- Auto Equip Loop (DENGAN PENGECEKAN ISMINING)
 task.spawn(function()
     while true do
         if States.AutoEquip and not States.IsMining then 
@@ -387,7 +436,6 @@ task.spawn(function()
     end
 end)
 
--- WoW Loop
 Services.RunService.RenderStepped:Connect(function()
     if States.WoW then
         local hrp = GetRoot()
@@ -403,7 +451,6 @@ Services.RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Noclip Loop
 Services.RunService.Stepped:Connect(function()
     if States.Noclip then
         local c = GetChar()
@@ -444,7 +491,6 @@ task.spawn(function()
     end
 end)
 
--- Event Loop (Safe Move Applied)
 local EventList = {"Ghost Shark", "Worm", "Treasure", "Shark", "Megalodon"}
 task.spawn(function()
     while true do
@@ -458,7 +504,6 @@ task.spawn(function()
                             for _, name in pairs(EventList) do
                                 if string.find(v.Name, name) then
                                     local pos = v:GetPivot().Position
-                                    -- Safe Check Distance
                                     if (hrp.Position - Vector3.new(pos.X, 4, pos.Z)).Magnitude > 15 then
                                         local targetCF = CFrame.new(pos.X, 5, pos.Z)
                                         SafeMove(targetCF)
@@ -473,3 +518,5 @@ task.spawn(function()
         SmartWait(2.0, 3.5)
     end
 end)
+
+Log("Mini UI Loaded. Enjoy Safe Mining.")
