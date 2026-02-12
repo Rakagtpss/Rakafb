@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V4.9 - STRICT EQUIP FIX ]]
--- Struktur: Save Pos -> FORCE HOLD PICKAXE -> Mine -> Wait 7s -> Done -> Return -> FORCE HOLD ROD -> Idle
+-- [[ MINI MINING HUB V5.0 - SAFE UI MODE ]]
+-- Struktur: UI First -> Check Remotes -> Save Pos -> Force Pickaxe -> Mine -> Wait 7s -> Force Rod -> Idle
 
 local Services = {
     Players = game:GetService("Players"),
@@ -11,183 +11,52 @@ local Services = {
 }
 
 local Player = Services.Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- // 1. CONFIG REMOTE
-local NetPath = Services.ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
-
-local RemoteEquip = NetPath:WaitForChild("RE/EquipToolFromHotbar")
-local RemoteUnequip = NetPath:WaitForChild("RE/UnequipToolFromHotbar")
-
-local States = {
-    AutoCrystal = false,
-    AutoLava = false,
-    IsMining = false
-}
-
--- Fungsi Helper
-local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
-local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
-local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
-
-local function Notify(msg, color)
-    if Services.CoreGui:FindFirstChild("MiniMiningUI") then
-        local lbl = Services.CoreGui.MiniMiningUI.MainFrame:FindFirstChild("StatusLabel")
-        if lbl then
-            lbl.Text = msg
-            lbl.TextColor3 = color or Color3.new(1,1,1)
-        end
-    end
-end
-
--- // 2. FUNGSI EQUIP SUPER KUAT (HYBRID)
-local function ForceEquipTool(targetType)
-    local char = GetChar()
-    local hum = GetHum()
-    local backpack = Player.Backpack
-    
-    -- Tentukan target (Rod atau Pickaxe)
-    local searchString = (targetType == "Pickaxe") and "pick" or "rod"
-    local slotNum = (targetType == "Pickaxe") and 2 or 1
-    
-    Notify("Equipping " .. targetType .. "...", Color3.fromRGB(255, 255, 0))
-
-    -- STEP 1: Cek apakah sudah pegang?
-    local current = char:FindFirstChildWhichIsA("Tool")
-    if current and string.find(string.lower(current.Name), searchString) then
-        return true -- Sudah pegang, lanjut
-    end
-
-    -- STEP 2: Unequip Total
-    hum:UnequipTools()
-    pcall(function() RemoteUnequip:FireServer() end)
-    task.wait(0.3)
-
-    -- STEP 3: Looping sampai terpegang (Maksimal 10 percobaan)
-    for i = 1, 10 do
-        -- A. Cari tool di Backpack
-        local foundTool = nil
-        for _, t in pairs(backpack:GetChildren()) do
-            if t:IsA("Tool") and string.find(string.lower(t.Name), searchString) then
-                foundTool = t
-                break
-            end
-        end
-
-        -- B. Paksa Equip (Client Side + Server Side)
-        if foundTool then
-            hum:EquipTool(foundTool) -- Paksa Humanoid
-        end
-        pcall(function() RemoteEquip:FireServer(slotNum) end) -- Paksa Server
-
-        -- C. Verifikasi
-        task.wait(0.5)
-        local held = char:FindFirstChildWhichIsA("Tool")
-        if held and string.find(string.lower(held.Name), searchString) then
-            Notify(targetType .. " Equipped!", Color3.fromRGB(0, 255, 0))
-            return true -- Berhasil
-        end
-    end
-    
-    Notify("Gagal Equip " .. targetType, Color3.fromRGB(255, 0, 0))
-    return false
-end
-
--- // 3. MOVEMENT
-local function SafeTween(targetCFrame)
-    local hrp = GetRoot()
-    if not hrp then return end
-    local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = 60
-    local time = dist / speed
-    if time < 0.1 then time = 0.1 end
-    
-    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
-    local tw = Services.TweenService:Create(hrp, ti, {CFrame = targetCFrame})
-    tw:Play()
-    tw.Completed:Wait()
-    hrp.AssemblyLinearVelocity = Vector3.zero
-end
-
--- // 4. LOGIKA UTAMA (STRUCTURED)
-local function RunMiningCycle(folder, stateKey)
-    local activeNodes = {}
-    for _, v in ipairs(folder:GetChildren()) do
-        if v:FindFirstChild("ProximityPrompt", true) then table.insert(activeNodes, v) end
-    end
-    
-    if #activeNodes == 0 then return end -- Tidak ada crystal, skip
-
-    -- [STEP 0] Persiapan
-    States.IsMining = true
-    local hrp = GetRoot()
-    
-    -- [STEP 1] SAVE POSITION
-    local SavedPosition = hrp.CFrame
-    
-    -- [STEP 2] EQUIP PICKAXE (SLOT 2) - WAJIB BERHASIL BARU LANJUT
-    local equipped = ForceEquipTool("Pickaxe")
-    if not equipped then 
-        States.IsMining = false 
-        return -- Batalkan jika gagal equip
-    end
-
-    -- Aktifkan Fly/Noclip (Bypass)
-    local hum = GetHum()
-    if hum then hum.PlatformStand = true end
-    
-    -- [STEP 3] TELEPORT -> MINE -> WAIT 7s
-    for i, node in ipairs(activeNodes) do
-        if not States[stateKey] then break end
-        
-        local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-        if prompt and prompt.Enabled then
-            local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-            
-            SafeTween(targetCF + Vector3.new(0, 3.5, 0)) -- Teleport
-            
-            Notify("Mining Node " .. i, Color3.fromRGB(255, 200, 50))
-            task.wait(0.5)
-            fireproximityprompt(prompt) -- Extract
-            
-            -- WAIT 7 DETIK
-            for cd = 7, 1, -1 do
-                if not States[stateKey] then break end
-                Notify("Wait... " .. cd .. "s", Color3.fromRGB(100, 255, 100))
-                task.wait(1)
-            end
-        end
-    end
-
-    -- [STEP 4] DONE ALL -> TELEPORT BACK
-    Notify("Selesai! Pulang...", Color3.fromRGB(0, 255, 255))
-    SafeTween(SavedPosition)
-    if hum then hum.PlatformStand = false end -- Matikan fly
-
-    -- [STEP 5 & 6] UNEQUIP PICKAXE -> EQUIP ROD (SLOT 1)
-    ForceEquipTool("Rod")
-
-    -- [STEP 7] IDLE
-    Notify("Idle (Waiting Spawn)...", Color3.fromRGB(150, 150, 150))
-    States.IsMining = false
-end
-
--- // UI SETUP
+-- // 1. BUILD UI TERLEBIH DAHULU (Supaya terlihat walau script error)
 if Services.CoreGui:FindFirstChild("MiniMiningUI") then Services.CoreGui.MiniMiningUI:Destroy() end
+-- Jika CoreGui error, fallback ke PlayerGui (hapus baris ini jika pakai CoreGui saja)
+if PlayerGui:FindFirstChild("MiniMiningUI") then PlayerGui.MiniMiningUI:Destroy() end
+
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MiniMiningUI"
-ScreenGui.Parent = Services.CoreGui
+-- Coba ke CoreGui dulu, kalau gagal ke PlayerGui
+pcall(function() ScreenGui.Parent = Services.CoreGui end)
+if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 220, 0, 130)
+MainFrame.Size = UDim2.new(0, 220, 0, 150) -- Sedikit diperbesar
 MainFrame.Position = UDim2.new(0.5, -110, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- Dragging
+-- Judul
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "MINING V5.0 (SAFE MODE)"
+Title.Size = UDim2.new(1,0,0,30)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.new(1,1,1)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 12
+
+-- Status Label
+local StatusLabel = Instance.new("TextLabel", MainFrame)
+StatusLabel.Name = "StatusLabel"
+StatusLabel.Text = "Initializing..."
+StatusLabel.Size = UDim2.new(1,0,0,20)
+StatusLabel.Position = UDim2.new(0,0,1,-20)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+StatusLabel.Font = Enum.Font.Gotham
+
+-- Fungsi Notify
+local function Notify(msg, color)
+    StatusLabel.Text = msg
+    StatusLabel.TextColor3 = color or Color3.new(1,1,1)
+end
+
+-- Dragging Logic
 local dragging, dragInput, dragStart, startPos
 MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -202,22 +71,14 @@ MainFrame.InputChanged:Connect(function(input)
 end)
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Text = "MINING V4.9 (FIXED EQUIP)"
-Title.Size = UDim2.new(1,0,0,30)
-Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.new(1,1,1)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 12
+-- // 2. STATE VARIABLES & CONFIG
+local States = {
+    AutoCrystal = false,
+    AutoLava = false,
+    IsMining = false
+}
 
-local StatusLabel = Instance.new("TextLabel", MainFrame)
-StatusLabel.Name = "StatusLabel"
-StatusLabel.Text = "Idle"
-StatusLabel.Size = UDim2.new(1,0,0,20)
-StatusLabel.Position = UDim2.new(0,0,1,-20)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.TextColor3 = Color3.fromRGB(150,150,150)
-
+-- Tombol UI
 local function CreateBtn(txt, yPos, varName)
     local btn = Instance.new("TextButton", MainFrame)
     btn.Size = UDim2.new(0.9,0,0,30)
@@ -225,6 +86,8 @@ local function CreateBtn(txt, yPos, varName)
     btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
     btn.Text = txt..": OFF"
     btn.TextColor3 = Color3.fromRGB(200,200,200)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
     
     btn.MouseButton1Click:Connect(function()
@@ -238,8 +101,6 @@ local function CreateBtn(txt, yPos, varName)
             btn.BackgroundColor3 = Color3.fromRGB(40,40,50)
             btn.TextColor3 = Color3.fromRGB(200,200,200)
             States.IsMining = false
-            -- Reset ke Rod jika dimatikan
-            ForceEquipTool("Rod")
         end
     end)
 end
@@ -247,60 +108,215 @@ end
 CreateBtn("Auto Crystal", 35, "AutoCrystal")
 CreateBtn("Auto Lava", 70, "AutoLava")
 
--- // LOOP UTAMA
-task.spawn(function()
-    while true do
-        if States.AutoCrystal and not States.IsMining then
-            local Islands = Services.Workspace:FindFirstChild("Islands")
-            local Folder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
-            
-            -- Cek apakah ada crystal yg siap (Prompt enabled)
-            local ready = false
-            if Folder then
-                for _, v in ipairs(Folder:GetChildren()) do
-                    if v:FindFirstChild("ProximityPrompt", true) and v:FindFirstChild("ProximityPrompt", true).Enabled then
-                        ready = true
-                        break
-                    end
-                end
-            end
-            
-            if ready then
-                RunMiningCycle(Folder, "AutoCrystal")
-            else
-                -- IDLE MODE: Pastikan Rod terpegang saat nunggu
-                local char = Player.Character
-                if char and not char:FindFirstChildWhichIsA("Tool") then
-                    ForceEquipTool("Rod")
+-- // 3. LOAD REMOTES (DENGAN ERROR CHECKING)
+Notify("Loading Remotes...", Color3.fromRGB(255, 255, 0))
+
+local RemoteEquip, RemoteUnequip
+local Success, Err = pcall(function()
+    local NetPath = Services.ReplicatedStorage:WaitForChild("Packages", 5)
+        :WaitForChild("_Index", 5)
+        :WaitForChild("sleitnick_net@0.2.0", 5)
+        :WaitForChild("net", 5)
+    
+    if NetPath then
+        RemoteEquip = NetPath:WaitForChild("RE/EquipToolFromHotbar", 5)
+        RemoteUnequip = NetPath:WaitForChild("RE/UnequipToolFromHotbar", 5)
+    end
+end)
+
+if not RemoteEquip or not RemoteUnequip then
+    Notify("ERROR: Remote Not Found!", Color3.fromRGB(255, 0, 0))
+    warn("Path Remote Salah atau Game Update!")
+    return -- STOP SCRIPT DISINI JIKA REMOTE TIDAK KETEMU
+else
+    Notify("Ready to Mine", Color3.fromRGB(0, 255, 0))
+end
+
+-- // 4. FUNGSI LOGIKA (HELPERS)
+local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
+local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
+local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
+
+-- Force Equip (Hybrid: Remote + Humanoid)
+local function ForceEquipTool(targetName)
+    local char = GetChar()
+    local hum = GetHum()
+    if not char or not hum then return false end
+    
+    local searchStr = (targetName == "Pickaxe") and "pick" or "rod"
+    local slotID = (targetName == "Pickaxe") and 2 or 1
+    
+    -- Cek jika sudah pegang
+    local current = char:FindFirstChildWhichIsA("Tool")
+    if current and string.find(string.lower(current.Name), searchStr) then
+        return true
+    end
+
+    Notify("Equipping " .. targetName .. "...", Color3.fromRGB(255, 200, 0))
+    
+    -- Unequip
+    hum:UnequipTools()
+    pcall(function() RemoteUnequip:FireServer() end)
+    task.wait(0.3)
+
+    -- Try Equip (Loop)
+    for i = 1, 5 do
+        -- Server Side
+        pcall(function() RemoteEquip:FireServer(slotID) end)
+        
+        -- Client Side (Backup)
+        local bp = Player:FindFirstChild("Backpack")
+        if bp then
+            for _, t in pairs(bp:GetChildren()) do
+                if t:IsA("Tool") and string.find(string.lower(t.Name), searchStr) then
+                    hum:EquipTool(t)
                 end
             end
         end
+        
+        task.wait(0.5)
+        local held = char:FindFirstChildWhichIsA("Tool")
+        if held and string.find(string.lower(held.Name), searchStr) then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Safe Tween
+local function SafeTween(targetCFrame)
+    local hrp = GetRoot()
+    if not hrp then return end
+    
+    local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    if dist < 5 then return end -- Dekat banget gak usah tween
+    
+    local time = dist / 60
+    if time < 0.1 then time = 0.1 end
+    
+    local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
+    local tw = Services.TweenService:Create(hrp, ti, {CFrame = targetCFrame})
+    tw:Play()
+    tw.Completed:Wait()
+    hrp.AssemblyLinearVelocity = Vector3.zero
+end
+
+-- Main Logic
+local function MiningSequence(folder, toggleKey)
+    -- Ambil nodes
+    local activeNodes = {}
+    for _, v in ipairs(folder:GetChildren()) do
+        if v:FindFirstChild("ProximityPrompt", true) then table.insert(activeNodes, v) end
+    end
+    if #activeNodes == 0 then return end
+
+    States.IsMining = true
+    local hrp = GetRoot()
+    local savedPos = hrp.CFrame
+
+    -- 1. Equip Pickaxe
+    if not ForceEquipTool("Pickaxe") then
+        Notify("Gagal Equip Pickaxe!", Color3.fromRGB(255, 0, 0))
+        States.IsMining = false
+        return
+    end
+
+    -- 2. Fly On
+    local hum = GetHum()
+    if hum then hum.PlatformStand = true end
+
+    -- 3. Loop Mining
+    for i, node in ipairs(activeNodes) do
+        if not States[toggleKey] then break end
+
+        local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt and prompt.Enabled then
+            local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
+            
+            SafeTween(targetCF + Vector3.new(0, 3.5, 0))
+            Notify("Mining Node " .. i, Color3.fromRGB(255, 170, 0))
+            task.wait(0.3)
+            
+            fireproximityprompt(prompt)
+            
+            -- Wait 7s
+            for k = 7, 1, -1 do
+                if not States[toggleKey] then break end
+                Notify("Wait " .. k .. "s", Color3.fromRGB(100, 255, 100))
+                task.wait(1)
+            end
+        end
+    end
+
+    -- 4. Pulang
+    Notify("Returning...", Color3.fromRGB(0, 255, 255))
+    SafeTween(savedPos)
+    if hum then hum.PlatformStand = false end
+
+    -- 5. Equip Rod
+    ForceEquipTool("Rod")
+    States.IsMining = false
+    Notify("Idle...", Color3.fromRGB(150, 150, 150))
+end
+
+-- // 5. LOOPS (DENGAN SAFETY CHECK)
+task.spawn(function()
+    while true do
         task.wait(1)
+        if States.AutoCrystal and not States.IsMining then
+            pcall(function()
+                local Islands = Services.Workspace:FindFirstChild("Islands")
+                local Folder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
+                
+                if Folder then
+                    local ready = false
+                    for _,v in ipairs(Folder:GetChildren()) do
+                        if v:FindFirstChild("ProximityPrompt", true) and v:FindFirstChild("ProximityPrompt", true).Enabled then
+                            ready = true; break
+                        end
+                    end
+                    
+                    if ready then MiningSequence(Folder, "AutoCrystal") end
+                end
+            end)
+        end
     end
 end)
 
 task.spawn(function()
     while true do
+        task.wait(1)
         if States.AutoLava and not States.IsMining then
             pcall(function()
                 local Islands = Services.Workspace:FindFirstChild("Islands")
                 local Folder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
                 
-                local ready = false
                 if Folder then
-                    for _, v in ipairs(Folder:GetChildren()) do
+                    local ready = false
+                    for _,v in ipairs(Folder:GetChildren()) do
                         if v:FindFirstChild("ProximityPrompt", true) and v:FindFirstChild("ProximityPrompt", true).Enabled then
-                            ready = true
-                            break
+                            ready = true; break
                         end
                     end
-                end
-
-                if ready then
-                    RunMiningCycle(Folder, "AutoLava")
+                    
+                    if ready then MiningSequence(Folder, "AutoLava") end
                 end
             end)
         end
-        task.wait(1)
+    end
+end)
+
+-- Auto Equip Rod saat Idle (Loop terpisah)
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if not States.IsMining and (States.AutoCrystal or States.AutoLava) then
+            local char = Player.Character
+            if char and not char:FindFirstChildWhichIsA("Tool") then
+                -- Hanya equip rod jika tidak sedang mining dan tidak pegang apa2
+                pcall(function() RemoteEquip:FireServer(1) end)
+            end
+        end
     end
 end)
