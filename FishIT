@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V5.2 - TOGGLE LOGIC FIX ]]
--- Logika: Tekan Slot Aktif (Unequip) -> Tekan Slot Tujuan (Equip) -> Mining -> Wait 7s -> Pulang -> Balik ke Rod
+-- [[ MINI MINING HUB V5.3 - SLOW & SURE MODE ]]
+-- Logika: Cek Alat -> Tembak Remote Slot Lama -> Tunggu 1.2 Detik -> Tembak Slot Baru
 
 local Services = {
     Players = game:GetService("Players"),
@@ -13,26 +13,23 @@ local Services = {
 local Player = Services.Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- // 1. BUILD UI (SAFE MODE)
--- Kita buat UI dulu agar terlihat meskipun ada error di remote
+-- // 1. BUILD UI (Supaya terlihat walau ada error)
 if Services.CoreGui:FindFirstChild("MiniMiningUI") then Services.CoreGui.MiniMiningUI:Destroy() end
 if PlayerGui:FindFirstChild("MiniMiningUI") then PlayerGui.MiniMiningUI:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MiniMiningUI"
--- Coba pasang di CoreGui, kalau gagal fallback ke PlayerGui
 pcall(function() ScreenGui.Parent = Services.CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 220, 0, 140)
 MainFrame.Position = UDim2.new(0.5, -110, 0.2, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-MainFrame.BorderSizePixel = 0
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Text = "MINING V5.2 (TOGGLE FIX)"
+Title.Text = "MINING V5.3 (SLOW SWAP)"
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = Color3.new(1,1,1)
@@ -67,9 +64,8 @@ end)
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 
 -- // 2. CONFIG REMOTE
-Notify("Loading Remotes...", Color3.fromRGB(255, 255, 0))
 local RemoteEquip = nil
-local Success, Err = pcall(function()
+pcall(function()
     RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages", 5)
         :WaitForChild("_Index", 5)
         :WaitForChild("sleitnick_net@0.2.0", 5)
@@ -78,60 +74,67 @@ local Success, Err = pcall(function()
 end)
 
 if not RemoteEquip then
-    Notify("ERROR: Remote Not Found!", Color3.fromRGB(255, 0, 0))
-    warn("Remote tidak ketemu, cek path!")
+    Notify("REMOTE ERROR!", Color3.fromRGB(255, 0, 0))
 else
-    Notify("Ready - Idle", Color3.fromRGB(0, 255, 0))
+    Notify("Ready", Color3.fromRGB(0, 255, 0))
 end
 
--- // 3. LOGIKA TOGGLE (PENTING)
+-- // 3. LOGIKA SWAP SUPER DETAILED
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 
--- Fungsi Ganti ke Pickaxe (Slot 2)
-local function SwapToPickaxe()
+-- Fungsi Utama Ganti Alat
+local function SmartSwap(targetMode) -- targetMode: "Pickaxe" atau "Rod"
     local char = GetChar()
-    if not char then return end
-
-    -- Cek Tool saat ini
-    local currentTool = char:FindFirstChildWhichIsA("Tool")
+    local hum = GetHum()
+    if not char or not hum then return end
     
-    -- Jika sedang pegang sesuatu (Kemungkinan besar Rod/Slot 1)
-    if currentTool then
-        -- Cek apakah itu Rod? Jika ya, tekan Slot 1 untuk LEPAS
-        if not string.find(string.lower(currentTool.Name), "pick") then
-            -- Anggap slot 1 adalah Rod
-            pcall(function() RemoteEquip:FireServer(1) end)
-            task.wait(0.6) -- Delay animasi unequip
+    -- Cek apa yang sedang dipegang
+    local currentTool = char:FindFirstChildWhichIsA("Tool")
+    local holdingSomething = (currentTool ~= nil)
+    
+    -- Tentukan Slot Tujuan
+    local targetSlot = (targetMode == "Pickaxe") and 2 or 1
+    
+    -- [[ FASE 1: LEPASKAN ALAT LAMA ]]
+    if holdingSomething then
+        local toolName = string.lower(currentTool.Name)
+        
+        -- Cek slot mana yang harus ditekan untuk melepas
+        local slotToUnequip = nil
+        
+        -- Jika pegang Rod (atau apapun yang bukan Pickaxe saat mau Mining)
+        if targetMode == "Pickaxe" then
+             -- Asumsi alat yang dipegang sekarang adalah slot 1
+             slotToUnequip = 1 
+        
+        -- Jika pegang Pickaxe (saat mau balik ke Rod)
+        elseif targetMode == "Rod" then
+             -- Asumsi alat yang dipegang sekarang adalah slot 2
+             slotToUnequip = 2
+        end
+
+        if slotToUnequip then
+            Notify("Melepas Slot " .. slotToUnequip .. "...", Color3.fromRGB(255, 200, 0))
+            
+            -- Tembak Remote untuk melepas
+            pcall(function() RemoteEquip:FireServer(slotToUnequip) end)
+            
+            -- Bantu lepas secara visual (Client side)
+            hum:UnequipTools()
+            
+            -- WAJIB TUNGGU LAMA (Agar server proses unequip selesai)
+            task.wait(1.2) 
         end
     end
-
-    -- Sekarang tangan kosong (atau seharusnya kosong), Tekan Slot 2 untuk EQUIP Pickaxe
-    pcall(function() RemoteEquip:FireServer(2) end)
-    task.wait(0.5)
-end
-
--- Fungsi Ganti ke Rod (Slot 1)
-local function SwapToRod()
-    local char = GetChar()
-    if not char then return end
-
-    local currentTool = char:FindFirstChildWhichIsA("Tool")
     
-    -- Jika sedang pegang sesuatu (Kemungkinan besar Pickaxe/Slot 2)
-    if currentTool then
-        -- Jika itu Pickaxe, tekan Slot 2 untuk LEPAS
-        if string.find(string.lower(currentTool.Name), "pick") then
-            pcall(function() RemoteEquip:FireServer(2) end)
-            task.wait(0.6)
-        end
-    end
-
-    -- Tekan Slot 1 untuk EQUIP Rod
-    pcall(function() RemoteEquip:FireServer(1) end)
-    task.wait(0.5)
+    -- [[ FASE 2: PASANG ALAT BARU ]]
+    Notify("Equip " .. targetMode .. " (Slot "..targetSlot..")", Color3.fromRGB(0, 255, 0))
+    pcall(function() RemoteEquip:FireServer(targetSlot) end)
+    task.wait(1.0) -- Tunggu animasi equip
 end
+
 
 -- // 4. MOVEMENT & SEQUENCE
 local function SafeTween(targetCFrame)
@@ -165,15 +168,14 @@ local function RunMiningSequence(folder, toggleKey)
     local hrp = GetRoot()
     local savedPos = hrp.CFrame
     
-    -- [STEP 1] GANTI KE PICKAXE (LOGIKA TOGGLE)
-    Notify("Swapping to Pickaxe...", Color3.fromRGB(255, 255, 0))
-    SwapToPickaxe()
+    -- [STEP 1] GANTI KE PICKAXE
+    SmartSwap("Pickaxe")
     
-    -- Aktifkan Fly
+    -- Fly On
     local hum = GetHum()
     if hum then hum.PlatformStand = true end
 
-    -- [STEP 2] MINING LOOP
+    -- [STEP 2] MINING
     for i, node in ipairs(activeNodes) do
         if not States[toggleKey] then break end
         
@@ -186,7 +188,7 @@ local function RunMiningSequence(folder, toggleKey)
             task.wait(0.5)
             fireproximityprompt(prompt)
             
-            -- WAIT 7 DETIK
+            -- Wait 7 Detik
             for k = 7, 1, -1 do
                 if not States[toggleKey] then break end
                 Notify("Wait... " .. k .. "s", Color3.fromRGB(100, 255, 100))
@@ -200,9 +202,8 @@ local function RunMiningSequence(folder, toggleKey)
     SafeTween(savedPos)
     if hum then hum.PlatformStand = false end
     
-    -- [STEP 4] GANTI KE ROD (LOGIKA TOGGLE)
-    Notify("Swapping to Rod...", Color3.fromRGB(255, 255, 0))
-    SwapToRod()
+    -- [STEP 4] GANTI KE ROD
+    SmartSwap("Rod")
 
     States.IsMining = false
     Notify("Idle...", Color3.fromRGB(150, 150, 150))
@@ -229,8 +230,8 @@ local function CreateBtn(txt, yPos, varName)
             btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
             btn.TextColor3 = Color3.fromRGB(200, 200, 200)
             States.IsMining = false
-            -- Reset ke Rod jika dimatikan manual
-            SwapToRod()
+            -- Reset ke Rod
+            SmartSwap("Rod")
         end
     end)
 end
@@ -257,7 +258,7 @@ task.spawn(function()
                     if ready then 
                         RunMiningSequence(Folder, "AutoCrystal") 
                     else
-                         -- IDLE CHECK: Pastikan pegang Rod saat diam
+                         -- Idle Check
                          local char = Player.Character
                          if char and not char:FindFirstChildWhichIsA("Tool") then
                              pcall(function() RemoteEquip:FireServer(1) end)
