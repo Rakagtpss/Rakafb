@@ -1,5 +1,5 @@
--- [[ SERAPHIN MINI UI - COMPACT & SAFE ]]
--- Version: Mini V1.0 (Safe Mining Integrated)
+-- [[ SERAPHIN MINI UI - AI SMART DELAY EDITION ]]
+-- Version: Mini V1.5 (Humanized Delays & Safe Floating)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -53,7 +53,7 @@ Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
 local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
-Title.Text = "SERAPHIN <font color='#00ffb4'>MINI</font>"
+Title.Text = "SERAPHIN <font color='#00ffb4'>AI</font>"
 Title.RichText = true
 Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 12
@@ -180,7 +180,7 @@ OpenBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ====================================================
--- [CORE LOGIC] SMART MINING V3 (FLOATING & SAFE)
+-- [CORE LOGIC] SMART MINING V4 (AI DELAYS & FLOAT)
 -- ====================================================
 
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
@@ -199,6 +199,13 @@ local function GetActiveNodes(folder)
     return activeList
 end
 
+-- [FUNGSI RANDOM DELAY]
+-- Menghasilkan delay acak pecahan (contoh: 0.45 detik) agar natural
+local function SmartWait(min, max)
+    local randomDelay = math.random(min * 100, max * 100) / 100
+    task.wait(randomDelay)
+end
+
 local function SmartMining(folder, toggleState)
     local activeNodes = GetActiveNodes(folder)
     if #activeNodes == 0 then return false end
@@ -213,23 +220,36 @@ local function SmartMining(folder, toggleState)
     States.IsMining = true 
     local SafeReturnPos = hrp.CFrame
     
-    -- [STEP 1] UNEQUIP ROD
+    -- [STEP 1] FORCE UNEQUIP ROD (AGRESIF & BERULANG)
     hrp.Anchored = true 
-    pcall(function() RemoteUnequip:FireServer() end)
-    hum:UnequipTools()
-    task.wait(0.6) 
+    
+    -- Loop cek apakah tangan kosong (Maks 5x percobaan)
+    for i = 1, 5 do
+        if char:FindFirstChildWhichIsA("Tool") then
+            pcall(function() RemoteUnequip:FireServer() end)
+            hum:UnequipTools()
+            SmartWait(0.2, 0.4) -- Delay acak kecil antar percobaan unequip
+        else
+            break -- Sudah kosong
+        end
+    end
+
+    SmartWait(0.5, 0.8) -- Delay natural setelah unequip
 
     -- [STEP 2] EQUIP PICKAXE (SLOT 2)
     pcall(function() RemoteEquip:FireServer(2) end)
-    task.wait(1.5) 
+    SmartWait(1.5, 1.8) -- Wajib lama untuk animasi equip
     
-    if not char:FindFirstChildWhichIsA("Tool") then
-        pcall(function() RemoteEquip:FireServer(2) end) -- Retry
-        task.wait(1)
+    -- Cek visual apakah Pickaxe terpegang
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if not tool or (not string.find(string.lower(tool.Name), "pick")) then
+        pcall(function() RemoteEquip:FireServer(2) end) -- Retry Equip
+        SmartWait(1.0, 1.2)
     end
-    hrp.Anchored = false 
+    
+    hrp.Anchored = false -- Lepas kunci posisi
 
-    -- [STEP 3] MINING LOOP (FLOATING)
+    -- [STEP 3] MINING LOOP (FLOATING MODE & AI DELAY)
     for i, node in ipairs(activeNodes) do
         if not States[toggleState] then break end
         
@@ -240,33 +260,48 @@ local function SmartMining(folder, toggleState)
             elseif node:IsA("BasePart") then targetCF = node.CFrame end
             
             if targetCF then
+                -- Persiapan Teleport
                 hrp.Anchored = false 
+                
+                -- Teleport ke atas Crystal (Jarak 4.5 Stud)
                 hrp.CFrame = targetCF + Vector3.new(0, 4.5, 0)
+                
+                -- Reset Kecepatan (Anti Mental)
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 
-                -- FLOAT
+                -- MODE MELAYANG (FLOAT)
                 task.wait(0.05)
-                hrp.Anchored = true 
-                task.wait(0.6) -- Safe Interaction Delay
+                hrp.Anchored = true -- Bekukan posisi di udara
                 
+                -- Delay "Mencari Posisi" (Reaksi Manusia)
+                SmartWait(0.55, 0.85) 
+                
+                -- Eksekusi Mining
                 fireproximityprompt(prompt)
-                task.wait(2.2) -- Mining Duration
+                
+                -- Durasi Mining (Acak agar durasi tidak selalu sama)
+                SmartWait(2.2, 2.6) 
             end
         end
     end
 
-    -- [STEP 4] RETURN
+    -- [STEP 4] RETURN & RE-EQUIP
     hrp.Anchored = false
     hrp.CFrame = SafeReturnPos
     hrp.AssemblyLinearVelocity = Vector3.zero
     
-    task.wait(0.5)
+    SmartWait(0.5, 0.7)
+    
+    -- Lepas Pickaxe
     hum:UnequipTools()
     pcall(function() RemoteUnequip:FireServer() end)
-    task.wait(0.8)
-    pcall(function() RemoteEquip:FireServer(1) end) -- Equip Rod
-    task.wait(1)
     
+    SmartWait(0.8, 1.1) -- Delay natural ganti item
+    
+    -- Ambil Kembali Rod (Slot 1)
+    pcall(function() RemoteEquip:FireServer(1) end) 
+    
+    SmartWait(1.0, 1.5)
     States.IsMining = false
     return true
 end
@@ -354,7 +389,7 @@ task.spawn(function()
             local Folder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
             if Folder then
                 local done = SmartMining(Folder, "AutoCrystal")
-                if done then task.wait(5) else task.wait(2) end
+                if done then SmartWait(5.0, 7.0) else SmartWait(2.0, 3.0) end
             end
         end
         task.wait(1)
@@ -368,7 +403,7 @@ task.spawn(function()
             local Folder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
             if Folder then
                 local done = SmartMining(Folder, "AutoLava")
-                if done then task.wait(5) else task.wait(2) end
+                if done then SmartWait(5.0, 7.0) else SmartWait(2.0, 3.0) end
             end
         end
         task.wait(1)
@@ -403,6 +438,6 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(2)
+        SmartWait(2.0, 3.5) -- Random scan interval
     end
 end)
