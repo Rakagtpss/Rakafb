@@ -1,13 +1,14 @@
 -- =====================================================
--- 1. LOAD LIBRARY & WINDOW (WINDUI)
+-- 1. LOAD LIBRARY & WINDOW (WINDUI FIXED LINK)
 -- =====================================================
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+-- Menggunakan link GitHub official agar tidak error 402
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/source.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "Fishing Super Fast", -- Judul Menu
-    Icon = "fish-symbol", -- Icon
-    Author = ".gg/script", -- Author
-    Folder = "FishingScript", -- Folder Config
+    Title = "Fishing Super Fast", 
+    Icon = "fish-symbol", 
+    Author = ".gg/script", 
+    Folder = "FishingScript", 
     Size = UDim2.fromOffset(580, 460),
     Transparent = true, 
     Theme = "Dark", 
@@ -28,7 +29,7 @@ local legit = false
 local instant = false
 local superInstant = true 
 
--- Args casting (Koordinat/Hash untuk Request Game - Sesuaikan jika update game berubah)
+-- Args casting
 local args = { -1.115296483039856, 0, 1763651451.636425 }
 
 -- Default Delays
@@ -44,7 +45,7 @@ local LocalPlayer = Players.LocalPlayer
 -- Remote Definitions
 local ChargeRod    = net["RF/ChargeFishingRod"]
 local RequestGame  = net["RF/RequestFishingMinigameStarted"]
-local CompleteGame = net["RF/CatchFishCompleted"] -- Target Bypass
+local CompleteGame = net["RF/CatchFishCompleted"] 
 local CancelInput  = net["RF/CancelFishingInputs"]
 local UpdateAuto   = net["RF/UpdateAutoFishingState"]
 
@@ -68,10 +69,9 @@ local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
 
-    -- Mencegah script game asli mengganggu proses kita
     if FishingBlocker.Enabled and BLOCKED_REMOTES[self] and not checkcaller() then
         if method == "InvokeServer" then
-            return task.wait(9e9) -- Infinite yield (Bekukan thread game asli)
+            return task.wait(9e9) 
         elseif method == "FireServer" then
             return nil
         end
@@ -121,19 +121,18 @@ local function startFishingLoop() -- Mode Normal/Legit
         if not getgenv().fishingStart then break end
         
         RequestGame:InvokeServer(unpack(args))
-        task.wait(delayTime) -- Delay Catch Regular
+        task.wait(delayTime) 
         
         if not getgenv().fishingStart then break end 
         
-        BypassCatch() -- Finish Game
+        BypassCatch() 
         
         task.wait(0.05)
         pcall(function() _Cancel:InvokeServer() end)
     end
 end
 
-local function startFishingSuperInstantLoop() -- Mode Super Fast / Blatant
-    -- WindUI:Notify({Title = "Mode", Content = "Super Fast Active", Duration = 2})
+local function startFishingSuperInstantLoop() -- Mode Super Fast
     local _Charge = ChargeRod
     local _Request = RequestGame
     local _Cancel = CancelInput
@@ -154,13 +153,10 @@ local function startFishingSuperInstantLoop() -- Mode Super Fast / Blatant
             _Request:InvokeServer(unpack(args))
         end)
         
-        -- Custom Delay Reel (Charge)
         task.wait(delayCharge) 
         
-        -- Panggil Bypass (Seolah kena air & menang)
         BypassCatch()
         
-        -- Custom Delay Bait (Reset)
         task.wait(delayReset) 
         
         pcall(function() _Cancel:InvokeServer() end)
@@ -245,7 +241,6 @@ TabFishing:Toggle({
         FishingBlocker.Enabled = state
         
         if state then
-            -- Mulai
             pcall(function() CancelInput:InvokeServer() end)
             
             if superInstant then
@@ -256,7 +251,6 @@ TabFishing:Toggle({
             
             WindUI:Notify({Title = "Fishing", Content = "Started!", Duration = 2})
         else
-            -- Stop
             if FishingBlocker.AutoGreat then
                 UpdateAuto:InvokeServer({false})
             end
@@ -281,5 +275,4 @@ TabFishing:Button({
     end
 })
 
--- Pilih Tab Default
 Window:SelectTab(1)
