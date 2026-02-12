@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V4.3 - STRICT DELAY ]]
--- Logika: Teleport -> Extract -> Wait 10s -> Next Crystal.
+-- [[ MINING HUB V5.0 - STRUCTURED SEQUENCE ]]
+-- Urutan: Save Pos -> Unequip -> Equip Slot 2 -> Tween Teleport -> Extract -> Delay 10s.
 
 local Services = {
     Players = game:GetService("Players"),
@@ -12,7 +12,7 @@ local Services = {
 
 local Player = Services.Players.LocalPlayer
 
--- // 1. CONFIG REMOTE
+-- // CONFIG
 local RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
@@ -25,49 +25,72 @@ local States = {
     IsMining = false
 }
 
--- Fungsi Character
+-- Helpers
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 
--- // 2. FORCE SWAP (ROD -> PICKAXE)
-local function ForceSwapToPickaxe()
+-- // FUNGSI 1: LEPAS ROD (UNEQUIP)
+local function Step_Unequip()
     local char = GetChar()
     local hum = GetHum()
     if not char or not hum then return end
-
-    -- Unequip Paksa
-    local currentTool = char:FindFirstChildWhichIsA("Tool")
-    if currentTool then currentTool.Parent = Player.Backpack end
-    hum:UnequipTools()
-    pcall(function() RemoteEquip:FireServer(1) end)
     
-    task.wait(0.5)
+    -- 1. Paksa pindah ke Backpack (Client)
+    for _, t in pairs(char:GetChildren()) do
+        if t:IsA("Tool") then t.Parent = Player.Backpack end
+    end
+    
+    -- 2. Unequip Humanoid
+    hum:UnequipTools()
+    
+    -- 3. Info Server (Unequip Slot 1)
+    pcall(function() RemoteEquip:FireServer(1) end)
+end
 
-    -- Equip Pickaxe
+-- // FUNGSI 2: EQUIP PICKAXE (SLOT 2)
+local function Step_EquipPickaxe()
+    -- 1. Request Server
     pcall(function() RemoteEquip:FireServer(2) end)
-    task.wait(0.3)
-
-    -- Cek Manual (Backup)
-    if not char:FindFirstChildWhichIsA("Tool") then
+    task.wait(0.5)
+    
+    -- 2. Cek apakah sudah terpasang?
+    local char = GetChar()
+    local hasTool = char:FindFirstChildWhichIsA("Tool")
+    
+    -- 3. Jika gagal, cari manual di tas
+    if not hasTool then
         local backpack = Player.Backpack
-        for _, tool in pairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") and string.find(string.lower(tool.Name), "pick") then
-                tool.Parent = char 
+        for _, t in pairs(backpack:GetChildren()) do
+            if t:IsA("Tool") and string.find(string.lower(t.Name), "pick") then
+                t.Parent = char
                 break
             end
         end
     end
 end
 
-local function ReturnToRod()
-    local hum = GetHum()
-    if hum then hum:UnequipTools() end
-    task.wait(0.3)
-    pcall(function() RemoteEquip:FireServer(1) end) 
+-- // FUNGSI 3: TELEPORT AMAN (TWEEN)
+local function Step_Teleport(targetCFrame)
+    local hrp = GetRoot()
+    if not hrp then return end
+    
+    -- Hitung waktu agar tidak terlalu cepat (Anti-Suspicion)
+    local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    local speed = 60 -- Kecepatan wajar
+    local time = dist / speed
+    if time < 0.1 then time = 0.1 end
+
+    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    local tween = Services.TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+    
+    tween:Play()
+    tween.Completed:Wait() -- Tunggu sampai
+    
+    hrp.AssemblyLinearVelocity = Vector3.zero -- Reset fisika
 end
 
--- // 3. UI SEDERHANA
+-- // UI SETUP
 if Services.CoreGui:FindFirstChild("MiniMiningUI") then Services.CoreGui.MiniMiningUI:Destroy() end
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MiniMiningUI"
@@ -77,13 +100,12 @@ local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Position = UDim2.new(0.5, -110, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 0
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "MINING V4.3 (DELAY 10s)"
+Title.Text = "MINING SEQUENCE V5"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
@@ -120,28 +142,26 @@ local function Notify(msg, color)
     StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
 end
 
--- // 4. BYPASS SYSTEM (FLY DIAM + NOCLIP)
+-- // BYPASS SETUP
 local NoclipConn = nil
 local function SetBypass(bool)
     local hrp = GetRoot()
     local hum = GetHum()
     if not hrp or not hum then return end
-
     if bool then
         hum.PlatformStand = true
         if not hrp:FindFirstChild("MiningFly") then
             local bv = Instance.new("BodyVelocity")
             bv.Name = "MiningFly"
             bv.Parent = hrp
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.zero -- Diam total
+            bv.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+            bv.Velocity = Vector3.zero
         end
-        -- Anti Collide
         if not NoclipConn then
             NoclipConn = Services.RunService.Stepped:Connect(function()
                 if Player.Character then
-                    for _, v in pairs(Player.Character:GetDescendants()) do
-                        if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+                    for _,v in pairs(Player.Character:GetDescendants()) do
+                        if v:IsA("BasePart") then v.CanCollide = false end
                     end
                 end
             end)
@@ -153,31 +173,7 @@ local function SetBypass(bool)
     end
 end
 
--- // 5. SAFE TWEEN (ANTI SUSPICIOUS MOVEMENT)
-local function SafeTween(targetCFrame)
-    local hrp = GetRoot()
-    if not hrp then return end
-    
-    local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    
-    -- Kecepatan Tween (Semakin kecil angka speed, semakin pelan & aman)
-    -- Saya set ke 60 (mirip kecepatan lari cepat/fly wajar)
-    local speed = 60 
-    local time = dist / speed
-    
-    if time < 0.1 then time = 0.1 end -- Minimal waktu
-
-    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-    local tween = Services.TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-    
-    tween:Play()
-    tween.Completed:Wait() -- Tunggu sampai benar-benar sampai tujuan
-    
-    -- Reset Velocity saat sampai
-    hrp.AssemblyLinearVelocity = Vector3.zero
-end
-
--- // 6. LOGIKA SMART MINING (10s DELAY)
+-- // LOGIKA UTAMA (URUTAN BARU)
 local function GetActiveNodes(folder)
     local activeList = {}
     if not folder then return activeList end
@@ -198,53 +194,83 @@ local function SmartMining(folder, toggleState)
     if not hrp then return false end
 
     States.IsMining = true 
-    local SafeReturnPos = hrp.CFrame
-    Notify("Found " .. #activeNodes .. " Nodes", Color3.fromRGB(0, 255, 255))
-    
-    ForceSwapToPickaxe()
+
+    -- ====================================================
+    -- [STEP 1] SAVE POSITION
+    -- ====================================================
+    local SavedPosition = hrp.CFrame
+    Notify("1. Position Saved", Color3.fromRGB(0, 255, 255))
     task.wait(0.5)
+
+    -- ====================================================
+    -- [STEP 2] LEPAS ROD
+    -- ====================================================
+    Notify("2. Unequipping Rod...", nil)
+    Step_Unequip()
+    task.wait(0.5)
+
+    -- ====================================================
+    -- [STEP 3] EQUIP PICKAXE SLOT 2
+    -- ====================================================
+    Notify("3. Equipping Pickaxe...", nil)
+    Step_EquipPickaxe()
+    task.wait(0.8) -- Tunggu animasi equip
+
+    -- Cek keamanan: Pastikan Pickaxe dipegang sebelum Teleport
+    local char = GetChar()
+    if not char:FindFirstChildWhichIsA("Tool") then
+        Notify("WARN: Equip Failed! Retrying...", Color3.fromRGB(255, 100, 0))
+        Step_EquipPickaxe()
+        task.wait(1)
+    end
+    
+    -- ====================================================
+    -- [STEP 4] TELEPORT TO CRYSTAL (LOOP)
+    -- ====================================================
     SetBypass(true)
 
     for i, node in ipairs(activeNodes) do
-        -- Cek jika tombol dimatikan
         if not States[toggleState] then break end
         
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
             local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-            
             if targetCF then
-                -- 1. TELEPORT PELAN (SafeTween)
                 local dest = targetCF + Vector3.new(0, 3.5, 0)
-                SafeTween(dest)
                 
-                -- Update Status
-                Notify("Mining Node " .. i .. "/" .. #activeNodes, Color3.fromRGB(255, 200, 50))
-                task.wait(0.5) -- Stabilisasi sebelum tekan E
+                -- A. TWEEN TELEPORT
+                Notify("4. Going to Node " .. i, Color3.fromRGB(255, 200, 50))
+                Step_Teleport(dest)
+                task.wait(0.5) -- Stabilisasi
                 
-                -- 2. INTERAKSI (TEKAN E)
+                -- B. EXTRACT
                 fireproximityprompt(prompt)
                 
-                -- 3. STRICT DELAY 10 DETIK (WAJIB TUNGGU SEBELUM PINDAH)
+                -- C. DELAY 10 DETIK (Sebelum pindah ke crystal lain)
                 for cd = 10, 1, -1 do
                     if not States[toggleState] then break end
-                    Notify("Next in... " .. cd .. "s", Color3.fromRGB(100, 255, 100))
+                    Notify("Wait Next... " .. cd .. "s", Color3.fromRGB(100, 255, 100))
                     task.wait(1)
                 end
             end
         end
     end
 
-    Notify("Selesai! Pulang...", Color3.fromRGB(100, 255, 100))
-    SafeTween(SafeReturnPos)
+    -- Selesai, pulang
+    Notify("Done! Returning...", Color3.fromRGB(0, 255, 100))
+    Step_Teleport(SavedPosition)
     SetBypass(false)
     
-    ReturnToRod()
+    -- Kembalikan Rod
+    Step_Unequip()
+    task.wait(0.3)
+    pcall(function() RemoteEquip:FireServer(1) end)
+    
     States.IsMining = false
     return true
 end
 
--- // 7. TOMBOL UI
+-- // TOMBOL
 local function CreateSwitch(text, stateKey, posY)
     local Btn = Instance.new("TextButton", MainFrame)
     Btn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -279,18 +305,17 @@ end
 CreateSwitch("Auto Crystal", "AutoCrystal", 40)
 CreateSwitch("Auto Lava", "AutoLava", 75)
 
--- // 8. LOOPS
+-- // LOOPS
 task.spawn(function()
     while true do
         if States.AutoCrystal then
              local Islands = Services.Workspace:FindFirstChild("Islands")
              local CryFolder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
-             
              if CryFolder then
                 local success = SmartMining(CryFolder, "AutoCrystal")
                 if success then task.wait(5) else task.wait(2) end
              else
-                Notify("Map Crystal tidak ketemu!", Color3.fromRGB(255, 50, 50))
+                Notify("Map Crystal Not Found", Color3.fromRGB(255, 50, 50))
                 task.wait(2)
              end
         else
