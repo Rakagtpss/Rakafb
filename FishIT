@@ -189,7 +189,7 @@ local function SmartMining(folder, toggleState)
     
     -- [STEP 1: SWAP ALAT LEBIH AGRESIF]
     ForceUnequipAll() -- Paksa lepas Rod
-    task.wait(0.5)    -- Beri waktu
+    task.wait(0.4)    -- Beri waktu
     EquipSlot2()      -- Ambil Pickaxe
     task.wait(0.6)    -- Tunggu animasi equip
 
@@ -217,7 +217,7 @@ local function SmartMining(folder, toggleState)
                 fireproximityprompt(prompt)
                 
                 -- Delay Extract (3.8 detik adalah waktu rata-rata mining)
-                task.wait(5) 
+                task.wait(3.8) 
             end
         end
     end
@@ -299,4 +299,5 @@ task.spawn(function()
             task.wait(2)
         end
     end
-end)
+end))
+
