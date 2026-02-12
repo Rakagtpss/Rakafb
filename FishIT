@@ -7,31 +7,28 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- --- 1. SETUP REMOTE FUNCTIONS ---
--- Mengakses folder remote dengan aman
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Index = Packages:WaitForChild("_Index")
 local Sleitnick = Index:WaitForChild("sleitnick_net@0.2.0")
 local NetFolder = Sleitnick:WaitForChild("net")
 
--- Mendefinisikan Remote Functions (Sesuai request)
 local Remotes = {
     ChargeRod = NetFolder:WaitForChild("RF/ChargeFishingRod"),
     CatchCompleted = NetFolder:WaitForChild("RF/CatchFishCompleted"),
     CancelInputs = NetFolder:WaitForChild("RF/CancelFishingInputs"),
-    MarkUsed = NetFolder:WaitForChild("RF/MarkAutoFishingUsed"),
     RequestMinigame = NetFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
     UpdateState = NetFolder:WaitForChild("RF/UpdateAutoFishingState"),
-    UpdateRadar = NetFolder:WaitForChild("RF/UpdateFishingRadar"),
 }
 
 -- --- 2. CONFIG VARIABLE ---
 local Config = {
     IsActive = false,
-    MinShakeDelay = 0.5, -- Default Min
-    MaxShakeDelay = 1.2, -- Default Max
+    MinShakeDelay = 0.5, -- Waktu tunggu minimal
+    MaxShakeDelay = 1.0, -- Waktu tunggu maksimal
+    CastPower = 95,      -- Kekuatan lempar (Simulasi 0 - 100)
 }
 
--- --- 3. UI GENERATION (Tampilan) ---
+-- --- 3. UI GENERATION (Tampilan Dark Mode) ---
 if getgenv and getgenv().FishUI then getgenv().FishUI:Destroy() end
 if CoreGui:FindFirstChild("FishingConfigUI") then CoreGui.FishingConfigUI:Destroy() end
 
@@ -42,18 +39,18 @@ if pcall(function() ScreenGui.Parent = CoreGui end) then else ScreenGui.Parent =
 -- Frame Utama
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 260, 0, 200)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -100)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.Size = UDim2.new(0, 260, 0, 210)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -105)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
-local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
+local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 10); UICorner.Parent = MainFrame
 
 -- Judul
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Size = UDim2.new(1, 0, 0, 35)
 Title.BackgroundTransparency = 1
-Title.Text = "🎣 Custom Shake Auto"
+Title.Text = "🎣 Auto Fish + Shake"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 16
@@ -62,9 +59,9 @@ Title.Parent = MainFrame
 -- Status Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 0, 25)
+StatusLabel.Position = UDim2.new(0, 0, 0, 30)
 StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "Idle..."
+StatusLabel.Text = "Status: Idle"
 StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.TextSize = 12
@@ -72,15 +69,15 @@ StatusLabel.Parent = MainFrame
 
 -- Input Min Delay
 local MinInput = Instance.new("TextBox")
-MinInput.Size = UDim2.new(0, 100, 0, 30)
-MinInput.Position = UDim2.new(0, 20, 0, 60)
-MinInput.PlaceholderText = "Min Delay"
+MinInput.Size = UDim2.new(0, 100, 0, 35)
+MinInput.Position = UDim2.new(0, 20, 0, 70)
+MinInput.PlaceholderText = "Min (s)"
 MinInput.Text = tostring(Config.MinShakeDelay)
-MinInput.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+MinInput.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 MinInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinInput.Font = Enum.Font.Gotham
 MinInput.Parent = MainFrame
-local MinCorner = Instance.new("UICorner"); MinCorner.CornerRadius = UDim.new(0, 4); MinCorner.Parent = MinInput
+local MinCorner = Instance.new("UICorner"); MinCorner.CornerRadius = UDim.new(0, 6); MinCorner.Parent = MinInput
 
 MinInput.FocusLost:Connect(function()
     Config.MinShakeDelay = tonumber(MinInput.Text) or Config.MinShakeDelay
@@ -88,15 +85,15 @@ end)
 
 -- Input Max Delay
 local MaxInput = Instance.new("TextBox")
-MaxInput.Size = UDim2.new(0, 100, 0, 30)
-MaxInput.Position = UDim2.new(0, 140, 0, 60)
-MaxInput.PlaceholderText = "Max Delay"
+MaxInput.Size = UDim2.new(0, 100, 0, 35)
+MaxInput.Position = UDim2.new(0, 140, 0, 70)
+MaxInput.PlaceholderText = "Max (s)"
 MaxInput.Text = tostring(Config.MaxShakeDelay)
-MaxInput.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+MaxInput.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 MaxInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 MaxInput.Font = Enum.Font.Gotham
 MaxInput.Parent = MainFrame
-local MaxCorner = Instance.new("UICorner"); MaxCorner.CornerRadius = UDim.new(0, 4); MaxCorner.Parent = MaxInput
+local MaxCorner = Instance.new("UICorner"); MaxCorner.CornerRadius = UDim.new(0, 6); MaxCorner.Parent = MaxInput
 
 MaxInput.FocusLost:Connect(function()
     Config.MaxShakeDelay = tonumber(MaxInput.Text) or Config.MaxShakeDelay
@@ -104,17 +101,17 @@ end)
 
 -- Tombol Toggle
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 220, 0, 40)
-ToggleBtn.Position = UDim2.new(0, 20, 0, 110)
+ToggleBtn.Size = UDim2.new(0, 220, 0, 45)
+ToggleBtn.Position = UDim2.new(0, 20, 0, 130)
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60) -- Merah
-ToggleBtn.Text = "START"
+ToggleBtn.Text = "START FISHING"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.TextSize = 18
+ToggleBtn.TextSize = 16
 ToggleBtn.Parent = MainFrame
-local BtnCorner = Instance.new("UICorner"); BtnCorner.CornerRadius = UDim.new(0, 6); BtnCorner.Parent = ToggleBtn
+local BtnCorner = Instance.new("UICorner"); BtnCorner.CornerRadius = UDim.new(0, 8); BtnCorner.Parent = ToggleBtn
 
--- Drag Logic
+-- Drag Logic (Agar UI bisa digeser)
 local dragging, dragInput, dragStart, startPos
 local function update(input)
     local delta = input.Position - dragStart
@@ -131,48 +128,49 @@ MainFrame.InputChanged:Connect(function(input)
 end)
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
 
--- --- 4. MAIN SCRIPT (LOGIKA AUTO FISHING) ---
+-- --- 4. LOGIKA UTAMA (Sesuai Remote Log) ---
 
 local function FishingRoutine()
     task.spawn(function()
         while Config.IsActive do
-            -- 1. LEMPAR KAIL (Charge Rod)
+            -- A. CHARGE ROD (Melempar Kail)
             StatusLabel.Text = "Casting Rod..."
-            -- [!] HARUS DIISI: Biasanya butuh Power (angka) dan Posisi (Vector3)
-            -- Contoh: Remotes.ChargeRod:InvokeServer(100, Vector3.new(0,0,0)) 
-            local castSuccess = pcall(function()
-                Remotes.ChargeRod:InvokeServer() -- <-- ISI ARGUMEN DISINI
-            end)
             
-            if not castSuccess then
-                warn("Gagal melempar kail. Cek Argumen Remote.")
-            end
+            -- Menggunakan GetServerTimeNow() agar timestamp valid
+            local chargeTime = workspace:GetServerTimeNow()
+            Remotes.ChargeRod:InvokeServer(chargeTime)
             
-            task.wait(2) -- Waktu animasi lempar
+            -- Tunggu animasi lempar & tunggu ikan menggigit
+            -- (Kita gunakan delay acak untuk simulasi "Shake Delay")
+            local shakeDelay = Config.MinShakeDelay + (math.random() * (Config.MaxShakeDelay - Config.MinShakeDelay))
+            StatusLabel.Text = "Waiting Delay: " .. string.format("%.2f", shakeDelay) .. "s"
+            task.wait(2.5 + shakeDelay) -- 2.5s animasi dasar + delay kustom
             
-            -- 2. TUNGGU SHAKE DELAY (Custom Delay)
-            local delay = Config.MinShakeDelay + (math.random() * (Config.MaxShakeDelay - Config.MinShakeDelay))
-            StatusLabel.Text = "Waiting Delay: " .. string.format("%.2f", delay) .. "s"
-            task.wait(delay)
-            
-            -- 3. REQUEST MINIGAME
+            if not Config.IsActive then break end
+
+            -- B. REQUEST MINIGAME
             StatusLabel.Text = "Starting Minigame..."
-            -- [!] Minta server mulai minigame
-            Remotes.RequestMinigame:InvokeServer() -- <-- ISI ARGUMEN JIKA PERLU
+            -- Argumen: (Power/Distance, Difficulty/BarSize, Timestamp)
+            -- Kita pakai Power random 90-100 agar terlihat legit, BarSize 0.5 sesuai log kamu
+            local minigameTime = workspace:GetServerTimeNow()
+            Remotes.RequestMinigame:InvokeServer(Config.CastPower, 0.5, minigameTime)
             
-            task.wait(0.5) -- Jeda sebentar
+            -- Tunggu sebentar (simulasi main minigame)
+            task.wait(1) 
             
-            -- 4. SELESAI (Catch Fish)
+            -- C. CATCH FISH (Menangkap)
             StatusLabel.Text = "Catching Fish..."
-            -- [!] Ini bagian paling penting. Server butuh bukti bahwa minigame selesai.
-            -- Cek RemoteSpy untuk melihat apa yang dikirim di sini.
-            Remotes.CatchCompleted:InvokeServer() -- <-- ISI ARGUMEN DISINI
+            Remotes.CatchCompleted:InvokeServer()
             
-            task.wait(1.5) -- Cooldown sebelum mengulang
+            -- D. COOLDOWN
+            StatusLabel.Text = "Cooldown..."
+            task.wait(1.5)
         end
         
-        -- Reset Text jika berhenti
+        -- Reset jika berhenti
         StatusLabel.Text = "Stopped."
+        Remotes.CancelFishingInputs:InvokeServer() -- Reset input agar char tidak bug
+        Remotes.UpdateState:InvokeServer(false)
     end)
 end
 
@@ -183,14 +181,15 @@ ToggleBtn.MouseButton1Click:Connect(function()
     
     if Config.IsActive then
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60) -- Hijau
-        ToggleBtn.Text = "STOP"
+        ToggleBtn.Text = "STOP FISHING"
         print("✅ Auto Fish Started")
         FishingRoutine()
     else
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60) -- Merah
-        ToggleBtn.Text = "START"
+        ToggleBtn.Text = "START FISHING"
         print("⏹ Auto Fish Stopped")
     end
 end)
 
+-- Simpan instance UI ke global agar tidak duplikat
 if getgenv then getgenv().FishUI = ScreenGui end
