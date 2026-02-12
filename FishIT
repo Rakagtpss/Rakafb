@@ -1,5 +1,5 @@
--- [[ SERAPHIN MINI UI - AI SMART DELAY EDITION ]]
--- Version: Mini V1.5 (Humanized Delays & Safe Floating)
+-- [[ SERAPHIN MINI UI - FINAL FIX (FORCE SWAP & MINING STATE) ]]
+-- Version: Mini V2.0 (Stable Mining & Anti-Interference)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -18,9 +18,9 @@ local Camera = Services.Workspace.CurrentCamera
 -- // THEME CONFIG
 local UI = {
     Color = Color3.fromRGB(15, 15, 20),
-    Accent = Color3.fromRGB(0, 255, 180), -- Warna Mint/Cyan
+    Accent = Color3.fromRGB(255, 50, 50), -- Warna Merah (Indikator Kuat)
     Text = Color3.fromRGB(240, 240, 240),
-    Size = UDim2.new(0, 220, 0, 280)
+    Size = UDim2.new(0, 220, 0, 300)
 }
 
 -- // CLEANUP OLD UI
@@ -37,7 +37,7 @@ ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UI.Size
-MainFrame.Position = UDim2.new(0, 20, 0.5, -140)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -150)
 MainFrame.BackgroundColor3 = UI.Color
 MainFrame.BorderSizePixel = 0
 MainFrame.BackgroundTransparency = 0.1
@@ -53,7 +53,7 @@ Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
 local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
-Title.Text = "SERAPHIN <font color='#00ffb4'>AI</font>"
+Title.Text = "SERAPHIN <font color='#ff3232'>FIX</font>"
 Title.RichText = true
 Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 12
@@ -111,7 +111,8 @@ local States = {
     AutoEvent = false,
     WoW = false,
     Noclip = false,
-    IsMining = false
+    IsMining = false, -- Status Mining
+    AutoEquip = false -- Status Auto Equip Rod
 }
 
 -- // TOGGLE CREATOR
@@ -180,7 +181,7 @@ OpenBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ====================================================
--- [CORE LOGIC] SMART MINING V4 (AI DELAYS & FLOAT)
+-- [CORE LOGIC] SMART MINING V5 (FORCE SWAP & STATE LOCK)
 -- ====================================================
 
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
@@ -199,11 +200,36 @@ local function GetActiveNodes(folder)
     return activeList
 end
 
--- [FUNGSI RANDOM DELAY]
--- Menghasilkan delay acak pecahan (contoh: 0.45 detik) agar natural
+-- [AI DELAY]
 local function SmartWait(min, max)
     local randomDelay = math.random(min * 100, max * 100) / 100
     task.wait(randomDelay)
+end
+
+-- [FUNGSI PAKSA KOSONGKAN TANGAN]
+local function ForceClearHand()
+    local char = Player.Character
+    if not char then return end
+    for _, t in pairs(char:GetChildren()) do
+        if t:IsA("Tool") then
+            t.Parent = Player.Backpack -- Pindah ke Tas (Instan)
+        end
+    end
+end
+
+-- [FUNGSI EQUIP DARI TAS]
+local function ForceEquipBag(keyword)
+    local char = Player.Character
+    local backpack = Player.Backpack
+    if not char or not backpack then return false end
+    
+    for _, t in pairs(backpack:GetChildren()) do
+        if t:IsA("Tool") and string.find(string.lower(t.Name), keyword) then
+            t.Parent = char -- Pindah ke Tangan (Instan)
+            return true
+        end
+    end
+    return false
 end
 
 local function SmartMining(folder, toggleState)
@@ -213,43 +239,37 @@ local function SmartMining(folder, toggleState)
     local hrp, char, hum = GetRoot(), GetChar(), GetHum()
     if not hrp or not char or not hum then return false end
 
-    local NetPath = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
-    local RemoteEquip = NetPath:WaitForChild("RE/EquipToolFromHotbar")
-    local RemoteUnequip = NetPath:WaitForChild("RE/UnequipToolFromHotbar")
+    local RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar")
 
-    States.IsMining = true 
+    -- [CRITICAL] LOCK STATE MINING
+    States.IsMining = true -- Ini akan memblokir Auto Equip Rod
     local SafeReturnPos = hrp.CFrame
     
-    -- [STEP 1] FORCE UNEQUIP ROD (AGRESIF & BERULANG)
+    -- [STEP 1] FORCE REMOVE ROD (SWAP PARENT)
     hrp.Anchored = true 
+    ForceClearHand() 
+    SmartWait(0.2, 0.3)
+    ForceClearHand() -- Double Check
     
-    -- Loop cek apakah tangan kosong (Maks 5x percobaan)
-    for i = 1, 5 do
-        if char:FindFirstChildWhichIsA("Tool") then
-            pcall(function() RemoteUnequip:FireServer() end)
-            hum:UnequipTools()
-            SmartWait(0.2, 0.4) -- Delay acak kecil antar percobaan unequip
-        else
-            break -- Sudah kosong
-        end
-    end
-
-    SmartWait(0.5, 0.8) -- Delay natural setelah unequip
-
-    -- [STEP 2] EQUIP PICKAXE (SLOT 2)
-    pcall(function() RemoteEquip:FireServer(2) end)
-    SmartWait(1.5, 1.8) -- Wajib lama untuk animasi equip
+    -- [STEP 2] EQUIP PICKAXE
+    local equipped = ForceEquipBag("pick") -- Coba cari manual dulu
     
-    -- Cek visual apakah Pickaxe terpegang
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if not tool or (not string.find(string.lower(tool.Name), "pick")) then
-        pcall(function() RemoteEquip:FireServer(2) end) -- Retry Equip
-        SmartWait(1.0, 1.2)
+    if not equipped then
+        -- Kalau gak ketemu di tas, pakai Remote Slot 2
+        pcall(function() RemoteEquip:FireServer(2) end)
     end
     
-    hrp.Anchored = false -- Lepas kunci posisi
+    SmartWait(1.2, 1.5) -- Tunggu Sync
+    
+    -- Validasi Akhir: Kalau masih pegang Rod, paksa lepas lagi
+    if char:FindFirstChild("Rod") or char:FindFirstChild("Fishing Rod") then
+        ForceClearHand()
+        if equipped then ForceEquipBag("pick") end
+    end
+    
+    hrp.Anchored = false 
 
-    -- [STEP 3] MINING LOOP (FLOATING MODE & AI DELAY)
+    -- [STEP 3] MINING LOOP (FLOAT 3.5 STUD)
     for i, node in ipairs(activeNodes) do
         if not States[toggleState] then break end
         
@@ -260,49 +280,41 @@ local function SmartMining(folder, toggleState)
             elseif node:IsA("BasePart") then targetCF = node.CFrame end
             
             if targetCF then
-                -- Persiapan Teleport
                 hrp.Anchored = false 
                 
-                -- Teleport ke atas Crystal (Jarak 4.5 Stud)
-                hrp.CFrame = targetCF + Vector3.new(0, 4.5, 0)
-                
-                -- Reset Kecepatan (Anti Mental)
+                -- Jarak 3.5 Stud (Ideal untuk Mining)
+                hrp.CFrame = targetCF + Vector3.new(0, 3.5, 0) 
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 
-                -- MODE MELAYANG (FLOAT)
                 task.wait(0.05)
-                hrp.Anchored = true -- Bekukan posisi di udara
+                hrp.Anchored = true -- Bekukan
                 
-                -- Delay "Mencari Posisi" (Reaksi Manusia)
-                SmartWait(0.55, 0.85) 
+                SmartWait(0.5, 0.7) -- Delay "Manusia" melihat prompt
                 
-                -- Eksekusi Mining
-                fireproximityprompt(prompt)
+                fireproximityprompt(prompt) -- TEKAN E
                 
-                -- Durasi Mining (Acak agar durasi tidak selalu sama)
-                SmartWait(2.2, 2.6) 
+                -- Tunggu Mining Selesai (Durasi animasi)
+                SmartWait(2.3, 2.6) 
             end
         end
     end
 
-    -- [STEP 4] RETURN & RE-EQUIP
+    -- [STEP 4] SELESAI & KEMBALI
     hrp.Anchored = false
     hrp.CFrame = SafeReturnPos
     hrp.AssemblyLinearVelocity = Vector3.zero
     
     SmartWait(0.5, 0.7)
     
-    -- Lepas Pickaxe
-    hum:UnequipTools()
-    pcall(function() RemoteUnequip:FireServer() end)
+    ForceClearHand() -- Lepas Pickaxe
     
-    SmartWait(0.8, 1.1) -- Delay natural ganti item
+    SmartWait(0.8, 1.0)
     
-    -- Ambil Kembali Rod (Slot 1)
+    -- Ambil Rod Kembali
     pcall(function() RemoteEquip:FireServer(1) end) 
     
-    SmartWait(1.0, 1.5)
-    States.IsMining = false
+    SmartWait(1.0, 1.2)
+    States.IsMining = false -- Buka Lock Mining
     return true
 end
 
@@ -310,30 +322,20 @@ end
 -- [LOOPS & BUTTONS]
 -- ====================================================
 
--- 1. Auto Crystal
+CreateToggle("Auto Equip Rod", "AutoEquip", nil) -- Tombol Auto Equip
+
 CreateToggle("Auto Crystal (Safe)", "AutoCrystal", function(val)
-    if val then
-        States.WoW = true -- Auto WoW on
-    else
-        States.WoW = false
-    end
+    if val then States.WoW = true else States.WoW = false end
 end)
 
--- 2. Auto Lava
 CreateToggle("Auto Lava (Safe)", "AutoLava", function(val)
-    if val then
-        States.WoW = true
-    else
-        States.WoW = false
-    end
+    if val then States.WoW = true else States.WoW = false end
 end)
 
--- 3. Auto Event
 CreateToggle("Auto Event Hunt", "AutoEvent", function(val)
     if val then States.WoW = true else States.WoW = false end
 end)
 
--- 4. Walk on Water
 CreateToggle("Walk on Water", "WoW", function(val)
     if val then
         local hrp = GetRoot()
@@ -348,10 +350,23 @@ CreateToggle("Walk on Water", "WoW", function(val)
     end
 end)
 
--- 5. Noclip
 CreateToggle("Noclip", "Noclip", nil)
 
 -- [LOGIC LOOPS]
+
+-- Auto Equip Loop (DENGAN PENGECEKAN ISMINING)
+task.spawn(function()
+    while true do
+        if States.AutoEquip and not States.IsMining then -- PENTING: Cek IsMining
+            local char = Player.Character
+            if char and not (char:FindFirstChild("Rod") or char:FindFirstChild("Fishing Rod")) then
+                local RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):FindFirstChild("RE/EquipToolFromHotbar")
+                if RemoteEquip then pcall(function() RemoteEquip:FireServer(1) end) end
+            end
+        end
+        task.wait(2)
+    end
+end)
 
 -- WoW Loop
 Services.RunService.RenderStepped:Connect(function()
@@ -417,15 +432,12 @@ task.spawn(function()
         if States.AutoEvent then
             local hrp = GetRoot()
             if hrp then
-                local found = false
                 local folders = {Services.Workspace:FindFirstChild("ActiveEvents"), Services.Workspace:FindFirstChild("Props")}
-                
                 for _, f in pairs(folders) do
                     if f then
                         for _, v in pairs(f:GetChildren()) do
                             for _, name in pairs(EventList) do
                                 if string.find(v.Name, name) then
-                                    found = true
                                     local pos = v:GetPivot().Position
                                     if (hrp.Position - Vector3.new(pos.X, 4, pos.Z)).Magnitude > 10 then
                                         hrp.CFrame = CFrame.new(pos.X, 4, pos.Z)
@@ -438,6 +450,6 @@ task.spawn(function()
                 end
             end
         end
-        SmartWait(2.0, 3.5) -- Random scan interval
+        SmartWait(2.0, 3.5)
     end
 end)
