@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V5.3 - SLOW & SURE MODE ]]
--- Logika: Cek Alat -> Tembak Remote Slot Lama -> Tunggu 1.2 Detik -> Tembak Slot Baru
+-- [[ MINI MINING HUB V5.4 - TIME DETECT & CUSTOM SEQ ]]
+-- Fitur: Print Waktu Spawn + Custom Remote Sequence (Unequip Rod -> Equip Pickaxe)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -13,7 +13,7 @@ local Services = {
 local Player = Services.Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- // 1. BUILD UI (Supaya terlihat walau ada error)
+-- // 1. SETUP UI
 if Services.CoreGui:FindFirstChild("MiniMiningUI") then Services.CoreGui.MiniMiningUI:Destroy() end
 if PlayerGui:FindFirstChild("MiniMiningUI") then PlayerGui.MiniMiningUI:Destroy() end
 
@@ -23,13 +23,13 @@ pcall(function() ScreenGui.Parent = Services.CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 220, 0, 140)
-MainFrame.Position = UDim2.new(0.5, -110, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 240, 0, 150) -- Lebar sedikit ditambah untuk jam
+MainFrame.Position = UDim2.new(0.5, -120, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Text = "MINING V5.3 (SLOW SWAP)"
+Title.Text = "MINING V5.4 (TIME STAMP)"
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = Color3.new(1,1,1)
@@ -37,11 +37,12 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
 
 local StatusLabel = Instance.new("TextLabel", MainFrame)
-StatusLabel.Text = "Initializing..."
+StatusLabel.Text = "Waiting for Spawn..."
 StatusLabel.Size = UDim2.new(1, 0, 0, 20)
 StatusLabel.Position = UDim2.new(0, 0, 1, -20)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+StatusLabel.Font = Enum.Font.Gotham
 
 local function Notify(msg, color)
     StatusLabel.Text = msg
@@ -63,7 +64,9 @@ MainFrame.InputChanged:Connect(function(input)
 end)
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 
--- // 2. CONFIG REMOTE
+-- // 2. CONFIG REMOTE (JALUR ASLI)
+-- Catatan: Remote asli biasanya ada di dalam folder .net["RE/EquipToolFromHotbar"]
+-- Saya menggunakan path ini agar FireServer berfungsi.
 local RemoteEquip = nil
 pcall(function()
     RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages", 5)
@@ -75,64 +78,46 @@ end)
 
 if not RemoteEquip then
     Notify("REMOTE ERROR!", Color3.fromRGB(255, 0, 0))
+    warn("Remote tidak ditemukan! Script mungkin tidak jalan.")
 else
     Notify("Ready", Color3.fromRGB(0, 255, 0))
 end
 
--- // 3. LOGIKA SWAP SUPER DETAILED
+-- // 3. LOGIKA SWAP BARU (SESUAI REQUEST)
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 
--- Fungsi Utama Ganti Alat
-local function SmartSwap(targetMode) -- targetMode: "Pickaxe" atau "Rod"
-    local char = GetChar()
-    local hum = GetHum()
-    if not char or not hum then return end
+local function CustomSequence_ToPickaxe()
+    -- LOGIKA SPESIFIK USER UNTUK MULAI MINING
+    Notify("Exec: Unequip Rod -> Equip Pickaxe", Color3.fromRGB(255, 200, 0))
     
-    -- Cek apa yang sedang dipegang
-    local currentTool = char:FindFirstChildWhichIsA("Tool")
-    local holdingSomething = (currentTool ~= nil)
+    -- 1. Sequence Unequip Rod (Sesuai Request)
+    pcall(function() RemoteEquip:FireServer() end)    -- Kosong
+    task.wait(0.1)
+    pcall(function() RemoteEquip:FireServer(1) end)   -- Angka 1
     
-    -- Tentukan Slot Tujuan
-    local targetSlot = (targetMode == "Pickaxe") and 2 or 1
-    
-    -- [[ FASE 1: LEPASKAN ALAT LAMA ]]
-    if holdingSomething then
-        local toolName = string.lower(currentTool.Name)
-        
-        -- Cek slot mana yang harus ditekan untuk melepas
-        local slotToUnequip = nil
-        
-        -- Jika pegang Rod (atau apapun yang bukan Pickaxe saat mau Mining)
-        if targetMode == "Pickaxe" then
-             -- Asumsi alat yang dipegang sekarang adalah slot 1
-             slotToUnequip = 1 
-        
-        -- Jika pegang Pickaxe (saat mau balik ke Rod)
-        elseif targetMode == "Rod" then
-             -- Asumsi alat yang dipegang sekarang adalah slot 2
-             slotToUnequip = 2
-        end
+    task.wait(0.5) -- Jeda aman antar sequence
 
-        if slotToUnequip then
-            Notify("Melepas Slot " .. slotToUnequip .. "...", Color3.fromRGB(255, 200, 0))
-            
-            -- Tembak Remote untuk melepas
-            pcall(function() RemoteEquip:FireServer(slotToUnequip) end)
-            
-            -- Bantu lepas secara visual (Client side)
-            hum:UnequipTools()
-            
-            -- WAJIB TUNGGU LAMA (Agar server proses unequip selesai)
-            task.wait(1.2) 
-        end
-    end
+    -- 2. Sequence Equip Pickaxe (Sesuai Request)
+    pcall(function() RemoteEquip:FireServer(2) end)   -- Angka 2
+    task.wait(0.1)
+    pcall(function() RemoteEquip:FireServer() end)    -- Kosong
     
-    -- [[ FASE 2: PASANG ALAT BARU ]]
-    Notify("Equip " .. targetMode .. " (Slot "..targetSlot..")", Color3.fromRGB(0, 255, 0))
-    pcall(function() RemoteEquip:FireServer(targetSlot) end)
-    task.wait(1.0) -- Tunggu animasi equip
+    task.wait(0.5)
+end
+
+local function CustomSequence_ToRod()
+    -- Sequence Balik ke Rod (Kebalikan standar)
+    Notify("Exec: Return to Rod", Color3.fromRGB(255, 200, 0))
+    
+    -- Reset Pickaxe (Slot 2)
+    pcall(function() RemoteEquip:FireServer(2) end)
+    task.wait(0.5)
+    
+    -- Equip Rod (Slot 1)
+    pcall(function() RemoteEquip:FireServer(1) end)
+    task.wait(0.5)
 end
 
 
@@ -165,11 +150,21 @@ local function RunMiningSequence(folder, toggleKey)
     if #activeNodes == 0 then return end 
 
     States.IsMining = true
+    
+    -- [FITUR BARU] DETEKSI WAKTU SPAWN
+    local currentTime = os.date("%X") -- Format Jam:Menit:Detik
+    print("------------------------------------------------")
+    print("[CRYSTAL DETECTED] Time: " .. currentTime)
+    print("Found " .. #activeNodes .. " Nodes.")
+    print("------------------------------------------------")
+    Notify("SPAWN: " .. currentTime, Color3.fromRGB(0, 255, 255))
+    task.wait(1) -- Biarkan player baca jam sebentar
+
     local hrp = GetRoot()
     local savedPos = hrp.CFrame
     
-    -- [STEP 1] GANTI KE PICKAXE
-    SmartSwap("Pickaxe")
+    -- [STEP 1] JALANKAN SEQUENCE CUSTOM USER
+    CustomSequence_ToPickaxe()
     
     -- Fly On
     local hum = GetHum()
@@ -184,7 +179,7 @@ local function RunMiningSequence(folder, toggleKey)
             local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
             SafeTween(targetCF + Vector3.new(0, 3.5, 0))
             
-            Notify("Mining Node " .. i, Color3.fromRGB(255, 170, 0))
+            Notify("Mining Node " .. i .. " ("..currentTime..")", Color3.fromRGB(255, 170, 0))
             task.wait(0.5)
             fireproximityprompt(prompt)
             
@@ -202,11 +197,11 @@ local function RunMiningSequence(folder, toggleKey)
     SafeTween(savedPos)
     if hum then hum.PlatformStand = false end
     
-    -- [STEP 4] GANTI KE ROD
-    SmartSwap("Rod")
+    -- [STEP 4] BALIK KE ROD
+    CustomSequence_ToRod()
 
     States.IsMining = false
-    Notify("Idle...", Color3.fromRGB(150, 150, 150))
+    Notify("Idle (Last Spawn: "..currentTime..")", Color3.fromRGB(150, 150, 150))
 end
 
 -- // 5. TOMBOL UI
@@ -231,7 +226,7 @@ local function CreateBtn(txt, yPos, varName)
             btn.TextColor3 = Color3.fromRGB(200, 200, 200)
             States.IsMining = false
             -- Reset ke Rod
-            SmartSwap("Rod")
+            CustomSequence_ToRod()
         end
     end)
 end
