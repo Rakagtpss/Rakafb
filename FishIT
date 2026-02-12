@@ -1,142 +1,190 @@
+--[[ 
+    MINI UI AUTO FISH - SUPER FAST / SHAKE BYPASS
+    Updated Target: RF/CatchFishCompleted
+]]
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CoreGui = game:GetService("CoreGui")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
--- --- 1. SETUP REMOTE FUNCTIONS ---
-local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Index = Packages:WaitForChild("_Index")
-local Sleitnick = Index:WaitForChild("sleitnick_net@0.2.0")
-local NetFolder = Sleitnick:WaitForChild("net")
+-- // 1. REMOTE SETUP \\ --
+local Net = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
 
 local Remotes = {
-    ChargeRod = NetFolder:WaitForChild("RF/ChargeFishingRod"),
-    CatchCompleted = NetFolder:WaitForChild("RF/CatchFishCompleted"),
-    CancelInputs = NetFolder:WaitForChild("RF/CancelFishingInputs"),
-    RequestMinigame = NetFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
-    UpdateState = NetFolder:WaitForChild("RF/UpdateAutoFishingState"),
+    ChargeRod    = Net["RF/ChargeFishingRod"],
+    RequestGame  = Net["RF/RequestFishingMinigameStarted"],
+    CatchFish    = Net["RF/CatchFishCompleted"], -- Updated from RE/FishingCompleted
+    CancelInput  = Net["RF/CancelFishingInputs"],
+    UpdateState  = Net["RF/UpdateAutoFishingState"]
 }
 
--- --- 2. CONFIG VARIABLE ---
-local Config = {
-    IsActive = false,
-    MinShakeDelay = 0.5, 
-    MaxShakeDelay = 1.0, 
-    CastPower = 100,      
+-- // 2. CONFIGURATION \\ --
+getgenv().Config = {
+    Active = false,
+    Mode = "Blatant", -- "Blatant" (Super Fast) or "Legit" (Slow)
+    CastDelay = 0.1,
+    CatchDelay = 0.05,
+    -- Arguments from your request
+    MinigameArgs = { -1.115296483039856, 0, 1763651451.636425 } 
 }
 
--- --- 3. UI GENERATION (Skipped for brevity - Same as before) ---
--- (Gunakan UI yang sama seperti sebelumnya, bagian ini hanya logika inti perbaikan)
-
-if getgenv and getgenv().FishUI then getgenv().FishUI:Destroy() end
-if CoreGui:FindFirstChild("FishingConfigUI") then CoreGui.FishingConfigUI:Destroy() end
+-- // 3. MINI UI CREATION \\ --
+if getgenv().MiniFishUI then getgenv().MiniFishUI:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "FishingConfigUI"
-if pcall(function() ScreenGui.Parent = CoreGui end) then else ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+ScreenGui.Name = "MiniFishUI"
+ScreenGui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 260, 0, 160)
-MainFrame.Position = UDim2.new(0.5, -130, 0.5, -80)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.Size = UDim2.new(0, 200, 0, 110)
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
 MainFrame.Parent = ScreenGui
-local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 10); UICorner.Parent = MainFrame
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
 
 local Title = Instance.new("TextLabel")
-Title.Text = "🎣 Auto Fish Fix v2"
-Title.Size = UDim2.new(1,0,0,30); Title.TextColor3 = Color3.new(1,1,1); Title.BackgroundTransparency = 1; Title.Parent = MainFrame
+Title.Text = "🐟 FAST FISH MINI"
+Title.Size = UDim2.new(1, 0, 0, 25)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = MainFrame
 
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Text = "Status: Idle"; StatusLabel.Size = UDim2.new(1,0,0,20); StatusLabel.Position = UDim2.new(0,0,0,30); StatusLabel.TextColor3 = Color3.fromRGB(150,150,150); StatusLabel.BackgroundTransparency = 1; StatusLabel.Parent = MainFrame
+StatusLabel.Name = "Status"
+StatusLabel.Text = "Status: IDLE"
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 0, 25)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 11
+StatusLabel.Parent = MainFrame
 
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Text = "START"; ToggleBtn.Size = UDim2.new(0,220,0,45); ToggleBtn.Position = UDim2.new(0,20,0,100); ToggleBtn.BackgroundColor3 = Color3.fromRGB(200,60,60); ToggleBtn.TextColor3 = Color3.new(1,1,1); ToggleBtn.Parent = MainFrame
-local BtnCorner = Instance.new("UICorner"); BtnCorner.Parent = ToggleBtn
+ToggleBtn.Name = "Toggle"
+ToggleBtn.Size = UDim2.new(0, 180, 0, 35)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 55)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleBtn.Text = "START FISHING"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 12
+ToggleBtn.Parent = MainFrame
 
--- --- 4. LOGIKA PERBAIKAN ---
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = ToggleBtn
 
-local function GetRod()
-    local Char = LocalPlayer.Character
-    if not Char then return nil end
-    -- Cari tool yang sedang dipegang
-    local Tool = Char:FindFirstChildWhichIsA("Tool")
-    if Tool and (Tool.Name:find("Rod") or Tool:FindFirstChild("Bobber")) then
-        return Tool
+-- // 4. BYPASS LOGIC (HOOK) \\ --
+-- Mencegah game mendeteksi spam remote atau cancel input saat kita "Speedrunning"
+local FishingBlocker = { Enabled = false }
+local BLOCKED_INSTANCES = {
+    [Remotes.ChargeRod] = true,
+    [Remotes.RequestGame] = true,
+    [Remotes.CatchFish] = true,
+    [Remotes.CancelInput] = true
+}
+
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    
+    if FishingBlocker.Enabled and BLOCKED_INSTANCES[self] and not checkcaller() then
+        if method == "InvokeServer" then
+            return task.wait(9e9) -- Freeze thread game asli
+        elseif method == "FireServer" then
+            return nil
+        end
     end
-    return nil
-end
+    return oldNamecall(self, ...)
+end)
 
-local function FishingRoutine()
+-- // 5. MAIN LOGIC \\ --
+
+local function RunFastLoop()
+    -- Update timestamp agar valid di server
+    -- Argumen ke-3 biasanya timestamp. Kita update real-time.
+    local function GetArgs()
+        local a = getgenv().Config.MinigameArgs
+        return { a[1], a[2], workspace:GetServerTimeNow() } 
+    end
+
     task.spawn(function()
-        while Config.IsActive do
-            local Rod = GetRod()
-            if not Rod then
-                StatusLabel.Text = "⚠️ Pegang pancingan dulu!"
-                task.wait(1)
-                continue
-            end
-
-            -- A. CHARGE ROD
-            StatusLabel.Text = "1. Casting..."
-            -- Error "Assertion Failed" sering terjadi karena Power = 0 atau nil.
-            -- Kita kirim Power 100 dan Posisi asal (karena server mungkin validasi jarak)
-            local Power = Config.CastPower
-            local BobberPos = LocalPlayer.Character.HumanoidRootPart.Position + (LocalPlayer.Character.HumanoidRootPart.CFrame.LookVector * 15) -- Lempar 15 stud ke depan
-            
-            -- Coba kirim argumen Power saja dulu (sesuai log kamu sebelumnya yg hanya 1 argumen angka)
-            -- Tapi jika error lagi, server mungkin butuh Vector3.
-            local success, err = pcall(function()
-                 Remotes.ChargeRod:InvokeServer(Power, BobberPos) 
+        while getgenv().Config.Active do
+            -- 1. Charge Rod (Instant)
+            task.spawn(function() 
+                pcall(function() Remotes.ChargeRod:InvokeServer() end)
             end)
             
-            if not success then
-                -- Fallback: Coba kirim tanpa argumen atau hanya 1 argumen jika gagal
-                 Remotes.ChargeRod:InvokeServer(Power)
-            end
+            -- Bypass delay animasi cast
+            task.wait(getgenv().Config.CastDelay) 
+            
+            -- 2. Request Minigame (Skip Shake)
+            task.spawn(function()
+                pcall(function() 
+                    Remotes.RequestGame:InvokeServer(unpack(GetArgs())) 
+                end)
+            end)
 
-            task.wait(1.5) -- Tunggu animasi lempar
+            -- 3. Catch (Super Fast Click Simulation)
+            task.wait(getgenv().Config.CatchDelay)
             
-            -- B. SHAKE DELAY
-            local shakeDelay = 2.0 + math.random() * 1.5 -- Tambah delay alami
-            StatusLabel.Text = "2. Waiting Fish..."
-            task.wait(shakeDelay)
-            
-            if not Config.IsActive then break end
+            pcall(function()
+                -- Menggunakan InvokeServer karena target adalah RF (RemoteFunction)
+                Remotes.CatchFish:InvokeServer()
+            end)
 
-            -- C. REQUEST MINIGAME
-            StatusLabel.Text = "3. Hooking..."
-            -- Argumen log kamu: (12.21, 0.5, timestamp). Kita ikuti format itu.
-            -- 12.21 itu Power/Distance. 0.5 itu Difficulty.
-            local timestamp = workspace:GetServerTimeNow()
-            Remotes.RequestMinigame:InvokeServer(Power, 0.5, timestamp)
+            -- 4. Reset / Cancel Input untuk loop selanjutnya
+            task.spawn(function()
+                pcall(function() Remotes.CancelInput:InvokeServer() end)
+            end)
             
-            task.wait(1) -- Simulasi main minigame
-            
-            -- D. CATCH
-            StatusLabel.Text = "4. Catching!"
-            Remotes.CatchCompleted:InvokeServer()
-            
-            StatusLabel.Text = "✅ Got Fish!"
-            task.wait(1.5) -- Cooldown
+            task.wait(0.05) -- Anti-crash cooldown
         end
         
-        StatusLabel.Text = "Stopped."
-        Remotes.UpdateState:InvokeServer(false)
+        -- Cleanup saat stop
+        StatusLabel.Text = "Status: STOPPED"
+        FishingBlocker.Enabled = false
+        pcall(function() Remotes.CancelInput:InvokeServer() end)
     end)
 end
 
+-- // 6. UI EVENTS \\ --
+
 ToggleBtn.MouseButton1Click:Connect(function()
-    Config.IsActive = not Config.IsActive
-    if Config.IsActive then
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
-        ToggleBtn.Text = "STOP"
-        FishingRoutine()
+    getgenv().Config.Active = not getgenv().Config.Active
+    
+    if getgenv().Config.Active then
+        FishingBlocker.Enabled = true
+        ToggleBtn.Text = "STOP FISHING"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Merah
+        StatusLabel.Text = "Status: ⚡ SUPER FAST ACTIVE"
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        
+        -- Anti-AFK / Auto Great Setup
+        pcall(function() 
+            Remotes.UpdateState:InvokeServer({true}) 
+        end)
+        
+        RunFastLoop()
     else
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-        ToggleBtn.Text = "START"
+        ToggleBtn.Text = "START FISHING"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Abu
+        StatusLabel.Text = "Status: STOPPING..."
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
     end
 end)
+
+-- Simpan Global Instance
+getgenv().MiniFishUI = ScreenGui
