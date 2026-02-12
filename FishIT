@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V4.4 - FIXED EQUIP/UNEQUIP ]]
--- Logika: Unequip Rod -> Equip Pickaxe -> Teleport -> Extract -> Wait 10s -> Next -> Unequip Pickaxe -> Equip Rod.
+-- [[ MINI MINING HUB V4.5 - FAST ROD RETURN ]]
+-- Logika: Unequip Rod -> Equip Pickaxe -> Mine -> Wait 7s -> Selesai -> Langsung Equip Rod (Slot 1)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -19,7 +19,7 @@ local NetPath = Services.ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("net")
 
 local RemoteEquip = NetPath:WaitForChild("RE/EquipToolFromHotbar")
-local RemoteUnequip = NetPath:WaitForChild("RE/UnequipToolFromHotbar") -- Remote Baru
+local RemoteUnequip = NetPath:WaitForChild("RE/UnequipToolFromHotbar")
 
 local States = {
     AutoCrystal = false,
@@ -38,24 +38,16 @@ local function ForceSwapToPickaxe()
     local hum = GetHum()
     if not char or not hum then return end
 
-    -- 1. LEPAS ROD (SLOT 1) MENGGUNAKAN REMOTE
-    pcall(function() 
-        RemoteUnequip:FireServer() 
-    end)
-    
-    -- Backup client side unequip
+    -- Lepas Rod (Slot 1)
+    pcall(function() RemoteUnequip:FireServer() end)
     hum:UnequipTools()
-    
-    task.wait(0.6) -- Beri waktu server memproses unequip
-
-    -- 2. EQUIP PICKAXE (SLOT 2)
-    pcall(function() 
-        RemoteEquip:FireServer(2) 
-    end)
-    
     task.wait(0.5)
 
-    -- Cek Manual (Backup jika remote gagal equip visual)
+    -- Equip Pickaxe (Slot 2)
+    pcall(function() RemoteEquip:FireServer(2) end)
+    task.wait(0.5)
+
+    -- Cek Manual jika gagal
     if not char:FindFirstChildWhichIsA("Tool") then
         local backpack = Player.Backpack
         for _, tool in pairs(backpack:GetChildren()) do
@@ -67,22 +59,23 @@ local function ForceSwapToPickaxe()
     end
 end
 
--- // FUNGSI KEMBALI KE ROD
+-- // FUNGSI KEMBALI KE ROD (UPDATED REQUEST)
 local function ReturnToRod()
     local hum = GetHum()
     
-    -- 1. LEPAS PICKAXE
-    pcall(function() 
-        RemoteUnequip:FireServer() 
-    end)
+    -- 1. Lepas Pickaxe dulu
+    pcall(function() RemoteUnequip:FireServer() end)
     if hum then hum:UnequipTools() end
-    
-    task.wait(0.6) -- Delay agar tidak bug inventory
+    task.wait(0.5)
 
-    -- 2. EQUIP ROD (SLOT 1)
-    pcall(function() 
-        RemoteEquip:FireServer(1) 
-    end) 
+    -- 2. Equip Rod (Slot 1) menggunakan Script Anda
+    pcall(function()
+        local args = {
+            1
+        }
+        -- Menggunakan path lengkap sesuai request atau variabel yang sudah didefinisikan
+        Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar"):FireServer(unpack(args))
+    end)
 end
 
 -- // 3. UI SEDERHANA
@@ -101,7 +94,7 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "MINING V4.4 (FIXED EQUIP)"
+Title.Text = "MINING V4.5 (DELAY 7s)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
@@ -138,7 +131,7 @@ local function Notify(msg, color)
     StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
 end
 
--- // 4. BYPASS SYSTEM (FLY DIAM + NOCLIP)
+-- // 4. BYPASS SYSTEM
 local NoclipConn = nil
 local function SetBypass(bool)
     local hrp = GetRoot()
@@ -152,9 +145,8 @@ local function SetBypass(bool)
             bv.Name = "MiningFly"
             bv.Parent = hrp
             bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.zero -- Diam total
+            bv.Velocity = Vector3.zero 
         end
-        -- Anti Collide
         if not NoclipConn then
             NoclipConn = Services.RunService.Stepped:Connect(function()
                 if Player.Character then
@@ -171,7 +163,7 @@ local function SetBypass(bool)
     end
 end
 
--- // 5. SAFE TWEEN (ANTI SUSPICIOUS MOVEMENT)
+-- // 5. SAFE TWEEN
 local function SafeTween(targetCFrame)
     local hrp = GetRoot()
     if not hrp then return end
@@ -179,7 +171,6 @@ local function SafeTween(targetCFrame)
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
     local speed = 60 
     local time = dist / speed
-    
     if time < 0.1 then time = 0.1 end 
 
     local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
@@ -190,7 +181,7 @@ local function SafeTween(targetCFrame)
     hrp.AssemblyLinearVelocity = Vector3.zero
 end
 
--- // 6. LOGIKA SMART MINING (10s DELAY)
+-- // 6. LOGIKA SMART MINING (7s DELAY)
 local function GetActiveNodes(folder)
     local activeList = {}
     if not folder then return activeList end
@@ -214,9 +205,8 @@ local function SmartMining(folder, toggleState)
     local SafeReturnPos = hrp.CFrame
     Notify("Found " .. #activeNodes .. " Nodes", Color3.fromRGB(0, 255, 255))
     
-    -- SWAP KE PICKAXE (UNEQUIP ROD DULU)
+    -- Mulai Mining: Swap ke Pickaxe
     ForceSwapToPickaxe()
-    
     SetBypass(true)
 
     for i, node in ipairs(activeNodes) do
@@ -235,6 +225,7 @@ local function SmartMining(folder, toggleState)
                 
                 fireproximityprompt(prompt)
                 
+                -- DELAY DIGANTI JADI 7 DETIK
                 for cd = 7, 1, -1 do
                     if not States[toggleState] then break end
                     Notify("Next in... " .. cd .. "s", Color3.fromRGB(100, 255, 100))
@@ -244,11 +235,11 @@ local function SmartMining(folder, toggleState)
         end
     end
 
-    Notify("Selesai! Pulang...", Color3.fromRGB(100, 255, 100))
+    Notify("Selesai! Pulang & Equip Rod...", Color3.fromRGB(100, 255, 100))
     SafeTween(SafeReturnPos)
     SetBypass(false)
     
-    -- KEMBALI KE ROD (UNEQUIP PICKAXE DULU)
+    -- SELESAI MINING -> LANGSUNG EQUIP ROD
     ReturnToRod()
     
     States.IsMining = false
@@ -273,6 +264,8 @@ local function CreateSwitch(text, stateKey, posY)
         if not States[stateKey] then
              SetBypass(false) 
              States.IsMining = false
+             -- Jika dimatikan paksa, kembalikan ke Rod juga
+             ReturnToRod()
         end
 
         if States[stateKey] then
@@ -326,4 +319,3 @@ task.spawn(function()
         end
     end
 end)
-
