@@ -1,190 +1,105 @@
---[[ 
-    MINI UI AUTO FISH - SUPER FAST / SHAKE BYPASS
-    Updated Target: RF/CatchFishCompleted
+--[[
+    SIMPLE AUTO TOOL CLICKER (UI VERSION)
+    Fungsi: Otomatis mengaktifkan tool (pedang/mining/pancingan)
 ]]
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
--- // 1. REMOTE SETUP \\ --
-local Net = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
-
-local Remotes = {
-    ChargeRod    = Net["RF/ChargeFishingRod"],
-    RequestGame  = Net["RF/RequestFishingMinigameStarted"],
-    CatchFish    = Net["RF/CatchFishCompleted"], -- Updated from RE/FishingCompleted
-    CancelInput  = Net["RF/CancelFishingInputs"],
-    UpdateState  = Net["RF/UpdateAutoFishingState"]
+-- Konfigurasi Awal
+getgenv().AutoClick = {
+    Enabled = false,
+    Delay = 0.1 -- Kecepatan klik (detik)
 }
 
--- // 2. CONFIGURATION \\ --
-getgenv().Config = {
-    Active = false,
-    Mode = "Blatant", -- "Blatant" (Super Fast) or "Legit" (Slow)
-    CastDelay = 0.1,
-    CatchDelay = 0.05,
-    -- Arguments from your request
-    MinigameArgs = { -1.115296483039856, 0, 1763651451.636425 } 
-}
+-- Hapus UI lama jika ada
+if getgenv().ClickUI then getgenv().ClickUI:Destroy() end
 
--- // 3. MINI UI CREATION \\ --
-if getgenv().MiniFishUI then getgenv().MiniFishUI:Destroy() end
-
+-- 1. Membuat UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MiniFishUI"
+ScreenGui.Name = "SimpleAutoClicker"
 ScreenGui.Parent = CoreGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 200, 0, 110)
-MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Draggable = true -- Bisa digeser
 MainFrame.Parent = ScreenGui
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
+-- Judul
 local Title = Instance.new("TextLabel")
-Title.Text = "🐟 FAST FISH MINI"
-Title.Size = UDim2.new(1, 0, 0, 25)
+Title.Text = "⚔️ AUTO TOOL"
+Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
 Title.Parent = MainFrame
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Name = "Status"
-StatusLabel.Text = "Status: IDLE"
-StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 0, 25)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.TextSize = 11
-StatusLabel.Parent = MainFrame
+-- Input Delay
+local DelayInput = Instance.new("TextBox")
+DelayInput.Size = UDim2.new(0, 180, 0, 25)
+DelayInput.Position = UDim2.new(0, 10, 0, 35)
+DelayInput.PlaceholderText = "Speed (0.1)"
+DelayInput.Text = tostring(getgenv().AutoClick.Delay)
+DelayInput.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+DelayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+DelayInput.Font = Enum.Font.Gotham
+DelayInput.Parent = MainFrame
+local InputCorner = Instance.new("UICorner"); InputCorner.Parent = DelayInput
 
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Name = "Toggle"
-ToggleBtn.Size = UDim2.new(0, 180, 0, 35)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 55)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-ToggleBtn.Text = "START FISHING"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.TextSize = 12
-ToggleBtn.Parent = MainFrame
-
-local BtnCorner = Instance.new("UICorner")
-BtnCorner.CornerRadius = UDim.new(0, 6)
-BtnCorner.Parent = ToggleBtn
-
--- // 4. BYPASS LOGIC (HOOK) \\ --
--- Mencegah game mendeteksi spam remote atau cancel input saat kita "Speedrunning"
-local FishingBlocker = { Enabled = false }
-local BLOCKED_INSTANCES = {
-    [Remotes.ChargeRod] = true,
-    [Remotes.RequestGame] = true,
-    [Remotes.CatchFish] = true,
-    [Remotes.CancelInput] = true
-}
-
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    
-    if FishingBlocker.Enabled and BLOCKED_INSTANCES[self] and not checkcaller() then
-        if method == "InvokeServer" then
-            return task.wait(9e9) -- Freeze thread game asli
-        elseif method == "FireServer" then
-            return nil
-        end
-    end
-    return oldNamecall(self, ...)
+DelayInput.FocusLost:Connect(function()
+    local num = tonumber(DelayInput.Text)
+    if num then getgenv().AutoClick.Delay = num end
 end)
 
--- // 5. MAIN LOGIC \\ --
+-- Tombol Toggle
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 180, 0, 30)
+ToggleBtn.Position = UDim2.new(0, 10, 0, 65)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+ToggleBtn.Text = "START"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Parent = MainFrame
+local BtnCorner = Instance.new("UICorner"); BtnCorner.Parent = ToggleBtn
 
-local function RunFastLoop()
-    -- Update timestamp agar valid di server
-    -- Argumen ke-3 biasanya timestamp. Kita update real-time.
-    local function GetArgs()
-        local a = getgenv().Config.MinigameArgs
-        return { a[1], a[2], workspace:GetServerTimeNow() } 
-    end
-
+-- 2. Logika Utama
+local function StartClicking()
     task.spawn(function()
-        while getgenv().Config.Active do
-            -- 1. Charge Rod (Instant)
-            task.spawn(function() 
-                pcall(function() Remotes.ChargeRod:InvokeServer() end)
-            end)
-            
-            -- Bypass delay animasi cast
-            task.wait(getgenv().Config.CastDelay) 
-            
-            -- 2. Request Minigame (Skip Shake)
-            task.spawn(function()
-                pcall(function() 
-                    Remotes.RequestGame:InvokeServer(unpack(GetArgs())) 
-                end)
-            end)
-
-            -- 3. Catch (Super Fast Click Simulation)
-            task.wait(getgenv().Config.CatchDelay)
-            
-            pcall(function()
-                -- Menggunakan InvokeServer karena target adalah RF (RemoteFunction)
-                Remotes.CatchFish:InvokeServer()
-            end)
-
-            -- 4. Reset / Cancel Input untuk loop selanjutnya
-            task.spawn(function()
-                pcall(function() Remotes.CancelInput:InvokeServer() end)
-            end)
-            
-            task.wait(0.05) -- Anti-crash cooldown
+        while getgenv().AutoClick.Enabled do
+            local Char = LocalPlayer.Character
+            if Char then
+                -- Cari tool yang sedang dipegang
+                local Tool = Char:FindFirstChildWhichIsA("Tool")
+                if Tool then
+                    Tool:Activate() -- Fungsi bawaan Roblox untuk menggunakan alat
+                end
+            end
+            task.wait(getgenv().AutoClick.Delay)
         end
-        
-        -- Cleanup saat stop
-        StatusLabel.Text = "Status: STOPPED"
-        FishingBlocker.Enabled = false
-        pcall(function() Remotes.CancelInput:InvokeServer() end)
     end)
 end
 
--- // 6. UI EVENTS \\ --
-
 ToggleBtn.MouseButton1Click:Connect(function()
-    getgenv().Config.Active = not getgenv().Config.Active
+    getgenv().AutoClick.Enabled = not getgenv().AutoClick.Enabled
     
-    if getgenv().Config.Active then
-        FishingBlocker.Enabled = true
-        ToggleBtn.Text = "STOP FISHING"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- Merah
-        StatusLabel.Text = "Status: ⚡ SUPER FAST ACTIVE"
-        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        
-        -- Anti-AFK / Auto Great Setup
-        pcall(function() 
-            Remotes.UpdateState:InvokeServer({true}) 
-        end)
-        
-        RunFastLoop()
+    if getgenv().AutoClick.Enabled then
+        ToggleBtn.Text = "STOP"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+        StartClicking()
     else
-        ToggleBtn.Text = "START FISHING"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- Abu
-        StatusLabel.Text = "Status: STOPPING..."
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+        ToggleBtn.Text = "START"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
     end
 end)
 
--- Simpan Global Instance
-getgenv().MiniFishUI = ScreenGui
+getgenv().ClickUI = ScreenGui
