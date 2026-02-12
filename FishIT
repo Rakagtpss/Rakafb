@@ -1,5 +1,5 @@
--- [[ SERAPHIN MINI UI - OPTIMIZED EDITION ]]
--- Version: V3.1 (Smart Chain Mining & Anti-Cheat Bypass)
+-- [[ SERAPHIN MINI UI - ULTIMATE EDITION ]]
+-- Version: V3.2 (Smart Chain Mining + Realtime Detector)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -8,7 +8,7 @@ local Services = {
     ReplicatedStorage = game:GetService("ReplicatedStorage"),
     TweenService = game:GetService("TweenService"),
     Workspace = game:GetService("Workspace"),
-    VirtualInputManager = game:GetService("VirtualInputManager")
+    StarterGui = game:GetService("StarterGui")
 }
 
 local Player = Services.Players.LocalPlayer
@@ -17,19 +17,19 @@ local Camera = Services.Workspace.CurrentCamera
 -- // THEME CONFIG
 local UI = {
     Color = Color3.fromRGB(15, 15, 20),
-    Accent = Color3.fromRGB(0, 255, 150), -- Warna Hijau (Optimized)
+    Accent = Color3.fromRGB(0, 255, 150), -- Hijau (Active)
     Text = Color3.fromRGB(240, 240, 240),
-    Size = UDim2.new(0, 220, 0, 300)
+    Size = UDim2.new(0, 240, 0, 320) -- Sedikit diperlebar untuk Jam
 }
 
 -- // CLEANUP OLD UI
-if Services.CoreGui:FindFirstChild("SeraphinOptimized") then 
-    Services.CoreGui.SeraphinOptimized:Destroy() 
+if Services.CoreGui:FindFirstChild("SeraphinUltimate") then 
+    Services.CoreGui.SeraphinUltimate:Destroy() 
 end
 
 -- // CREATE UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SeraphinOptimized"
+ScreenGui.Name = "SeraphinUltimate"
 ScreenGui.Parent = Services.CoreGui
 ScreenGui.ResetOnSpawn = false
 
@@ -50,15 +50,27 @@ Header.BackgroundTransparency = 0.95
 Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
 
 local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Size = UDim2.new(0.6, 0, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
-Title.Text = "SERAPHIN <font color='#00ff96'>V3.1</font>"
+Title.Text = "SERAPHIN <font color='#00ff96'>V3.2</font>"
 Title.RichText = true
 Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 12
 Title.TextColor3 = UI.Text
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.BackgroundTransparency = 1
+
+-- [NEW] REALTIME CLOCK IN UI
+local TimeLabel = Instance.new("TextLabel", Header)
+TimeLabel.Name = "ServerTime"
+TimeLabel.Size = UDim2.new(0, 60, 1, 0)
+TimeLabel.Position = UDim2.new(1, -95, 0, 0) 
+TimeLabel.BackgroundTransparency = 1
+TimeLabel.Text = "00:00:00"
+TimeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+TimeLabel.TextSize = 11
+TimeLabel.Font = Enum.Font.Code
+TimeLabel.TextXAlignment = Enum.TextXAlignment.Right
 
 local MiniBtn = Instance.new("TextButton", Header)
 MiniBtn.Size = UDim2.new(0, 30, 0, 30)
@@ -82,7 +94,7 @@ local UIList = Instance.new("UIListLayout", Scroll)
 UIList.Padding = UDim.new(0, 6)
 UIList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- // HELPER FUNCTIONS
+-- // HELPER FUNCTIONS (DRAG)
 local function Drag(frame)
     local dragToggle, dragStart, startPos
     local function updateInput(input)
@@ -159,7 +171,7 @@ local MiniBtnLogic = Instance.new("TextButton", ScreenGui)
 MiniBtnLogic.Size = UDim2.new(0, 40, 0, 40)
 MiniBtnLogic.Position = UDim2.new(0, 20, 0.5, -20)
 MiniBtnLogic.BackgroundColor3 = UI.Color
-MiniBtnLogic.Text = "M"
+MiniBtnLogic.Text = "S"
 MiniBtnLogic.Font = Enum.Font.GothamBlack
 MiniBtnLogic.TextColor3 = UI.Accent
 MiniBtnLogic.Visible = false
@@ -170,30 +182,73 @@ MiniBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false; MiniBtnL
 MiniBtnLogic.MouseButton1Click:Connect(function() MainFrame.Visible = true; MiniBtnLogic.Visible = false end)
 
 -- ====================================================
--- [CORE LOGIC] OPTIMIZED MINING (CHAIN SYSTEM)
+-- [CORE LOGIC] SMART DETECTOR (CONSOLE & NOTIF)
+-- ====================================================
+local function WatchCrystalSpawns()
+    local Zones = {
+        {Name = "Crystal Depths", Path = {"Islands", "Crystal Depths", "Crystals"}},
+        {Name = "Lava Basin", Path = {"Islands", "Lava Basin", "Crystals"}}
+    }
+
+    for _, zone in pairs(Zones) do
+        task.spawn(function()
+            local folder = Services.Workspace
+            for _, p in ipairs(zone.Path) do
+                folder = folder:WaitForChild(p, 10)
+                if not folder then return end
+            end
+
+            print("[SERAPHIN] Monitoring " .. zone.Name .. " Active...")
+
+            folder.ChildAdded:Connect(function(child)
+                if child:IsA("Model") or child:IsA("BasePart") then
+                    
+                    -- TIME CALCULATION
+                    local RealTime = os.date("%H:%M:%S")
+                    local ServerUptime = math.floor(workspace.DistributedGameTime)
+                    
+                    local upHours = math.floor(ServerUptime / 3600)
+                    local upMins = math.floor((ServerUptime % 3600) / 60)
+                    local upSecs = ServerUptime % 60
+                    local UptimeStr = string.format("%02d:%02d:%02d", upHours, upMins, upSecs)
+
+                    -- CONSOLE LOG (F9)
+                    warn("------------------------------------------------")
+                    warn("[💎 SPAWN DETECTED] Lokasi: " .. zone.Name)
+                    print("   ➤ Real Time    : " .. RealTime)
+                    print("   ➤ Server Age   : " .. UptimeStr .. " (Uptime)")
+                    warn("------------------------------------------------")
+
+                    -- SCREEN NOTIFICATION
+                    pcall(function()
+                        Services.StarterGui:SetCore("SendNotification", {
+                            Title = "💎 Crystal Spawned!",
+                            Text = zone.Name .. " @ " .. RealTime,
+                            Duration = 8,
+                        })
+                    end)
+                end
+            end)
+        end)
+    end
+end
+task.spawn(WatchCrystalSpawns)
+
+-- ====================================================
+-- [CORE LOGIC] MINING (CHAIN SYSTEM)
 -- ====================================================
 
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 
--- [SAFE MOVE]
--- Mengurangi speed agar tidak kick (Speed Hack)
--- Menghindari instant teleport jarak jauh
 local function SafeMove(targetCFrame)
     local hrp = GetRoot()
     if not hrp then return end
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    if dist < 5 then hrp.CFrame = targetCFrame; return end
     
-    -- Jarak sangat dekat (jalan saja)
-    if dist < 5 then 
-        hrp.CFrame = targetCFrame
-        return 
-    end
-    
-    -- SPEED ADJUSTMENT (Anti-Kick)
-    -- 180-200 adalah batas aman server side check biasanya.
-    -- Jika masih kena kick, turunkan ke 150.
+    -- Speed 190 = Aman dari Kick
     local speed = 190 
     local time = dist / speed
     
@@ -213,11 +268,9 @@ local function EquipTool(keyword)
     local backpack = Player.Backpack
     if not char or not backpack then return end
     
-    -- Cek jika sudah equip
     local equipped = char:FindFirstChildWhichIsA("Tool")
     if equipped and string.find(string.lower(equipped.Name), keyword) then return true end
     
-    -- Cari di backpack
     for _, t in pairs(backpack:GetChildren()) do
         if t:IsA("Tool") and string.find(string.lower(t.Name), keyword) then
             t.Parent = char
@@ -225,19 +278,16 @@ local function EquipTool(keyword)
         end
     end
     
-    -- Force Equip via Remote jika gagal (Fisch specific)
     local Remote = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar")
     if Remote then pcall(function() Remote:FireServer(2) end) end
     return true
 end
 
--- Mendapatkan list node yang valid
 local function GetMiningNodes(folder)
     local nodes = {}
     if not folder then return nodes end
     for _, item in ipairs(folder:GetChildren()) do
         if item:IsA("Model") or item:IsA("BasePart") then
-            -- Cek apakah crystal sudah habis (biasanya Transparency 1 atau hilang prompt)
             local prompt = item:FindFirstChildWhichIsA("ProximityPrompt", true)
             local mainPart = item:IsA("Model") and item.PrimaryPart or item
             
@@ -249,16 +299,12 @@ local function GetMiningNodes(folder)
     return nodes
 end
 
--- Fungsi Utama: Chain Mining
 local function RunChainMining(folderName, toggleState)
     States.IsMining = true
-    
-    -- Loop utama mining
     while States[toggleState] do
         local Islands = Services.Workspace:WaitForChild("Islands", 5)
         local Folder = nil
         
-        -- Deteksi Folder (Crystal atau Lava)
         if folderName == "Crystal" then
             Folder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
         elseif folderName == "Lava" then
@@ -267,52 +313,37 @@ local function RunChainMining(folderName, toggleState)
         
         if not Folder then task.wait(1); continue end
         
-        -- Dapatkan semua crystal aktif
         local nodes = GetMiningNodes(Folder)
         if #nodes == 0 then task.wait(1); continue end
         
         local hrp = GetRoot()
         if not hrp then task.wait(1); continue end
 
-        -- [SORTING] Cari crystal terdekat (Nearest Neighbor)
-        -- Ini mencegah karakter bolak-balik kejauhan
+        -- Nearest Neighbor Sort
         table.sort(nodes, function(a, b)
             return (hrp.Position - a.Pos).Magnitude < (hrp.Position - b.Pos).Magnitude
         end)
         
-        -- Ambil yang terdekat
         local target = nodes[1]
+        local approachPos = CFrame.new(target.Pos + Vector3.new(3, 2, 0), target.Pos)
         
-        -- [MOVE] Pergi ke Crystal
-        local approachPos = CFrame.new(target.Pos + Vector3.new(3, 2, 0), target.Pos) -- Posisi sedikit di atas/samping
         SafeMove(approachPos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
         
-        -- [ACTION]
-        hrp.AssemblyLinearVelocity = Vector3.zero -- Stop momentum
-        
-        -- Equip Pickaxe (Hanya jika belum equip)
         EquipTool("pick")
-        task.wait(0.1) -- Sedikit delay agar server detect tool
+        task.wait(0.1)
         
-        -- Fire Prompt
         if target.Prompt and target.Prompt.Parent then
             fireproximityprompt(target.Prompt)
-            
-            -- [WAIT OPTIMIZED]
-            -- Tunggu sampai prompt hilang (artinya mining selesai) atau timeout max 2.5 detik
             local t = 0
             while target.Prompt.Enabled and t < 2.5 do
                 t = t + 0.1
                 task.wait(0.1)
             end
         end
-        
-        -- JANGAN UNEQUIP! Langsung loop ke kristal berikutnya (Sort ulang di iterasi berikutnya)
         task.wait(0.1) 
     end
-    
     States.IsMining = false
-    -- Unequip saat stop total
     local char = Player.Character
     if char then
         for _, t in pairs(char:GetChildren()) do
@@ -327,19 +358,27 @@ end
 
 CreateToggle("Auto Crystal (Fast)", "AutoCrystal", function(val)
     if val then
-        States.AutoLava = false -- Matikan yang lain
+        States.AutoLava = false
         task.spawn(function() RunChainMining("Crystal", "AutoCrystal") end)
     end
 end)
 
 CreateToggle("Auto Lava (Fast)", "AutoLava", function(val)
     if val then
-        States.AutoCrystal = false -- Matikan yang lain
+        States.AutoCrystal = false
         task.spawn(function() RunChainMining("Lava", "AutoLava") end)
     end
 end)
 
 CreateToggle("Noclip (Safety)", "Noclip", nil)
+
+-- Clock Update Loop
+task.spawn(function()
+    while true do
+        TimeLabel.Text = os.date("%H:%M:%S")
+        task.wait(1)
+    end
+end)
 
 -- Noclip Loop
 Services.RunService.Stepped:Connect(function()
