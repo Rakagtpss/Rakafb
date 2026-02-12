@@ -1,5 +1,5 @@
--- [[ SERAPHIN MINI UI - ANTI-SUSPENSION EDITION ]]
--- Version: Mini V3.0 (Tween Travel & Natural Mining)
+-- [[ SERAPHIN MINI UI - FINAL SAFE (SMOOTH TRAVEL & DELAY) ]]
+-- Version: Mini V3.5 (Sine Easing + Mining Cooldown)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -18,7 +18,7 @@ local Camera = Services.Workspace.CurrentCamera
 -- // THEME CONFIG
 local UI = {
     Color = Color3.fromRGB(15, 15, 20),
-    Accent = Color3.fromRGB(255, 180, 50), -- Warna Orange (Warning/Safety)
+    Accent = Color3.fromRGB(100, 255, 100), -- Warna Hijau (Safe Status)
     Text = Color3.fromRGB(240, 240, 240),
     Size = UDim2.new(0, 220, 0, 300)
 }
@@ -53,7 +53,7 @@ Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
 local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 10, 0, 0)
-Title.Text = "SERAPHIN <font color='#ffb432'>SAFE</font>"
+Title.Text = "SERAPHIN <font color='#64ff64'>SAFE V2</font>"
 Title.RichText = true
 Title.Font = Enum.Font.GothamBlack
 Title.TextSize = 12
@@ -181,7 +181,7 @@ OpenBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ====================================================
--- [CORE LOGIC] SMART MINING REWORK (TWEEN TRAVEL)
+-- [CORE LOGIC] SAFE TRAVEL V2 (SINE EASING)
 -- ====================================================
 
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
@@ -206,40 +206,40 @@ local function SmartWait(min, max)
     task.wait(randomDelay)
 end
 
--- [SAFE MOVE / TWEEN TRAVEL]
--- Ini kunci Anti-Suspension: Bergerak cepat tapi tidak teleport instan
+-- [SAFE MOVE V2: SMOOTH START/STOP]
+-- Menggunakan EasingStyle.Sine (InOut) agar start pelan -> cepat -> pelan
 local function SafeMove(targetCFrame)
     local hrp = GetRoot()
     if not hrp then return end
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
     
-    -- Jika dekat (< 15 studs), boleh teleport biasa (smooth)
-    if dist < 15 then
+    if dist < 10 then
         hrp.CFrame = targetCFrame
         return
     end
     
-    -- Jika jauh, gunakan Tween (Kecepatan 300 studs/detik)
-    -- Speed terlalu tinggi = Kick. Speed 250-300 = Aman.
-    local speed = 150 
+    -- Speed diturunkan (160) agar tidak terdeteksi akselerasi tinggi
+    local speed = 160 
     local time = dist / speed
     
-    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    -- EasingStyle.Sine = Anti-Robotic Movement
+    local tweenInfo = TweenInfo.new(time, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
     local tween = Services.TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
     
-    -- Aktifkan Noclip sementara saat terbang
     States.Noclip = true 
+    -- Reset Velocity SEBELUM gerak (Penting!)
+    hrp.AssemblyLinearVelocity = Vector3.zero 
+    
     tween:Play()
     tween.Completed:Wait()
-    States.Noclip = false -- Matikan noclip saat sampai
     
-    -- Reset Velocity saat sampai
+    States.Noclip = false 
+    -- Reset Velocity SESUDAH gerak
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
 end
 
--- [FUNGSI EQUIP SYSTEM]
 local function ForceClearHand()
     local char = Player.Character
     if not char then return end
@@ -276,7 +276,7 @@ local function SmartMining(folder, toggleState)
     
     -- [STEP 1] FORCE UNEQUIP AWAL
     ForceClearHand()
-    SmartWait(0.2, 0.3)
+    SmartWait(0.2, 0.4)
     
     -- [STEP 2] MINING LOOP (NATURAL POS)
     for i, node in ipairs(activeNodes) do
@@ -291,33 +291,34 @@ local function SmartMining(folder, toggleState)
             if targetPos then
                 hrp.Anchored = false
                 
-                -- LOGIKA POSISI BARU:
-                -- Jangan di atas (Floating), tapi di samping/depan crystal
-                -- CFrame.lookAt memastikan kita menghadap crystal (Natural interaction)
+                -- Posisi: Menghadap crystal dari jarak 4 stud (Natural)
                 local approachPos = CFrame.lookAt(targetPos + Vector3.new(4, 1, 0), targetPos)
                 
-                -- Terbang aman ke lokasi
+                -- TRAVEL (Sine Easing)
                 SafeMove(approachPos)
                 
-                -- Bekukan fisik saat sampai (Anti-Slide)
+                -- Stabilisasi
                 hrp.AssemblyLinearVelocity = Vector3.zero
                 hrp.Anchored = true 
                 
-                -- [STEP 3] EQUIP PICKAXE DI LOKASI (SAFE EXTRACT)
-                -- Equip dilakukan SETELAH sampai, bukan sebelumnya (Biar terbang tangan kosong)
+                -- [STEP 3] EQUIP PICKAXE
                 local equipped = ForceEquipBag("pick")
                 if not equipped then pcall(function() RemoteEquip:FireServer(2) end) end
                 
-                SmartWait(0.8, 1) -- Delay lihat crystal
+                SmartWait(0.6, 0.9) 
                 
                 -- Eksekusi Mining
                 fireproximityprompt(prompt)
                 
-                -- Tunggu animasi mining
-                SmartWait(3.5)
+                -- Tunggu Animasi Mining
+                SmartWait(2.3, 2.6)
                 
-                -- Lepas Pickaxe sebelum pindah ke crystal berikutnya (Biar terbang ringan)
+                -- Lepas Pickaxe
                 ForceClearHand()
+                
+                -- [NEW] DELAY ANTAR CRYSTAL (Mencegah Instant Travel)
+                -- Ini jeda istirahat sebelum pindah ke batu selanjutnya
+                SmartWait(1.5, 2.5) 
             end
         end
     end
@@ -327,7 +328,7 @@ local function SmartMining(folder, toggleState)
     SafeMove(SafeReturnPos) -- Terbang pulang
     hrp.AssemblyLinearVelocity = Vector3.zero
     
-    SmartWait(0.8, 1)
+    SmartWait(0.5, 0.7)
     
     -- Ambil Rod Kembali
     pcall(function() RemoteEquip:FireServer(1) end) 
@@ -402,7 +403,7 @@ Services.RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Noclip Loop (Diperlukan untuk Safe Move)
+-- Noclip Loop
 Services.RunService.Stepped:Connect(function()
     if States.Noclip then
         local c = GetChar()
@@ -459,7 +460,6 @@ task.spawn(function()
                                     local pos = v:GetPivot().Position
                                     -- Safe Check Distance
                                     if (hrp.Position - Vector3.new(pos.X, 4, pos.Z)).Magnitude > 15 then
-                                        -- Gunakan Safe Move untuk ke Event juga
                                         local targetCF = CFrame.new(pos.X, 5, pos.Z)
                                         SafeMove(targetCF)
                                     end
