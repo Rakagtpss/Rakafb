@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V5.8 - STABLE STATE & POSITION FIX ]]
--- Fix: Save Position Error, Character Check, & Force Equip Logic
+-- [[ MINI MINING HUB V5.9 - FRONT POSITION FIX ]]
+-- Source Equip dari User + Posisi Mining "Di Depan" (Bukan di Atas/Samping)
 
 local Services = {
     Players = game:GetService("Players"),
@@ -29,7 +29,7 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Text = "MINING V5.8 (STABLE)"
+Title.Text = "MINING V5.9 (FRONT POS)"
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = Color3.new(1,1,1)
@@ -64,14 +64,11 @@ MainFrame.InputChanged:Connect(function(input)
 end)
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 
--- // 2. CONFIG REMOTE
+-- // 2. CONFIG REMOTE (SESUAI REQUEST)
+-- Menggunakan Path spesifik yang Anda berikan
 local RemoteEquip = nil
 pcall(function()
-    RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages", 5)
-        :WaitForChild("_Index", 5)
-        :WaitForChild("sleitnick_net@0.2.0", 5)
-        :WaitForChild("net", 5)
-        :WaitForChild("RE/EquipToolFromHotbar", 5)
+    RemoteEquip = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
 end)
 
 if not RemoteEquip then
@@ -97,7 +94,6 @@ local function SafeStop()
     hrp.AssemblyAngularVelocity = Vector3.zero
     hum.PlatformStand = false
     
-    -- Anchor sebentar untuk mematikan momentum
     hrp.Anchored = true
     task.wait(0.1)
     hrp.Anchored = false
@@ -106,10 +102,10 @@ end
 -- Fungsi Tween Aman
 local function SafeTween(targetCFrame)
     local hrp = GetRoot()
-    if not hrp or not targetCFrame then return end -- Validasi agar tidak error
+    if not hrp or not targetCFrame then return end
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    if dist < 3 then return end
+    if dist < 2 then return end
     
     local speed = 60
     local time = dist / speed
@@ -120,16 +116,6 @@ local function SafeTween(targetCFrame)
     tw:Play()
     tw.Completed:Wait()
     hrp.AssemblyLinearVelocity = Vector3.zero
-end
-
--- Fungsi Cek Tool (Helpers untuk step 2 & 3)
-local function IsToolEquipped()
-    local char = Player.Character
-    if not char then return false end
-    for _,v in pairs(char:GetChildren()) do
-        if v:IsA("Tool") then return true end
-    end
-    return false
 end
 
 -- // 4. LOGIKA UTAMA
@@ -147,79 +133,27 @@ local function RunMiningSequence(folder, toggleKey)
     local hrp = GetRoot()
     local hum = GetHum()
     
-    if not hrp or not hum then return end -- Cek awal
-
     -- Print Time
     local currentTime = os.date("%X")
     print("Nodes: " .. #activeNodes .. " | Time: " .. currentTime)
     Notify("SPAWN: " .. currentTime, Color3.fromRGB(0, 255, 255))
     task.wait(1)
 
-    -- [STEP 1] SAVE POSITION (VALIDATED)
+    -- [STEP 1] SAVE POSITION
     local SavedPosition = nil
-    if hrp then
-        SavedPosition = hrp.CFrame
-        Notify("1. Saving Position...", Color3.fromRGB(255, 255, 0))
-    else
-        Notify("Error: No Character!", Color3.fromRGB(255, 0, 0))
-        States.IsMining = false
-        return
-    end
+    if hrp then SavedPosition = hrp.CFrame end
+    Notify("1. Saving Position...", Color3.fromRGB(255, 255, 0))
     task.wait(0.2)
 
-    -- ===============================
-    -- [STEP 2] FORCE UNEQUIP ALL
-    -- ===============================
-    Notify("2. Force Unequip...", Color3.fromRGB(255, 200, 0))
+    -- [STEP 2] EQUIP PICKAXE (SLOT 2) - SOURCE DARI USER
+    Notify("2. Equip Pickaxe (Slot 2)...", Color3.fromRGB(0, 255, 0))
+    pcall(function() 
+        RemoteEquip:FireServer(2) 
+    end)
+    task.wait(0.6) -- Beri waktu agar terpegang
 
-    -- Kosongkan via remote
-    pcall(function() RemoteEquip:FireServer(0) end)
-    if hum then hum:UnequipTools() end
-
-    -- Tunggu sampai benar-benar kosong
-    local timeout = 0
-    while IsToolEquipped() and timeout < 2 do
-        if hum then hum:UnequipTools() end
-        pcall(function() RemoteEquip:FireServer(0) end)
-        task.wait(0.2)
-        timeout = timeout + 0.2
-    end
-    task.wait(0.3)
-
-    -- ===============================
-    -- [STEP 3] EQUIP SLOT 2 (RETRY)
-    -- ===============================
-    Notify("3. Equip Slot 2...", Color3.fromRGB(0, 255, 0))
-    local equipped = false
-    for i = 1,5 do
-        pcall(function() RemoteEquip:FireServer(2) end)
-        task.wait(0.4)
-        if IsToolEquipped() then
-            equipped = true
-            break
-        end
-    end
-
-    if not equipped then
-        Notify("Equip Failed!", Color3.fromRGB(255,0,0))
-        States.IsMining = false
-        SafeStop()
-        return
-    end
-    Notify("Slot 2 Equipped ✓", Color3.fromRGB(0,255,120))
-    task.wait(0.5)
-
-    -- ===============================
-    -- [STEP 4] TELEPORT TO CRYSTAL
-    -- ===============================
-    -- Re-Check Character sebelum terbang
-    hrp = GetRoot()
-    hum = GetHum()
-    if not hrp or not hum or hum.Health <= 0 then 
-        States.IsMining = false
-        return 
-    end
-
+    -- [STEP 3] MINING LOOP
+    -- Aktifkan Fly
     if hum then 
         hum.PlatformStand = true 
         if not hrp:FindFirstChild("MiningFly") then
@@ -234,23 +168,25 @@ local function RunMiningSequence(folder, toggleKey)
     for i, node in ipairs(activeNodes) do
         if not States[toggleKey] then break end
         
-        -- Re-Check Character di dalam loop
         hrp = GetRoot()
-        if not hrp then break end -- Stop jika mati
+        if not hrp then break end
 
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
-            local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
+            -- [PERBAIKAN POSISI]
+            -- Ambil posisi asli node
+            local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
             
-            SafeTween(targetCF + Vector3.new(0, 3.5, 0))
+            -- Hitung posisi DI DEPAN (Mundur 4 stud dari arah crystal menghadap)
+            -- Kita pakai CFrame.lookAt agar karakter menghadap ke Crystal
+            local targetPos = nodeCF * CFrame.new(0, 0, 4) 
+            local finalCF = CFrame.lookAt(targetPos.Position, nodeCF.Position)
+            
+            -- Teleport
+            SafeTween(finalCF)
             
             Notify("Mining Node " .. i, Color3.fromRGB(255, 170, 0))
-            task.wait(0.5)
-            
-            -- Safety Check: Pickaxe
-            if not IsToolEquipped() then
-                 pcall(function() RemoteEquip:FireServer(2) end)
-            end
+            task.wait(0.3)
             
             fireproximityprompt(prompt)
             
@@ -263,20 +199,22 @@ local function RunMiningSequence(folder, toggleKey)
         end
     end
 
-    -- ===============================
-    -- [STEP 5] BACK TO SAVE POSITION
-    -- ===============================
-    hrp = GetRoot() -- Ambil HRP terbaru (takutnya respawn)
-    if hrp and SavedPosition then
-        Notify("Done! Back to Save Pos...", Color3.fromRGB(0, 255, 255))
+    -- [STEP 4] BACK TO SAVE POSITION
+    if SavedPosition and hrp then
+        Notify("Done! Returning...", Color3.fromRGB(0, 255, 255))
         SafeTween(SavedPosition)
-        SafeStop()
-        Notify("Idle at Saved Pos.", Color3.fromRGB(150, 150, 150))
-    else
-        Notify("Pos Lost/Char Dead", Color3.fromRGB(255, 100, 100))
     end
+    
+    SafeStop() -- Matikan Fly
 
+    -- [STEP 5] EQUIP ROD (SLOT 1) - SOURCE DARI USER
+    Notify("5. Equip Rod (Slot 1)...", Color3.fromRGB(0, 255, 120))
+    pcall(function() 
+        RemoteEquip:FireServer(1) 
+    end)
+    
     States.IsMining = false
+    Notify("Idle.", Color3.fromRGB(150, 150, 150))
 end
 
 -- // 5. UI BUTTONS
