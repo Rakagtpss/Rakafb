@@ -25,7 +25,7 @@ local function GetHum() local c = Player.Character; return c and c:FindFirstChil
 -- // KONFIGURASI VISUAL (MODERN DARK TRANSPARENT)
 local UI_THEME = {
     Width = 400,
-    Height = 320, 
+    Height = 270, 
     
     Color = Color3.fromRGB(12, 12, 14),        
     SidebarColor = Color3.fromRGB(8, 8, 8), 
@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "Safe Mode & Crafting Loaded", nil, 4)
+Notify("SERAPHIN", "Script Loaded", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -189,7 +189,7 @@ local FloatHUD = Instance.new("Frame", ScreenGui)
 FloatHUD.Name = "FloatingStats"
 FloatHUD.AnchorPoint = Vector2.new(0.5, 0) 
 FloatHUD.Size = UDim2.new(0, 150, 0, 100) 
-FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0) 
+FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0) -- Tengah Layar
 FloatHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18) 
 FloatHUD.BackgroundTransparency = 0.3
 FloatHUD.BorderSizePixel = 0 
@@ -434,9 +434,9 @@ end
 
 -- PAGE INIT 
 local PageMain   = CreatePage("PageMain", true, false)
-local PageEvent  = CreatePage("PageEvent", false, true) -- LIST LAYOUT ENABLED (Untuk Crafting Dropdown)
-local PagePlayer = CreatePage("PagePlayer", false, true) 
-local PageMisc   = CreatePage("PageMisc", false, true)  
+local PageEvent  = CreatePage("PageEvent", false, true) -- [UPDATED] Event Page is ListLayout now for Drawer
+local PagePlayer = CreatePage("PagePlayer", false, true) -- LIST LAYOUT ENABLED
+local PageMisc   = CreatePage("PageMisc", false, true)   -- [MODIFIED] LIST LAYOUT FOR DRAWER
 
 local function SwitchTab(tabName)
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
@@ -507,8 +507,8 @@ local function MakeBtn(parent, text)
     b.TextScaled = true 
     b.BorderSizePixel = 0
     
-    -- ADJUST WIDTH FOR LIST PAGES
-    if parent == PageMisc or parent == PagePlayer or parent == PageEvent then
+    -- ADJUST WIDTH FOR LIST LAYOUT PAGES
+    if parent == PageMisc or parent == PageEvent then
         b.Size = UDim2.new(0.95, 0, 0, 26)
     end
 
@@ -531,7 +531,7 @@ local function MakeSwitch(parent, text, defaultState, callback)
     
     -- ADJUST SIZE FOR PLAYER/MISC/EVENT TAB
     if parent == PagePlayer or parent == PageMisc or parent == PageEvent then
-        Frame.Size = UDim2.new(0.95, 0, 0, 26) 
+        Frame.Size = UDim2.new(0.95, 0, 0, 26) -- Full width for List Layout
     else
         -- Grid Layout handled by parent UIGridLayout
     end
@@ -624,14 +624,14 @@ local States = {
     AutoCoral=false,
     AutoFarmRelic=false, 
     AutoCrystal=false, 
-    AutoLava=false,
+    AutoLava=false, -- [NEW]
     Busy=false,
     HasTank=false,
     RelicSel="Blacktide", 
     RelicSpot=1,
     HideRod=false,
     StreamerMode=false,
-    AnimSkin="Off" 
+    AnimSkin="Off" -- [New] State Animation
 }
 local SavedCFrame = nil 
 local EventStartCFrame = nil 
@@ -754,25 +754,27 @@ local function SetAutoEquip(bool)
 end
 
 -- ====================================================
--- [UPDATED V3] CPU BOOSTER (BRIGHT / NO DARK)
+-- [UPDATED V4] CPU BOOSTER (BRIGHT & OPTIMIZED)
 -- ====================================================
 local function ToggleBoost(enable)
     States.Boost = enable
     if enable then
-        -- 1. Uncap FPS
+        -- 1. Uncap FPS (Safety)
         if setfpscap then setfpscap(999) end
 
-        -- 2. Lighting Optimize (NOT DARK)
+        -- 2. Lighting Optimized (BRIGHT MODE)
         pcall(function()
             local l = Services.Lighting
             l.GlobalShadows = false
             l.FogEnd = 9e9
-            l.Brightness = 2 -- Tetap terang
-            l.TimeOfDay = "12:00:00" -- Siang hari
-            l.Ambient = Color3.new(0.8, 0.8, 0.8) -- Ambient terang
-            l.OutdoorAmbient = Color3.new(0.8, 0.8, 0.8)
+            l.Brightness = 2 -- Make it bright
+            l.ClockTime = 14 -- Day time
+            l.EnvironmentDiffuseScale = 0
+            l.EnvironmentSpecularScale = 0
+            l.Ambient = Color3.fromRGB(200, 200, 200) -- White Ambient
+            l.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
             
-            -- Matikan efek berat tapi jangan bikin hitam
+            -- Disable heavy post effects
             for _, v in pairs(l:GetChildren()) do
                 if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("DepthOfField") or v:IsA("SunRays") or v:IsA("BlurEffect") or v:IsA("BloomEffect") then
                     v.Enabled = false
@@ -780,33 +782,36 @@ local function ToggleBoost(enable)
             end
         end)
         
-        -- 3. Terrain Optimize
+        -- 3. Terrain Nuke (Smooth & Clear Water)
         if Services.Workspace.Terrain then
             Services.Workspace.Terrain.WaterReflectance = 0
             Services.Workspace.Terrain.WaterTransparency = 1 
             Services.Workspace.Terrain.WaterWaveSize = 0
             Services.Workspace.Terrain.WaterWaveSpeed = 0
+            pcall(function() Services.Workspace.Terrain.Material = Enum.Material.SmoothPlastic end)
         end
 
         -- 4. Object Optimizer
         local function OptimizeObject(v)
             pcall(function()
                 if v:IsA("BasePart") then
-                    -- Jangan ubah warna jadi hitam, hanya material
-                    if v.Material ~= Enum.Material.SmoothPlastic then
-                        v.Material = Enum.Material.SmoothPlastic
-                    end
+                    v.Material = Enum.Material.SmoothPlastic
                     v.Reflectance = 0
                     v.CastShadow = false
-                    
                     if v:IsA("MeshPart") then v.TextureID = "" end
                     if v.Name == "Water" then v.Transparency = 1 end
                     
                 elseif v:IsA("Decal") or v:IsA("Texture") then
                     v.Transparency = 1 
                     
-                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") then
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Explosion") then
                     v.Enabled = false 
+                    
+                elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
+                    v.Enabled = false
+                    
+                elseif v:IsA("Clothing") then
+                    v:Destroy()
                 end
             end)
         end
@@ -820,7 +825,7 @@ local function ToggleBoost(enable)
             OptimizeObject(v)
         end)
         
-        Notify("BOOST", "CPU Optimized (Lite Mode)", Color3.fromRGB(0, 255, 100))
+        Notify("BOOST", "Bright & Fast Mode Active", Color3.fromRGB(0, 255, 100))
     else
         if Connections["BoosterDynamic"] then Connections["BoosterDynamic"]:Disconnect() end
         Notify("BOOST", "Optimization Disabled", nil)
@@ -975,7 +980,7 @@ MakeSwitch(PageMain, "No Clip", States.Noclip, function(val)
     end 
 end)
 
-MakeSwitch(PageMain, "CPU Booster (Lite)", States.Boost, function(val)
+MakeSwitch(PageMain, "CPU Booster (Bright)", States.Boost, function(val)
     ToggleBoost(val)
 end)
 
@@ -985,93 +990,18 @@ MakeSwitch(PageMain, "3D No Render", States.NoRender, function(val)
     Notify("RENDER", "No Render: "..(val and "ON" or "OFF"), nil)
 end)
 
--- [TAB EVENT] - Updated with Auto Craft & Lava
-MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
-    States.AutoEvent = val
-    Notify("EVENT", "Auto Hunt: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    
-    if not val then 
-        local hrp = GetRoot()
-        if IsInEvent and EventStartCFrame and hrp then 
-            hrp.CFrame = EventStartCFrame 
-            EventStartCFrame = nil
-            Notify("AUTO HUNT", "Returning...", nil)
-        end
-        IsInEvent = false
-        SetWoW(false) 
-    end
-end)
-
--- [NEW] AUTO CAVE CRYSTAL SWITCH
-MakeSwitch(PageEvent, "Auto Cave Crystal (Safe)", States.AutoCrystal, function(val)
-    States.AutoCrystal = val
-    Notify("EVENT", "Auto Crystal: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    
-    if val then
-        States.AutoLava = false -- Matikan Lava jika aktif
-        SetWoW(true) -- Hidupkan WoW
-        States.WoW = true 
-    else
-        SetWoW(false) 
-        States.WoW = false
-    end
-end)
-
--- [NEW] AUTO LAVA CRYSTAL SWITCH
-MakeSwitch(PageEvent, "Auto Lava Crystal (Safe)", States.AutoLava, function(val)
-    States.AutoLava = val
-    Notify("EVENT", "Auto Lava: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    
-    if val then
-        States.AutoCrystal = false -- Matikan Cave jika aktif
-        SetWoW(true)
-        States.WoW = true
-    else
-        SetWoW(false)
-        States.WoW = false
-    end
-end)
-
-
-MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
-    States.AutoCoral = val
-    Notify("EVENT", "Auto Coral: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    
-    if val then
-        -- OXYGEN TANK AUTO EQUIP
-        if not States.HasTank then
-            pcall(function() TankRemote:InvokeServer(105) end)
-            States.HasTank = true
-            Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
-        end
-    end
-    
-    if not val then
-         local hrp = GetRoot()
-         if IsLootingCoral and CoralReturnCFrame and hrp then
-             hrp.CFrame = CoralReturnCFrame
-             Notify("CORAL", "Returning...", nil)
-         end
-         IsLootingCoral = false
-         SetWoW(false)
-    end
-end)
+-- [TAB EVENT]
 
 -- ====================================================
--- [NEW] AUTO CRAFT CHARM SYSTEM
+-- [ADDON] AUTO CRAFT CHARM (DRAWER STYLE)
 -- ====================================================
--- Definisi Remote Crafting
-local StartCraft = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:FindFirstChild("RF/StartCrafting")
-local ConfirmCraft = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:FindFirstChild("RF/ConfirmCrafting")
-
--- Container Utama Crafting
 local CraftContainer = Instance.new("Frame", PageEvent)
 CraftContainer.Name = "CraftSystem"
-CraftContainer.Size = UDim2.new(0.95, 0, 0, 85) -- Ukuran default tertutup
+CraftContainer.Size = UDim2.new(0.95, 0, 0, 85) 
 CraftContainer.BackgroundTransparency = 1
 CraftContainer.ClipsDescendants = true 
 
--- 1. HEADER & DROPDOWN (LACI)
+-- Dropdown Header
 local CraftDropdown = Instance.new("Frame", CraftContainer)
 CraftDropdown.Name = "Dropdown"
 CraftDropdown.Size = UDim2.new(1, 0, 0, 26)
@@ -1089,7 +1019,7 @@ CraftBtn.TextSize = 10
 CraftBtn.AutoButtonColor = true
 Instance.new("UICorner", CraftBtn).CornerRadius = UDim.new(0, 6)
 
--- List Item (Isi Laci)
+-- List Item
 local CraftListFrame = Instance.new("ScrollingFrame", CraftDropdown)
 CraftListFrame.Size = UDim2.new(1, 0, 0, 100)
 CraftListFrame.Position = UDim2.new(0, 0, 0, 30)
@@ -1104,7 +1034,6 @@ local CraftListLayout = Instance.new("UIListLayout", CraftListFrame)
 CraftListLayout.Padding = UDim.new(0, 2)
 CraftListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Data Charm Crafting
 local SelectedCraft = nil
 local CraftData = {
     "Oculus Charm",
@@ -1113,11 +1042,9 @@ local CraftData = {
     "Winged Charm"
 }
 
--- Fungsi Pilih Craft
 local function UpdateCraftSelect(name)
     SelectedCraft = name
-    CraftBtn.Text = "Crafting: " .. name
-    -- Tutup laci otomatis
+    CraftBtn.Text = "Craft: " .. name
     CraftListFrame.Visible = false
     Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
 end
@@ -1132,14 +1059,10 @@ for _, cName in pairs(CraftData) do
     btn.Font = UI_THEME.FontUI
     btn.TextSize = 9
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-    
-    btn.MouseButton1Click:Connect(function()
-        UpdateCraftSelect(cName)
-    end)
+    btn.MouseButton1Click:Connect(function() UpdateCraftSelect(cName) end)
 end
 CraftListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CraftData * 26))
 
--- Toggle Laci Craft
 local IsCraftOpen = false
 CraftBtn.MouseButton1Click:Connect(function()
     IsCraftOpen = not IsCraftOpen
@@ -1152,72 +1075,155 @@ CraftBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 2. QUANTITY INPUT & CRAFT BUTTON
-local CraftActionFrame = Instance.new("Frame", CraftContainer)
-CraftActionFrame.Name = "Action"
-CraftActionFrame.Size = UDim2.new(1, 0, 0, 26)
-CraftActionFrame.Position = UDim2.new(0, 0, 1, -26) 
-CraftActionFrame.BackgroundTransparency = 1
+-- Action Input
+local ActionFrameC = Instance.new("Frame", CraftContainer)
+ActionFrameC.Name = "Action"
+ActionFrameC.Size = UDim2.new(1, 0, 0, 26)
+ActionFrameC.Position = UDim2.new(0, 0, 1, -26)
+ActionFrameC.BackgroundTransparency = 1
 
-local CraftQtyInput = Instance.new("TextBox", CraftActionFrame)
-CraftQtyInput.Size = UDim2.new(0.3, 0, 1, 0)
-CraftQtyInput.Position = UDim2.new(0, 0, 0, 0)
-CraftQtyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-CraftQtyInput.BackgroundTransparency = 0.3
-CraftQtyInput.Text = "1"
-CraftQtyInput.PlaceholderText = "Qty"
-CraftQtyInput.TextColor3 = UI_THEME.Accent
-CraftQtyInput.Font = UI_THEME.FontUI
-CraftQtyInput.TextSize = 10
-Instance.new("UICorner", CraftQtyInput).CornerRadius = UDim.new(0, 6)
+local QtyInputC = Instance.new("TextBox", ActionFrameC)
+QtyInputC.Size = UDim2.new(0.3, 0, 1, 0)
+QtyInputC.Position = UDim2.new(0, 0, 0, 0)
+QtyInputC.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+QtyInputC.BackgroundTransparency = 0.3
+QtyInputC.Text = "1"
+QtyInputC.PlaceholderText = "Qty"
+QtyInputC.TextColor3 = UI_THEME.Accent
+QtyInputC.Font = UI_THEME.FontUI
+QtyInputC.TextSize = 10
+Instance.new("UICorner", QtyInputC).CornerRadius = UDim.new(0, 6)
 
-local DoCraftBtn = Instance.new("TextButton", CraftActionFrame)
-DoCraftBtn.Size = UDim2.new(0.65, 0, 1, 0)
-DoCraftBtn.Position = UDim2.new(0.35, 0, 0, 0)
-DoCraftBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0) -- Warna Orange
-DoCraftBtn.BackgroundTransparency = 0.2
-DoCraftBtn.Text = "START CRAFT"
-DoCraftBtn.TextColor3 = Color3.new(1,1,1)
-DoCraftBtn.Font = UI_THEME.FontBtn
-DoCraftBtn.TextSize = 10
-Instance.new("UICorner", DoCraftBtn).CornerRadius = UDim.new(0, 6)
+local StartCraftBtn = Instance.new("TextButton", ActionFrameC)
+StartCraftBtn.Size = UDim2.new(0.65, 0, 1, 0)
+StartCraftBtn.Position = UDim2.new(0.35, 0, 0, 0)
+StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+StartCraftBtn.BackgroundTransparency = 0.2
+StartCraftBtn.Text = "START CRAFT"
+StartCraftBtn.TextColor3 = Color3.new(1,1,1)
+StartCraftBtn.Font = UI_THEME.FontBtn
+StartCraftBtn.TextSize = 10
+Instance.new("UICorner", StartCraftBtn).CornerRadius = UDim.new(0, 6)
 
--- 3. LOGIKA CRAFTING
-DoCraftBtn.MouseButton1Click:Connect(function()
-    if not SelectedCraft then 
-        Notify("CRAFT", "Please Select a Charm!", Color3.fromRGB(255, 50, 50)) 
-        return 
-    end
-    
-    local amount = tonumber(CraftQtyInput.Text) or 1
-    if amount < 1 then amount = 1 end
-    
-    if not StartCraft or not ConfirmCraft then
-        Notify("ERROR", "Remotes Not Found!", Color3.fromRGB(255,0,0))
+-- CRAFT LOGIC
+local IsCrafting = false
+local StartCraftRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/StartCrafting")
+local ConfirmCraftRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/ConfirmCrafting")
+local CancelCraftRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/CancelCrafting")
+
+StartCraftBtn.MouseButton1Click:Connect(function()
+    if IsCrafting then
+        IsCrafting = false
+        CancelCraftRF:InvokeServer()
+        StartCraftBtn.Text = "START CRAFT"
+        StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
         return
     end
 
+    if not SelectedCraft then 
+        Notify("CRAFT", "Select Charm!", Color3.fromRGB(255, 50, 50)) 
+        return 
+    end
+    
+    local amount = tonumber(QtyInputC.Text) or 1
+    if amount < 1 then amount = 1 end
+    
+    IsCrafting = true
+    StartCraftBtn.Text = "STOP CRAFTING"
+    StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    
     Notify("CRAFT", "Crafting " .. amount .. " " .. SelectedCraft .. "...", Color3.fromRGB(255, 200, 0))
     
     task.spawn(function()
         for i = 1, amount do
-            local success, err = pcall(function()
-                StartCraft:InvokeServer(SelectedCraft)
-                task.wait(0.2)
-                ConfirmCraft:InvokeServer()
-            end)
+            if not IsCrafting then break end
             
-            if not success then
-                Notify("ERROR", "Crafting Failed!", Color3.fromRGB(255, 0, 0))
-                break
-            end
-            task.wait(0.4) -- Delay aman
+            pcall(function()
+                StartCraftRF:InvokeServer(SelectedCraft)
+                task.wait(0.2)
+                ConfirmCraftRF:InvokeServer()
+            end)
+            task.wait(0.5) -- Delay safe
         end
+        IsCrafting = false
+        StartCraftBtn.Text = "START CRAFT"
+        StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
         Notify("CRAFT", "Finished!", Color3.fromRGB(0, 255, 100))
     end)
 end)
 
--- [RELICS LOGIC]
+-- [EVENT SWITCHES]
+
+MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
+    States.AutoEvent = val
+    Notify("EVENT", "Auto Hunt: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
+    
+    if not val then 
+        local hrp = GetRoot()
+        if IsInEvent and EventStartCFrame and hrp then 
+            hrp.CFrame = EventStartCFrame 
+            EventStartCFrame = nil
+            Notify("AUTO HUNT", "Returning...", nil)
+        end
+        IsInEvent = false
+        SetWoW(false) 
+    end
+end)
+
+-- [NEW] AUTO CAVE CRYSTAL SWITCH (SAFE)
+MakeSwitch(PageEvent, "Auto Cave Crystal (Safe)", States.AutoCrystal, function(val)
+    States.AutoCrystal = val
+    Notify("EVENT", "Auto Crystal: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
+    
+    if val then
+        States.WoW = true 
+        SetWoW(true) 
+    else
+        SetWoW(false) 
+        States.WoW = false
+    end
+end)
+
+-- [NEW] AUTO TAKE LAVA (SAFE)
+MakeSwitch(PageEvent, "Auto Take Lava (Safe)", States.AutoLava, function(val)
+    States.AutoLava = val
+    Notify("EVENT", "Auto Lava: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
+    
+    if val then
+        States.WoW = true 
+        SetWoW(true) 
+    else
+        SetWoW(false) 
+        States.WoW = false
+    end
+end)
+
+MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
+    States.AutoCoral = val
+    Notify("EVENT", "Auto Coral: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
+    
+    if val then
+        -- OXYGEN TANK AUTO EQUIP
+        local TankRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:FindFirstChild("RF/EquipOxygenTank")
+        if TankRemote and not States.HasTank then
+            pcall(function() TankRemote:InvokeServer(105) end)
+            States.HasTank = true
+            Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
+        end
+    end
+    
+    if not val then
+         local hrp = GetRoot()
+         if IsLootingCoral and CoralReturnCFrame and hrp then
+             hrp.CFrame = CoralReturnCFrame
+             Notify("CORAL", "Returning...", nil)
+         end
+         IsLootingCoral = false
+         SetWoW(false)
+    end
+end)
+
+-- [NEW LOGIC] RELIC DEFINITIONS & SPOT CYCLING
 local RelicsFolder = Services.Workspace:WaitForChild("LeviathanEvent"):WaitForChild("Relics")
 local ClaimRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ClaimRelic"]
 local TankRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/EquipOxygenTank"]
@@ -1482,7 +1488,7 @@ local AnimationList = {
     ["Soul Scythe"] = "Soul Scythe - FishCaught",
     ["Eclipse Katana"] = "Eclipse Katana - FishCaught",
     ["Ban Hammer"] = "1x1x1x1 Ban Hammer - FishCaught",
-    ["Trident"] = "Holy Trident - FishCaught"
+    ["Trident"] = "Holy Trident - FishCaught" 
 }
 
 -- Buat Tombol dalam List
@@ -1925,166 +1931,130 @@ task.spawn(function()
     end 
 end)
 
--- ====================================================
--- [REVISED V5] UNIFIED SAFE MINING (TWEEN + DELAY + UNEQUIP)
--- ====================================================
-task.spawn(function()
-    local MiningReturnCFrame = nil
+-- [SAFE MINING FUNCTIONS]
+local function isActiveCrystal(crystal)
+    for _, v in ipairs(crystal:GetDescendants()) do
+        if v:IsA("PointLight") or v:IsA("Highlight") or v:IsA("MeshPart") or v:IsA("SpecialMesh") or v:IsA("ProximityPrompt") then
+            return true
+        end
+    end
+    return false
+end
+
+local function SmartMining(folder, toggleState)
+    if not folder then return false end
     
-    -- Definisi Remote
-    local PkgNet = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
-    local EquipHotbar = PkgNet:WaitForChild("RE/EquipToolFromHotbar")
-    local UnequipHotbar = PkgNet:WaitForChild("RE/UnequipToolFromHotbar")
-    local MineRemote = PkgNet:FindFirstChild("RE/PickaxeMining")
-
-    -- [FIX 1] Fungsi Equip Pintar
-    local function SmartEquipPickaxe()
-        local char = Player.Character
-        local hum = char and char:FindFirstChild("Humanoid")
-        if not char or not hum then return false end
-        
-        local backpack = Player.Backpack
-        for _, tool in pairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") and (string.find(string.lower(tool.Name), "pickaxe") or string.find(string.lower(tool.Name), "drill")) then
-                hum:EquipTool(tool)
-                return true
-            end
+    local hrp = GetRoot()
+    local EquipRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
+    
+    -- Find active nodes
+    local activeNodes = {}
+    for _, node in ipairs(folder:GetChildren()) do
+        if isActiveCrystal(node) then
+            table.insert(activeNodes, node)
         end
-        return false
     end
 
-    -- [FIX 2] TWEEN MOVEMENT (Gerak Halus - Anti Speed Hack)
-    local MOVE_SPEED = 65 -- Dikurangi agar lebih aman (seperti lari cepat)
-    local function SafeTravel(targetCFrame)
-        local hrp = GetRoot()
-        if not hrp then return end
-        
-        local dist = (hrp.Position - targetCFrame.Position).Magnitude
-        local duration = dist / MOVE_SPEED
-        if duration < 0.6 then duration = 0.6 end -- Minimal durasi agar tidak instan
-        
-        -- Bekukan gravitasi
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        
-        local ti = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-        local tween = Services.TweenService:Create(hrp, ti, {CFrame = targetCFrame})
-        tween:Play()
-        tween.Completed:Wait()
-        
-        hrp.AssemblyLinearVelocity = Vector3.zero
-    end
+    if #activeNodes > 0 then
+        -- 1. Equip Pickaxe
+        pcall(function() EquipRemote:FireServer(2) end)
+        task.wait(0.6) -- Delay Equip Safe
 
-    -- Helper: Cek visual/prompt crystal
-    local function isActiveCrystal(crystal)
-        for _, v in ipairs(crystal:GetDescendants()) do
-            if v:IsA("ProximityPrompt") and v.Enabled then return true end
-        end
-        return false
-    end
+        for _, node in ipairs(activeNodes) do
+            if not States[toggleState] then break end
+            
+            -- Get position
+            local cf = nil
+            if node:IsA("Model") and node.PrimaryPart then cf = node.PrimaryPart.CFrame
+            elseif node:IsA("BasePart") then cf = node.CFrame
+            else local p = node:FindFirstChildWhichIsA("BasePart", true); if p then cf = p.CFrame end end
 
-    -- Helper: Logika Mining Utama
-    local function PerformMining(folder, toggleStateName)
-        if not folder then return end
-        local hrp = GetRoot()
-        if not hrp then return end
+            if cf then
+                -- 2. Safe Teleport
+                hrp.CFrame = cf
+                task.wait(0.5) -- Delay movement
 
-        local activeCrystals = {}
-        for _, crystal in ipairs(folder:GetChildren()) do
-            if isActiveCrystal(crystal) then table.insert(activeCrystals, crystal) end
-        end
-
-        if #activeCrystals > 0 then
-            -- 1. Save Posisi Awal
-            if not MiningReturnCFrame then
-                MiningReturnCFrame = hrp.CFrame
-                Notify("MINING", "Safe Mode: Scanning...", nil)
-            end
-
-            -- 2. UNEQUIP DULU (WAJIB)
-            pcall(function() UnequipHotbar:FireServer() end)
-            task.wait(0.5) 
-
-            -- 3. EQUIP PICKAXE
-            local hasPickaxe = SmartEquipPickaxe()
-            if not hasPickaxe then
-                Notify("ERROR", "No Pickaxe Found!", Color3.fromRGB(255,0,0))
-                return 
-            end
-            task.wait(0.8) -- Delay equip agak lama biar aman
-
-            -- 4. LOOP MINING
-            for _, crystal in ipairs(activeCrystals) do
-                if not States[toggleStateName] then break end
-                
-                local cf = nil
-                if crystal:IsA("Model") and crystal.PrimaryPart then
-                    cf = crystal.PrimaryPart.CFrame
-                elseif crystal:IsA("BasePart") then
-                    cf = crystal.CFrame
-                else
-                    local part = crystal:FindFirstChildWhichIsA("BasePart", true)
-                    if part then cf = part.CFrame end
-                end
-
-                if cf then
-                    -- TWEEN KE CRYSTAL
-                    SafeTravel(cf) 
-                    task.wait(0.3) -- Stabilisasi
-
-                    -- EKSEKUSI MINING
-                    pcall(function()
-                        if MineRemote then MineRemote:FireServer() end
-                    end)
-
-                    for _, v in ipairs(crystal:GetDescendants()) do
-                        if v:IsA("ProximityPrompt") and v.Enabled then
-                            fireproximityprompt(v)
-                        end
+                -- 3. Interact
+                for _, v in ipairs(node:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") and v.Enabled then
+                        fireproximityprompt(v, v.HoldDuration)
+                        task.wait(0.2)
                     end
-                    
-                    -- [FIX 3] DELAY MINING (Anti-Mining Detected)
-                    task.wait(1.5) 
                 end
             end
-            
-            -- 5. KEMBALI KE SPOT
-            if States[toggleStateName] and MiningReturnCFrame then
-                SafeTravel(MiningReturnCFrame)
-                task.wait(0.5)
-            end
+            task.wait(0.2)
+        end
+        return true
+    end
+    return false
+end
 
-            -- 6. UNEQUIP -> EQUIP ROD
-            pcall(function() 
-                UnequipHotbar:FireServer()
-                task.wait(0.5)
-                EquipHotbar:FireServer(1) 
-            end)
-            
-            task.wait(2) 
+-- [LOOP: AUTO CRYSTAL CAVE]
+task.spawn(function()
+    local Islands = Services.Workspace:FindFirstChild("Islands")
+    local CryFolder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
+    local ReturnCFrame = nil
+    
+    while true do
+        if States.AutoCrystal and CryFolder then
+            local hrp = GetRoot()
+            if hrp then
+                if not ReturnCFrame then ReturnCFrame = hrp.CFrame end
+                
+                local didMine = SmartMining(CryFolder, "AutoCrystal")
+                
+                if didMine then
+                    if States.AutoCrystal and ReturnCFrame then
+                        hrp.CFrame = ReturnCFrame
+                        task.wait(0.5)
+                        -- Equip Rod Back
+                        Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+                    end
+                else
+                     -- Idle Safe
+                    if ReturnCFrame and (hrp.Position - ReturnCFrame.Position).Magnitude > 10 then
+                         hrp.CFrame = ReturnCFrame
+                    end
+                end
+            end
+            task.wait(1.5)
         else
-            -- IDLE
-             if MiningReturnCFrame and (hrp.Position - MiningReturnCFrame.Position).Magnitude > 20 then
-                 SafeTravel(MiningReturnCFrame)
-             end
+            ReturnCFrame = nil
+            task.wait(2)
         end
     end
+end)
 
-    -- Main Loop
+-- [LOOP: AUTO LAVA CRYSTAL]
+task.spawn(function()
+    local Islands = Services.Workspace:FindFirstChild("Islands")
+    local LavaFolder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
+    local ReturnCFrame = nil
+    
     while true do
-        if States.AutoCrystal then
-            local Islands = Services.Workspace:FindFirstChild("Islands")
-            local CryFolder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
-            if CryFolder then PerformMining(CryFolder, "AutoCrystal") end
-            task.wait(1) 
-            
-        elseif States.AutoLava then
-            local Islands = Services.Workspace:FindFirstChild("Islands")
-            local LavaFolder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
-            if LavaFolder then PerformMining(LavaFolder, "AutoLava") end
-            task.wait(1)
-            
+        if States.AutoLava and LavaFolder then
+            local hrp = GetRoot()
+            if hrp then
+                if not ReturnCFrame then ReturnCFrame = hrp.CFrame end
+                
+                local didMine = SmartMining(LavaFolder, "AutoLava")
+                
+                if didMine then
+                    if States.AutoLava and ReturnCFrame then
+                        hrp.CFrame = ReturnCFrame
+                        task.wait(0.5)
+                        -- Equip Rod Back
+                        Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+                    end
+                else
+                    if ReturnCFrame and (hrp.Position - ReturnCFrame.Position).Magnitude > 10 then
+                         hrp.CFrame = ReturnCFrame
+                    end
+                end
+            end
+            task.wait(1.5)
         else
-            MiningReturnCFrame = nil
+            ReturnCFrame = nil
             task.wait(2)
         end
     end
