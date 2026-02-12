@@ -1,278 +1,332 @@
--- =====================================================
--- 1. LOAD LIBRARY & WINDOW (WINDUI FIXED LINK)
--- =====================================================
--- Menggunakan link GitHub official agar tidak error 402
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/source.lua"))()
+--[[
+    MINI UI FISHING SCRIPT (NO 402 ERROR GUARANTEED)
+    Dibuat langsung di dalam script (Native) agar tidak perlu loadstring.
+]]
 
-local Window = WindUI:CreateWindow({
-    Title = "Fishing Super Fast", 
-    Icon = "fish-symbol", 
-    Author = ".gg/script", 
-    Folder = "FishingScript", 
-    Size = UDim2.fromOffset(580, 460),
-    Transparent = true, 
-    Theme = "Dark", 
-    SideBarWidth = 170,
-    HasOutline = true,
-})
-
-local TabFishing = Window:Tab({
-    Title = "Auto Farm",
-    Icon = "fish",
-})
-
--- =====================================================
--- 2. VARIABLES & REMOTES
--- =====================================================
-getgenv().fishingStart = false
-local legit = false
-local instant = false
-local superInstant = true 
-
--- Args casting
-local args = { -1.115296483039856, 0, 1763651451.636425 }
-
--- Default Delays
-local delayTime = 0.56   
-local delayCharge = 1.15 -- Delay Reel (Super Fast)
-local delayReset = 0.2   -- Delay Bait (Reset)
-
-local rs = game:GetService("ReplicatedStorage")
-local net = rs.Packages["_Index"]["sleitnick_net@0.2.0"].net
 local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
+-- =====================================================
+-- 1. VARIABLES & SETTINGS
+-- =====================================================
+getgenv().fishingStart = false
+local config = {
+    mode = "Blatan", -- "Instant" or "Blatan"
+    delayReel = 1.15, -- Delay Charge
+    delayReset = 0.2, -- Delay Bait
+    delayCatch = 0.56, -- Delay Regular Catch
+    autoGreat = false
+}
+
+local args = { -1.115296483039856, 0, 1763651451.636425 }
+
 -- Remote Definitions
+local net = ReplicatedStorage.Packages["_Index"]["sleitnick_net@0.2.0"].net
 local ChargeRod    = net["RF/ChargeFishingRod"]
 local RequestGame  = net["RF/RequestFishingMinigameStarted"]
 local CompleteGame = net["RF/CatchFishCompleted"] 
 local CancelInput  = net["RF/CancelFishingInputs"]
 local UpdateAuto   = net["RF/UpdateAutoFishingState"]
 
-local FishingBlocker = {
-    Enabled = false,
-    AutoGreat = false,
-}
-
-local BLOCKED_REMOTES = {
-    [ChargeRod]    = true,
-    [RequestGame]  = true,
-    [CompleteGame] = true,
-    [CancelInput]  = true,
-}
-
 -- =====================================================
--- 3. HOOKING & BYPASS LOGIC
+-- 2. FISHING LOGIC
 -- =====================================================
+
+-- Hooking untuk Anti-Cheat Sederhana
+local FishingBlocker = { Enabled = false }
+local BLOCKED_REMOTES = { [ChargeRod]=true, [RequestGame]=true, [CompleteGame]=true, [CancelInput]=true }
 
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
-
     if FishingBlocker.Enabled and BLOCKED_REMOTES[self] and not checkcaller() then
-        if method == "InvokeServer" then
-            return task.wait(9e9) 
-        elseif method == "FireServer" then
-            return nil
-        end
+        if method == "InvokeServer" then return task.wait(9e9)
+        elseif method == "FireServer" then return nil end
     end
-
     return oldNamecall(self, ...)
 end)
 
+-- Helper Functions
+local function BypassCatch()
+    pcall(function()
+        local success = CompleteGame:InvokeServer(100, true)
+        if not success then CompleteGame:InvokeServer() end
+    end)
+end
+
 local MAX_PARALLEL = 4
 local active = 0
-
 local function lightSpawn(fn)
     if active >= MAX_PARALLEL then return end
     active = active + 1
+    task.spawn(function() pcall(fn); active = active - 1 end)
+end
+
+-- Looping Logic
+local function startFishing()
+    FishingBlocker.Enabled = true
+    pcall(function() CancelInput:InvokeServer() end)
+    
+    if config.autoGreat then UpdateAuto:InvokeServer({true}) end
+    
     task.spawn(function()
-        pcall(fn)
-        active = active - 1
-    end)
-end
-
--- FUNGSI BYPASS AGAR DIKIRA SAH OLEH SERVER
-local function BypassCatch()
-    pcall(function()
-        -- Mengirim sinyal 100% progress dan Perfect Catch = true
-        local success = CompleteGame:InvokeServer(100, true) 
-        if not success then
-             CompleteGame:InvokeServer()
-        end
-    end)
-end
-
--- =====================================================
--- 4. FISHING LOOPS
--- =====================================================
-
-local function startFishingLoop() -- Mode Normal/Legit
-    local _Cancel = CancelInput
-    local _Charge = ChargeRod
-    
-    if FishingBlocker.AutoGreat then
-        UpdateAuto:InvokeServer({true})
-    end
-    
-    while getgenv().fishingStart do
-        pcall(function() _Charge:InvokeServer() end) 
-        task.wait(0.055)
-        if not getgenv().fishingStart then break end
-        
-        RequestGame:InvokeServer(unpack(args))
-        task.wait(delayTime) 
-        
-        if not getgenv().fishingStart then break end 
-        
-        BypassCatch() 
-        
-        task.wait(0.05)
-        pcall(function() _Cancel:InvokeServer() end)
-    end
-end
-
-local function startFishingSuperInstantLoop() -- Mode Super Fast
-    local _Charge = ChargeRod
-    local _Request = RequestGame
-    local _Cancel = CancelInput
-    
-    if FishingBlocker.AutoGreat then
-        UpdateAuto:InvokeServer({true})
-    end
-    
-    pcall(function() _Cancel:InvokeServer() end)
-    task.wait(0.055)
-    
-    while getgenv().fishingStart do
-        lightSpawn(function()
-            _Charge:InvokeServer()
-        end)
-        
-        lightSpawn(function()
-            _Request:InvokeServer(unpack(args))
-        end)
-        
-        task.wait(delayCharge) 
-        
-        BypassCatch()
-        
-        task.wait(delayReset) 
-        
-        pcall(function() _Cancel:InvokeServer() end)
-    end
-end
-
-local function resetCharacter()
-    local _Cancel = CancelInput
-    pcall(function() BypassCatch() end) 
-    task.wait(0.05) 
-    pcall(function() _Cancel:InvokeServer() end)
-end
-
--- =====================================================
--- 5. UI CONFIGURATION (MENU)
--- =====================================================
-
-TabFishing:Section({ Title = "Mode Selection" })
-
-TabFishing:Dropdown({
-    Title = "Fishing Mode",
-    Desc = "Pilih gaya memancing",
-    Values = {"Instant (Legit)", "Blatan (Super Fast)"},
-    Value = "Blatan (Super Fast)",
-    Callback = function(option)
-        instant = (option == "Instant (Legit)")
-        superInstant = (option == "Blatan (Super Fast)")
-    end
-})
-
-TabFishing:Section({ Title = "Custom Delays (Tweak This)" })
-
-TabFishing:Input({
-    Title = "Delay Reel / Charge",
-    Desc = "Semakin kecil = Semakin cepat tarik (Default: 1.15)",
-    Value = tostring(delayCharge),
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then delayCharge = math.clamp(num, 0, 3) end
-    end
-})
-
-TabFishing:Input({
-    Title = "Delay Bait / Reset",
-    Desc = "Jeda lempar ulang (Default: 0.2)",
-    Value = tostring(delayReset),
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then delayReset = math.clamp(num, 0, 2) end
-    end
-})
-
-TabFishing:Input({
-    Title = "Delay Catch (Instant Mode Only)",
-    Desc = "Hanya efek di mode Instant",
-    Value = tostring(delayTime),
-    Callback = function(text)
-        local num = tonumber(text)
-        if num then delayTime = math.clamp(num, 0.1, 3) end
-    end
-})
-
-TabFishing:Section({ Title = "Execution" })
-
-TabFishing:Toggle({
-    Title = "Auto Great (Perfect Catch)",
-    Desc = "Selalu dapat status Perfect/Great",
-    Icon = "star",
-    Value = false,
-    Callback = function(state)
-        FishingBlocker.AutoGreat = state
-    end
-})
-
-TabFishing:Toggle({
-    Title = "Start Auto Fishing",
-    Desc = "Mulai script memancing",
-    Icon = "play",
-    Value = false,
-    Callback = function(state)
-        getgenv().fishingStart = state
-        FishingBlocker.Enabled = state
-        
-        if state then
-            pcall(function() CancelInput:InvokeServer() end)
-            
-            if superInstant then
-                task.spawn(startFishingSuperInstantLoop)
+        while getgenv().fishingStart do
+            if config.mode == "Blatan" then
+                -- MODE SUPER FAST
+                lightSpawn(function() ChargeRod:InvokeServer() end)
+                lightSpawn(function() RequestGame:InvokeServer(unpack(args)) end)
+                task.wait(config.delayReel)
+                BypassCatch()
+                task.wait(config.delayReset)
+                pcall(function() CancelInput:InvokeServer() end)
             else
-                task.spawn(startFishingLoop)
+                -- MODE INSTANT (LEGIT)
+                pcall(function() ChargeRod:InvokeServer() end)
+                task.wait(0.055)
+                if not getgenv().fishingStart then break end
+                RequestGame:InvokeServer(unpack(args))
+                task.wait(config.delayCatch)
+                if not getgenv().fishingStart then break end
+                BypassCatch()
+                task.wait(0.05)
+                pcall(function() CancelInput:InvokeServer() end)
             end
-            
-            WindUI:Notify({Title = "Fishing", Content = "Started!", Duration = 2})
-        else
-            if FishingBlocker.AutoGreat then
-                UpdateAuto:InvokeServer({false})
-            end
-            
-            pcall(function() BypassCatch() end)
-            pcall(function() CancelInput:InvokeServer() end)
-            
-            WindUI:Notify({Title = "Fishing", Content = "Stopped", Duration = 2})
         end
-    end
-})
+        
+        -- Cleanup saat stop
+        FishingBlocker.Enabled = false
+        if config.autoGreat then UpdateAuto:InvokeServer({false}) end
+        pcall(function() BypassCatch() end)
+        pcall(function() CancelInput:InvokeServer() end)
+    end)
+end
 
-TabFishing:Button({
-    Title = "Unstuck / Reset Rod",
-    Desc = "Klik jika pancingan error/bug",
-    Icon = "rotate-cw",
-    Callback = function()
-        task.spawn(function()
-            resetCharacter()
-            WindUI:Notify({Title = "System", Content = "Reset command sent", Duration = 2})
-        end)
-    end
-})
+local function stopFishing()
+    getgenv().fishingStart = false
+end
 
-Window:SelectTab(1)
+local function unstuck()
+    task.spawn(function()
+        pcall(function() BypassCatch() end)
+        task.wait(0.1)
+        pcall(function() CancelInput:InvokeServer() end)
+    end)
+end
+
+-- =====================================================
+-- 3. MINI UI CREATION (NATIVE)
+-- =====================================================
+
+-- Hapus UI lama jika ada
+if game.CoreGui:FindFirstChild("MiniFishUI") then
+    game.CoreGui:FindFirstChild("MiniFishUI"):Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MiniFishUI"
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.1, 0, 0.1, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 280) -- UKURAN KECIL
+MainFrame.Active = true
+MainFrame.Draggable = true -- Bisa digeser
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Title Bar
+local Title = Instance.new("TextLabel")
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.BackgroundTransparency = 0
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "  Fishing Mini"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+local HideFix = Instance.new("Frame") -- Tutup rounded corner bawah title
+HideFix.Parent = Title
+HideFix.BorderSizePixel = 0
+HideFix.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+HideFix.Size = UDim2.new(1, 0, 0, 10)
+HideFix.Position = UDim2.new(0, 0, 1, -10)
+
+-- Container
+local Container = Instance.new("Frame")
+Container.Parent = MainFrame
+Container.BackgroundTransparency = 1
+Container.Position = UDim2.new(0, 10, 0, 40)
+Container.Size = UDim2.new(1, -20, 1, -50)
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = Container
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 8)
+
+-- >> UI ELEMENTS GENERATOR
+
+local function CreateLabel(text)
+    local Lab = Instance.new("TextLabel")
+    Lab.Parent = Container
+    Lab.BackgroundTransparency = 1
+    Lab.Size = UDim2.new(1, 0, 0, 15)
+    Lab.Font = Enum.Font.Gotham
+    Lab.Text = text
+    Lab.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Lab.TextSize = 12
+    Lab.TextXAlignment = Enum.TextXAlignment.Left
+    return Lab
+end
+
+local function CreateInput(placeholder, default, callback)
+    local Box = Instance.new("TextBox")
+    Box.Parent = Container
+    Box.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Box.BorderSizePixel = 0
+    Box.Size = UDim2.new(1, 0, 0, 25)
+    Box.Font = Enum.Font.Gotham
+    Box.Text = tostring(default)
+    Box.PlaceholderText = placeholder
+    Box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Box.TextSize = 12
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = Box
+    
+    Box.FocusLost:Connect(function()
+        callback(Box.Text)
+    end)
+end
+
+local function CreateToggle(text, callback)
+    local Frame = Instance.new("Frame")
+    Frame.Parent = Container
+    Frame.BackgroundTransparency = 1
+    Frame.Size = UDim2.new(1, 0, 0, 25)
+    
+    local Btn = Instance.new("TextButton")
+    Btn.Parent = Frame
+    Btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Btn.Size = UDim2.new(0, 25, 0, 25)
+    Btn.Text = ""
+    
+    local BtnCorner = Instance.new("UICorner")
+    BtnCorner.CornerRadius = UDim.new(0, 4)
+    BtnCorner.Parent = Btn
+    
+    local Indicator = Instance.new("Frame")
+    Indicator.Parent = Btn
+    Indicator.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    Indicator.Size = UDim2.new(0, 15, 0, 15)
+    Indicator.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Indicator.AnchorPoint = Vector2.new(0.5, 0.5)
+    Indicator.Visible = false
+    Indicator.BorderSizePixel = 0
+    
+    local IndCorner = Instance.new("UICorner")
+    IndCorner.CornerRadius = UDim.new(0, 100)
+    IndCorner.Parent = Indicator
+    
+    local Label = Instance.new("TextLabel")
+    Label.Parent = Frame
+    Label.BackgroundTransparency = 1
+    Label.Position = UDim2.new(0, 35, 0, 0)
+    Label.Size = UDim2.new(1, -35, 1, 0)
+    Label.Font = Enum.Font.Gotham
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.TextSize = 12
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    
+    local toggled = false
+    Btn.MouseButton1Click:Connect(function()
+        toggled = not toggled
+        Indicator.Visible = toggled
+        callback(toggled)
+    end)
+end
+
+local function CreateButton(text, color, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Parent = Container
+    Btn.BackgroundColor3 = color
+    Btn.Size = UDim2.new(1, 0, 0, 30)
+    Btn.Font = Enum.Font.GothamBold
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.TextSize = 13
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = Btn
+    
+    Btn.MouseButton1Click:Connect(callback)
+    return Btn
+end
+
+-- >> BUILDING THE MENU
+
+CreateLabel("Delay Reel (Charge):")
+CreateInput("Default: 1.15", config.delayReel, function(val)
+    local n = tonumber(val)
+    if n then config.delayReel = n end
+end)
+
+CreateLabel("Delay Bait (Reset):")
+CreateInput("Default: 0.2", config.delayReset, function(val)
+    local n = tonumber(val)
+    if n then config.delayReset = n end
+end)
+
+CreateToggle("Auto Great / Perfect", function(state)
+    config.autoGreat = state
+    if getgenv().fishingStart then
+        UpdateAuto:InvokeServer({state})
+    end
+end)
+
+CreateLabel("--------------------")
+
+local StartBtn -- Forward declare
+StartBtn = CreateButton("START FISHING", Color3.fromRGB(0, 150, 80), function()
+    if not getgenv().fishingStart then
+        -- Start
+        getgenv().fishingStart = true
+        StartBtn.Text = "STOP FISHING"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        startFishing()
+    else
+        -- Stop
+        stopFishing()
+        StartBtn.Text = "START FISHING"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    end
+end)
+
+CreateButton("UNSTUCK / RESET", Color3.fromRGB(80, 80, 80), function()
+    unstuck()
+end)
+
+-- Notify Loaded
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "Script Loaded";
+    Text = "Mini UI Ready. Draggable.";
+    Duration = 3;
+})
