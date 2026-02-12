@@ -473,4 +473,3 @@ task.spawn(function()
         SmartWait(2.0, 3.5)
     end
 end)
-
