@@ -1969,12 +1969,9 @@ local function SmartMining(folder, toggleState)
     if not hrp or not char or not hum then return false end
 
     -- Path Remote Super Aman
-    local RemoteEquip = Services.ReplicatedStorage
-        :WaitForChild("Packages")
-        :WaitForChild("_Index")
-        :WaitForChild("sleitnick_net@0.2.0")
-        :WaitForChild("net")
-        :WaitForChild("RE/EquipToolFromHotbar")
+    local NetPath = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+    local RemoteEquip = NetPath:WaitForChild("RE/EquipToolFromHotbar")
+    local RemoteUnequip = NetPath:WaitForChild("RE/UnequipToolFromHotbar")
     
     -- [CRITICAL] Set status mining agar Auto Equip Rod tidak mengganggu
     States.IsMining = true 
@@ -1983,9 +1980,14 @@ local function SmartMining(folder, toggleState)
     local SafeReturnPos = hrp.CFrame
     Notify("MINING", "Crystal Ditemukan ("..#activeNodes..")...", Color3.fromRGB(0, 255, 255))
     
-    -- Force Unequip dulu (Supaya bersih)
-    hum:UnequipTools()
-    task.wait(0.3)
+    -- >> FIX: MENGGUNAKAN REMOTE UNEQUIP SESUAI REQUEST <<
+    pcall(function()
+        RemoteUnequip:FireServer()
+    end)
+    -- Backup unequip biasa jika remote gagal
+    hum:UnequipTools() 
+    
+    task.wait(0.5) -- Beri waktu agar server memproses unequip
     
     -- Equip Pickaxe (Slot 2)
     pcall(function() 
@@ -2016,12 +2018,17 @@ local function SmartMining(folder, toggleState)
             if targetCF then
                 -- Teleport Safe
                 hrp.CFrame = targetCF + Vector3.new(0, 3.5, 0)
-                task.wait(0.5) -- Stabilisasi
+                
+                -- >> FIX: RESET VELOCITY AGAR TIDAK TERDETEKSI SPEED/TERPENTAL <<
+                hrp.AssemblyLinearVelocity = Vector3.zero
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                
+                task.wait(0.5) -- Stabilisasi posisi sebelum interaksi
                 
                 -- Interaksi
                 fireproximityprompt(prompt)
                 
-                -- Delay Aman
+                -- Delay Aman Mining
                 local delayTime = math.random(15, 25) / 10 
                 Notify("MINING", "Mining Node " .. i .. "...", nil, 1)
                 task.wait(delayTime)
@@ -2032,13 +2039,19 @@ local function SmartMining(folder, toggleState)
     -- [STEP 4] SELESAI
     Notify("MINING", "Selesai! Kembali...", Color3.fromRGB(0, 255, 100))
     
-    -- Balik Posisi
+    -- Balik Posisi Awal
     hrp.CFrame = SafeReturnPos
+    -- Reset velocity lagi saat pulang
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+
     task.wait(1) 
     
     -- Equip Rod (Slot 1)
+    pcall(function() RemoteUnequip:FireServer() end) -- Lepas Pickaxe
     hum:UnequipTools()
-    task.wait(0.2)
+    task.wait(0.3)
+    
     pcall(function() 
         local args = { 1 }
         RemoteEquip:FireServer(unpack(args)) 
