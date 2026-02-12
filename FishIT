@@ -235,7 +235,7 @@ local function SmartMining(folder, toggleState)
                 
                 fireproximityprompt(prompt)
                 
-                for cd = 10, 1, -1 do
+                for cd = 7, 1, -1 do
                     if not States[toggleState] then break end
                     Notify("Next in... " .. cd .. "s", Color3.fromRGB(100, 255, 100))
                     task.wait(1)
@@ -326,3 +326,4 @@ task.spawn(function()
         end
     end
 end)
+
