@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V5.9 - FRONT POSITION FIX ]]
--- Source Equip dari User + Posisi Mining "Di Depan" (Bukan di Atas/Samping)
+-- [[ MINI MINING HUB V5.9 - FRONT POSITION & LOGIC FIX ]]
+-- Update: Fixed Position (Face Target), User Remote Path, Unified Logic
 
 local Services = {
     Players = game:GetService("Players"),
@@ -13,7 +13,7 @@ local Services = {
 local Player = Services.Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- // 1. UI SETUP
+-- // 1. UI SETUP (CLEAN & MINIMALIST)
 if Services.CoreGui:FindFirstChild("MiniMiningUI") then Services.CoreGui.MiniMiningUI:Destroy() end
 if PlayerGui:FindFirstChild("MiniMiningUI") then PlayerGui.MiniMiningUI:Destroy() end
 
@@ -23,33 +23,36 @@ pcall(function() ScreenGui.Parent = Services.CoreGui end)
 if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 240, 0, 160)
-MainFrame.Position = UDim2.new(0.5, -120, 0.2, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Size = UDim2.new(0, 250, 0, 170)
+MainFrame.Position = UDim2.new(0.5, -125, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
+-- Header
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Text = "MINING V5.9 (FRONT POS)"
+Title.Text = "MINING HUB V5.9 (FIXED)"
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.new(1,1,1)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 12
+Title.TextSize = 13
 
 local StatusLabel = Instance.new("TextLabel", MainFrame)
-StatusLabel.Text = "Ready."
+StatusLabel.Text = "Status: Idle"
 StatusLabel.Size = UDim2.new(1, 0, 0, 20)
-StatusLabel.Position = UDim2.new(0, 0, 1, -20)
+StatusLabel.Position = UDim2.new(0, 0, 1, -25)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
 StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.TextSize = 11
 
 local function Notify(msg, color)
     StatusLabel.Text = msg
     StatusLabel.TextColor3 = color or Color3.new(1,1,1)
 end
 
--- Dragging
+-- Drag Function
 local dragging, dragInput, dragStart, startPos
 MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -64,226 +67,211 @@ MainFrame.InputChanged:Connect(function(input)
 end)
 MainFrame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 
--- // 2. CONFIG REMOTE (SESUAI REQUEST)
--- Menggunakan Path spesifik yang Anda berikan
+-- // 2. CONFIG REMOTE (SESUAI REQUEST USER)
 local RemoteEquip = nil
-pcall(function()
+local SuccessRemote, Err = pcall(function()
+    -- Path spesifik dari User
     RemoteEquip = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
 end)
 
 if not RemoteEquip then
-    Notify("REMOTE ERROR!", Color3.fromRGB(255, 0, 0))
+    Notify("REMOTE NOT FOUND!", Color3.fromRGB(255, 0, 0))
+    warn("Remote Error: " .. tostring(Err))
 else
-    Notify("Idle", Color3.fromRGB(0, 255, 0))
+    Notify("Remote Connected.", Color3.fromRGB(0, 255, 0))
 end
 
--- // 3. HELPERS
-local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
-local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
-local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
+-- // 3. MOVEMENT & POSITION HELPERS
+local function GetRoot() 
+    return Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") 
+end
 
--- Fungsi Anti Terpental (Safe Stop)
+local function GetHum() 
+    return Player.Character and Player.Character:FindFirstChild("Humanoid") 
+end
+
 local function SafeStop()
     local hrp = GetRoot()
     local hum = GetHum()
     if not hrp or not hum then return end
     
-    if hrp:FindFirstChild("MiningFly") then hrp.MiningFly:Destroy() end
+    if hrp:FindFirstChild("MiningBodyVel") then hrp.MiningBodyVel:Destroy() end
     
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
     hum.PlatformStand = false
-    
-    hrp.Anchored = true
-    task.wait(0.1)
-    hrp.Anchored = false
 end
 
--- Fungsi Tween Aman
-local function SafeTween(targetCFrame)
+local function SafeTween(targetCF)
     local hrp = GetRoot()
-    if not hrp or not targetCFrame then return end
+    if not hrp then return end
     
-    local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    if dist < 2 then return end
-    
-    local speed = 60
-    local time = dist / speed
-    if time < 0.1 then time = 0.1 end
+    -- Hitung jarak dan waktu
+    local dist = (hrp.Position - targetCF.Position).Magnitude
+    local speed = 55 -- Speed standar agar tidak kick
+    local time = math.max(0.1, dist / speed)
     
     local ti = TweenInfo.new(time, Enum.EasingStyle.Linear)
-    local tw = Services.TweenService:Create(hrp, ti, {CFrame = targetCFrame})
+    local tw = Services.TweenService:Create(hrp, ti, {CFrame = targetCF})
     tw:Play()
     tw.Completed:Wait()
-    hrp.AssemblyLinearVelocity = Vector3.zero
+    
+    hrp.AssemblyLinearVelocity = Vector3.zero -- Stop momentum setelah sampai
 end
 
--- // 4. LOGIKA UTAMA
-local States = { AutoCrystal = false, AutoLava = false, IsMining = false }
+-- // 4. LOGIKA MINING (CORE)
+local States = { AutoCrystal = false, AutoLava = false, IsBusy = false }
 
-local function RunMiningSequence(folder, toggleKey)
-    local activeNodes = {}
-    for _, v in ipairs(folder:GetChildren()) do
-        if v:FindFirstChild("ProximityPrompt", true) then table.insert(activeNodes, v) end
+local function StartMiningJob(folderName, toggleVarName)
+    -- Cek apakah folder ada dan punya child
+    local Islands = Services.Workspace:FindFirstChild("Islands")
+    if not Islands then return end
+    
+    -- Logic pencarian folder yang dinamis (Lava Basin atau Crystal Depths)
+    local TargetFolder = nil
+    if Islands:FindFirstChild(folderName) then
+        TargetFolder = Islands[folderName]:FindFirstChild("Crystals")
     end
     
-    if #activeNodes == 0 then return end 
+    if not TargetFolder then return end
 
-    States.IsMining = true
-    local hrp = GetRoot()
-    local hum = GetHum()
-    
-    -- Print Time
-    local currentTime = os.date("%X")
-    print("Nodes: " .. #activeNodes .. " | Time: " .. currentTime)
-    Notify("SPAWN: " .. currentTime, Color3.fromRGB(0, 255, 255))
-    task.wait(1)
-
-    -- [STEP 1] SAVE POSITION
-    local SavedPosition = nil
-    if hrp then SavedPosition = hrp.CFrame end
-    Notify("1. Saving Position...", Color3.fromRGB(255, 255, 0))
-    task.wait(0.2)
-
-    -- [STEP 2] EQUIP PICKAXE (SLOT 2) - SOURCE DARI USER
-    Notify("2. Equip Pickaxe (Slot 2)...", Color3.fromRGB(0, 255, 0))
-    pcall(function() 
-        RemoteEquip:FireServer(2) 
-    end)
-    task.wait(0.6) -- Beri waktu agar terpegang
-
-    -- [STEP 3] MINING LOOP
-    -- Aktifkan Fly
-    if hum then 
-        hum.PlatformStand = true 
-        if not hrp:FindFirstChild("MiningFly") then
-            local bv = Instance.new("BodyVelocity")
-            bv.Name = "MiningFly"
-            bv.Parent = hrp
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.zero
+    -- Cek Prompt Aktif
+    local activeNodes = {}
+    for _, v in ipairs(TargetFolder:GetChildren()) do
+        if v:FindFirstChild("ProximityPrompt", true) and v:FindFirstChild("ProximityPrompt", true).Enabled then
+            table.insert(activeNodes, v)
         end
     end
+    
+    if #activeNodes == 0 then return end -- Tidak ada crystal spawn
 
+    -- == MULAI SEQUENCE ==
+    States.IsBusy = true
+    Notify("Event Detected: " .. folderName, Color3.fromRGB(0, 255, 255))
+    
+    local hrp = GetRoot()
+    local hum = GetHum()
+    local savedPos = hrp.CFrame -- Simpan Posisi Awal
+    
+    task.wait(0.5)
+
+    -- [STEP A] EQUIP PICKAXE (SLOT 2)
+    Notify("Equipping Pickaxe...", Color3.fromRGB(255, 200, 0))
+    if RemoteEquip then pcall(function() RemoteEquip:FireServer(2) end) end
+    task.wait(0.8)
+
+    -- [STEP B] ENABLE FLY
+    if hum then hum.PlatformStand = true end
+    if hrp and not hrp:FindFirstChild("MiningBodyVel") then
+        local bv = Instance.new("BodyVelocity", hrp)
+        bv.Name = "MiningBodyVel"
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = Vector3.zero
+    end
+
+    -- [STEP C] LOOP MINING
     for i, node in ipairs(activeNodes) do
-        if not States[toggleKey] then break end
-        
+        if not States[toggleVarName] then break end -- Break jika dimatikan manual
         hrp = GetRoot()
         if not hrp then break end
 
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
-            -- [PERBAIKAN POSISI]
-            -- Ambil posisi asli node
-            local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
+            -- [[ LOGIC POSISI BARU: DI DEPAN ]]
+            local nodePivot = node:IsA("Model") and node:GetPivot() or node.CFrame
             
-            -- Hitung posisi DI DEPAN (Mundur 4 stud dari arah crystal menghadap)
-            -- Kita pakai CFrame.lookAt agar karakter menghadap ke Crystal
-            local targetPos = nodeCF * CFrame.new(0, 0, 4) 
-            local finalCF = CFrame.lookAt(targetPos.Position, nodeCF.Position)
+            -- Posisi target: 3.5 stud "Mundur" dari titik tengah crystal (relatif axis Z)
+            -- Kita pakai LookAt agar karakter menghadap Crystal
+            local targetPos = nodePivot * CFrame.new(0, 0, 3.5) 
+            local finalCFrame = CFrame.lookAt(targetPos.Position, nodePivot.Position)
             
-            -- Teleport
-            SafeTween(finalCF)
+            Notify("Mining Node " .. i .. "/" .. #activeNodes, Color3.fromRGB(100, 255, 100))
+            SafeTween(finalCFrame)
             
-            Notify("Mining Node " .. i, Color3.fromRGB(255, 170, 0))
-            task.wait(0.3)
-            
+            -- Fire Prompt
+            task.wait(0.2)
             fireproximityprompt(prompt)
             
-            -- Wait 7s
-            for k = 7, 1, -1 do
-                if not States[toggleKey] then break end
-                Notify("Wait " .. k .. "s", Color3.fromRGB(100, 255, 100))
-                task.wait(1)
+            -- Smart Wait (Tunggu sampai prompt hilang/selesai)
+            local maxWait = 7
+            local t = 0
+            while t < maxWait and prompt.Enabled do
+                task.wait(0.5)
+                t = t + 0.5
             end
         end
     end
 
-    -- [STEP 4] BACK TO SAVE POSITION
-    if SavedPosition and hrp then
-        Notify("Done! Returning...", Color3.fromRGB(0, 255, 255))
-        SafeTween(SavedPosition)
+    -- [STEP D] FINISH & RETURN
+    SafeStop()
+    if savedPos and hrp then
+        Notify("Returning...", Color3.fromRGB(0, 150, 255))
+        SafeTween(savedPos)
     end
     
-    SafeStop() -- Matikan Fly
-
-    -- [STEP 5] EQUIP ROD (SLOT 1) - SOURCE DARI USER
-    Notify("5. Equip Rod (Slot 1)...", Color3.fromRGB(0, 255, 120))
-    pcall(function() 
-        RemoteEquip:FireServer(1) 
-    end)
+    -- [STEP E] EQUIP ROD (SLOT 1)
+    Notify("Equipping Rod...", Color3.fromRGB(0, 255, 100))
+    if RemoteEquip then pcall(function() RemoteEquip:FireServer(1) end) end
     
-    States.IsMining = false
-    Notify("Idle.", Color3.fromRGB(150, 150, 150))
+    task.wait(1)
+    States.IsBusy = false
+    Notify("Waiting for spawn...", Color3.fromRGB(150, 150, 150))
 end
 
 -- // 5. UI BUTTONS
-local function CreateBtn(txt, yPos, varName)
+local function CreateToggle(text, yPos, varState, folderTarget)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
     btn.Position = UDim2.new(0.05, 0, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    btn.Text = txt .. ": OFF"
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+    btn.Text = text .. " [OFF]"
+    btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 12
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    
+
     btn.MouseButton1Click:Connect(function()
-        States[varName] = not States[varName]
-        if States[varName] then
-            btn.Text = txt .. ": ON"
-            btn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        States[varState] = not States[varState]
+        
+        if States[varState] then
+            btn.Text = text .. " [ON]"
+            btn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
             btn.TextColor3 = Color3.new(1,1,1)
+            Notify(text .. " Activated", Color3.fromRGB(0, 255, 0))
         else
-            btn.Text = txt .. ": OFF"
-            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-            States.IsMining = false
+            btn.Text = text .. " [OFF]"
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+            States.IsBusy = false -- Force Stop Flag
             SafeStop()
+            Notify("Stopped.", Color3.fromRGB(255, 100, 100))
         end
     end)
 end
 
-CreateBtn("Auto Crystal", 35, "AutoCrystal")
-CreateBtn("Auto Lava", 70, "AutoLava")
+CreateToggle("Auto Crystal Depths", 40, "AutoCrystal", "Crystal Depths")
+CreateToggle("Auto Lava Basin", 80, "AutoLava", "Lava Basin")
 
--- // 6. LOOPS
+-- // 6. MAIN LOOPS (MONITORING)
+-- Loop Crystal Depths
 task.spawn(function()
     while true do
         task.wait(1)
-        if States.AutoCrystal and not States.IsMining then
+        if States.AutoCrystal and not States.IsBusy then
             pcall(function()
-                local Islands = Services.Workspace:FindFirstChild("Islands")
-                local Folder = Islands and Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
-                
-                if Folder then
-                    local ready = false
-                    for _, v in ipairs(Folder:GetChildren()) do
-                        local prompt = v:FindFirstChild("ProximityPrompt", true)
-                        if prompt and prompt.Enabled then ready = true; break end
-                    end
-                    if ready then RunMiningSequence(Folder, "AutoCrystal") end
-                end
+                StartMiningJob("Crystal Depths", "AutoCrystal")
             end)
         end
     end
 end)
 
+-- Loop Lava Basin
 task.spawn(function()
     while true do
         task.wait(1)
-        if States.AutoLava and not States.IsMining then
+        if States.AutoLava and not States.IsBusy then
             pcall(function()
-                local Islands = Services.Workspace:FindFirstChild("Islands")
-                local Folder = Islands and Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
-                
-                if Folder then
-                    local ready = false
-                    for _, v in ipairs(Folder:GetChildren()) do
-                        local prompt = v:FindFirstChild("ProximityPrompt", true)
-                        if prompt and prompt.Enabled then ready = true; break end
-                    end
-                    if ready then RunMiningSequence(Folder, "AutoLava") end
-                end
+                StartMiningJob("Lava Basin", "AutoLava")
             end)
         end
     end
