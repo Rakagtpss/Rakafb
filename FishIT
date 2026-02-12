@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V2 - AUTO CRYSTAL & LAVA (FLY FIX) ]]
--- Fitur: Fly saat mining, Delay extract aman, State fix.
+-- [[ MINI MINING HUB V3 - SMART EQUIP & FLY ]]
+-- Fitur: Smart Equip (Cari di Tas), Fly saat mining, Delay aman.
 
 local Services = {
     Players = game:GetService("Players"),
@@ -12,19 +12,70 @@ local Services = {
 
 local Player = Services.Players.LocalPlayer
 
--- // 1. VARIABEL & STATE
+-- // 1. DEFINISI REMOTE & STATE
+-- Path Remote (Sesuai kode request)
+local RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+    :WaitForChild("RE/EquipToolFromHotbar")
+
 local States = {
     AutoCrystal = false,
     AutoLava = false,
-    IsMining = false -- Status agar script tahu sedang sibuk
+    IsMining = false
 }
 
--- Fungsi Dasar
+-- Fungsi Dasar Character
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 
--- // 2. UI SETUP (MINI UI)
+-- // 2. FUNGSI TOOL HANDLING (MODIFIED DARI REQUEST MU)
+local function UnequipAll()
+    local char = Player.Character
+    if not char then return end
+    
+    -- Pindahkan semua tool dari tangan ke backpack
+    for _, item in pairs(char:GetChildren()) do
+        if item:IsA("Tool") then
+            item.Parent = Player.Backpack
+        end
+    end
+end
+
+local function EquipPickaxe()
+    local char = Player.Character
+    local backpack = Player.Backpack
+    if not char or not backpack then return end
+
+    local found = false
+
+    -- Cara 1: Cari manual di tas (Client Side) - Prioritas
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") and string.find(string.lower(item.Name), "pick") then
+            item.Parent = char -- Pindahkan ke tangan
+            found = true
+            break
+        end
+    end
+
+    -- Cara 2: Paksa via Remote (Server Side - Backup)
+    if not found then
+        pcall(function()
+            RemoteEquip:FireServer(2) -- Slot 2 biasanya Pickaxe
+        end)
+    end
+end
+
+local function EquipRod()
+    -- Fungsi tambahan untuk mengembalikan Pancingan (Slot 1)
+    pcall(function()
+        RemoteEquip:FireServer(1) 
+    end)
+end
+
+-- // 3. UI SETUP (MINI UI)
 if Services.CoreGui:FindFirstChild("MiniMiningUI") then 
     Services.CoreGui.MiniMiningUI:Destroy() 
 end
@@ -33,19 +84,17 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MiniMiningUI"
 ScreenGui.Parent = Services.CoreGui
 
--- Frame Utama
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 220, 0, 120)
+MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Position = UDim2.new(0.5, -110, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- Header
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "MINING HUB V2 (FLY)"
+Title.Text = "SMART MINING V3"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
@@ -68,7 +117,6 @@ MainFrame.InputChanged:Connect(function(input)
     end
 end)
 
--- Status Label
 local StatusLabel = Instance.new("TextLabel", MainFrame)
 StatusLabel.Size = UDim2.new(1, 0, 0, 15)
 StatusLabel.Position = UDim2.new(0, 0, 1, -15)
@@ -83,14 +131,13 @@ local function Notify(msg, color)
     StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
 end
 
--- // 3. SISTEM FLY (ANTI JATUH)
+-- // 4. SISTEM FLY (ANTI JATUH)
 local function SetFly(bool)
     local hrp = GetRoot()
     local hum = GetHum()
     if not hrp or not hum then return end
 
     if bool then
-        -- Buat BodyVelocity agar melayang diam
         if not hrp:FindFirstChild("MiningFly") then
             local bv = Instance.new("BodyVelocity")
             bv.Name = "MiningFly"
@@ -98,17 +145,16 @@ local function SetFly(bool)
             bv.MaxForce = Vector3.new(100000, 100000, 100000)
             bv.Velocity = Vector3.new(0, 0, 0) -- Diam di udara
         end
-        hum.PlatformStand = true -- Mematikan fisika kaki (supaya tidak jatuh)
+        hum.PlatformStand = true 
     else
-        -- Hapus Fly
         if hrp:FindFirstChild("MiningFly") then
             hrp.MiningFly:Destroy()
         end
-        hum.PlatformStand = false -- Kembalikan fisika normal
+        hum.PlatformStand = false 
     end
 end
 
--- // 4. LOGIKA MINING (DIPERBAIKI)
+-- // 5. LOGIKA MINING UTAMA
 local function GetActiveNodes(folder)
     local activeList = {}
     if not folder then return activeList end
@@ -126,70 +172,58 @@ local function SmartMining(folder, toggleState)
     if #activeNodes == 0 then return false end
     
     local hrp = GetRoot()
-    local char = GetChar()
-    local hum = GetHum()
-    
-    if not hrp or not char or not hum then return false end
+    if not hrp then return false end
 
-    -- Persiapan
     States.IsMining = true 
     local SafeReturnPos = hrp.CFrame
-    Notify("Found " .. #activeNodes .. " Crystals", Color3.fromRGB(0, 255, 255))
+    Notify("Found " .. #activeNodes .. " Nodes", Color3.fromRGB(0, 255, 255))
     
-    -- Equip Pickaxe
-    local RemoteEquip = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
-    hum:UnequipTools()
+    -- [BAGIAN BARU] Pake fungsi Equip kamu
+    UnequipAll()
     task.wait(0.3)
-    pcall(function() RemoteEquip:FireServer(2) end)
+    EquipPickaxe()
     task.wait(1)
 
-    -- AKTIFKAN FLY SEBELUM TELEPORT
+    -- Aktifkan Fly
     SetFly(true)
 
     for i, node in ipairs(activeNodes) do
-        if not States[toggleState] then break end -- Cek jika tombol dimatikan tiba-tiba
+        if not States[toggleState] then break end
         
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
             local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-            
             if targetCF then
-                -- 1. Teleport ke Crystal
-                hrp.CFrame = targetCF + Vector3.new(0, 4, 0) -- Di atas crystal sedikit
-                Notify("Mining Node " .. i .. "/" .. #activeNodes, Color3.fromRGB(255, 200, 50))
+                -- Teleport sedikit di atas crystal
+                hrp.CFrame = targetCF + Vector3.new(0, 4, 0)
+                Notify("Mining " .. i .. "/" .. #activeNodes, Color3.fromRGB(255, 200, 50))
                 
-                -- 2. Stabilisasi sebelum interaksi
-                task.wait(0.5) 
-                
-                -- 3. Interaksi (Extract)
+                task.wait(0.5) -- Stabilisasi
                 fireproximityprompt(prompt)
                 
-                -- 4. DELAY EXTRACT (PENTING: Agar tidak langsung kabur)
-                -- Delay ini memberi waktu server memproses hadiah sebelum pindah
+                -- DELAY EXTRACT (Agar animasi selesai & item masuk)
                 task.wait(3.5) 
             end
         end
     end
 
-    -- Selesai Mining
     Notify("Done! Returning...", Color3.fromRGB(100, 255, 100))
     
-    -- MATIKAN FLY
+    -- Matikan Fly & Balik Posisi
     SetFly(false)
-    
-    -- Kembali ke posisi awal
     hrp.CFrame = SafeReturnPos
     task.wait(1)
     
-    -- Ganti ke Pancingan lagi
-    hum:UnequipTools()
-    pcall(function() RemoteEquip:FireServer(1) end)
+    -- Balik ke Pancingan
+    UnequipAll()
+    task.wait(0.2)
+    EquipRod() -- Kembali ke Slot 1
     
     States.IsMining = false
     return true
 end
 
--- // 5. TOMBOL ON/OFF
+-- // 6. TOMBOL UI
 local function CreateSwitch(text, stateKey, posY)
     local Btn = Instance.new("TextButton", MainFrame)
     Btn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -204,9 +238,9 @@ local function CreateSwitch(text, stateKey, posY)
     Btn.MouseButton1Click:Connect(function()
         States[stateKey] = not States[stateKey]
         
-        -- Reset visual jika dimatikan paksa
         if not States[stateKey] then
-             SetFly(false) -- Safety: Matikan fly jika tombol di-klik OFF
+             -- Safety OFF
+             SetFly(false) 
              States.IsMining = false
         end
 
@@ -225,7 +259,7 @@ end
 CreateSwitch("Auto Crystal", "AutoCrystal", 40)
 CreateSwitch("Auto Lava", "AutoLava", 75)
 
--- // 6. LOOP LOGIC
+-- // 7. LOOPS
 task.spawn(function()
     local Islands = Services.Workspace:WaitForChild("Islands", 10)
     local CryFolder = Islands and Islands:WaitForChild("Crystal Depths", 10) and Islands["Crystal Depths"]:WaitForChild("Crystals", 10)
