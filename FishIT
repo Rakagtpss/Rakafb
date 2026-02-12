@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V4 - BYPASS & SWAP ]]
--- Fitur: Force Swap (1->2), Safe Teleport (Anti-Rollback), Delay Extract.
+-- [[ MINI MINING HUB V5 - BRUTE FORCE & ANCHOR FIX ]]
+-- Fitur: Paksa Lepas Rod (Parenting), Equip Slot 2, Anchor Teleport (Anti-Kick).
 
 local Services = {
     Players = game:GetService("Players"),
@@ -12,7 +12,7 @@ local Services = {
 
 local Player = Services.Players.LocalPlayer
 
--- // 1. REMOTE & CONFIG
+-- // 1. REMOTE & VAR
 local RemoteEquip = Services.ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
@@ -25,56 +25,55 @@ local States = {
     IsMining = false
 }
 
--- Fungsi Dasar Character
-local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
-local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
-local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
+local function GetRoot() 
+    local c = Player.Character 
+    return c and c:FindFirstChild("HumanoidRootPart") 
+end
 
--- // 2. FUNGSI SWAP ALAT (FORCE 1 -> 2)
-local function ForceSwapToPickaxe()
-    local char = GetChar()
-    local hum = GetHum()
-    if not char or not hum then return end
-
-    -- [STEP 1] FORCE UNEQUIP SLOT 1 (ROD)
-    -- Kita lepas paksa semua alat dari tangan
-    hum:UnequipTools()
-    
-    -- Opsi Tambahan: Fire Remote 1 untuk memastikan server tahu kita lepas slot 1
-    -- (Kadang diperlukan jika server lag)
-    pcall(function() 
-        -- RemoteEquip:FireServer(1) -- Opsional, biasanya unequip tools sudah cukup
-    end)
-    
-    task.wait(0.3) -- Jeda aman agar server memproses unequip
-
-    -- [STEP 2] EQUIP SLOT 2 (PICKAXE)
-    -- Cek dulu apakah Pickaxe sudah ada di Backpack
-    local hasPickaxe = false
+-- // 2. FUNGSI BRUTE FORCE UNEQUIP (SOLUSI ROD NYANGKUT)
+local function ForceUnequipAll()
+    local char = Player.Character
     local backpack = Player.Backpack
-    
-    -- Coba cari manual dulu
-    for _, tool in pairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") and string.find(string.lower(tool.Name), "pick") then
-            tool.Parent = char -- Equip manual
-            hasPickaxe = true
-            break
+    if not char or not backpack then return end
+
+    -- METODE PAKSA: Pindahkan langsung item dari Character ke Backpack
+    for _, item in pairs(char:GetChildren()) do
+        if item:IsA("Tool") then
+            item.Parent = backpack -- Pindah paksa ke tas
         end
     end
+
+    -- Backup: Panggil fungsi bawaan humanoid
+    local hum = char:FindFirstChild("Humanoid")
+    if hum then hum:UnequipTools() end
+end
+
+local function EquipSlot2()
+    -- Coba request server untuk Slot 2 (Pickaxe)
+    pcall(function()
+        RemoteEquip:FireServer(2)
+    end)
     
-    -- Jika tidak ketemu/gagal, TEMBAK REMOTE SLOT 2
-    if not hasPickaxe then
-        pcall(function()
-            RemoteEquip:FireServer(2) 
-        end)
+    -- Verifikasi Client (Cari item 'Pick' di tas lalu equip manual jika remote gagal)
+    task.wait(0.5)
+    local char = Player.Character
+    local backpack = Player.Backpack
+    
+    -- Cek apakah tangan masih kosong?
+    if char and not char:FindFirstChildWhichIsA("Tool") then
+        for _, t in pairs(backpack:GetChildren()) do
+            if t:IsA("Tool") and string.find(string.lower(t.Name), "pick") then
+                t.Parent = char -- Equip manual
+                break
+            end
+        end
     end
 end
 
-local function ReturnToRod()
-    local hum = GetHum()
-    if hum then hum:UnequipTools() end
-    task.wait(0.3)
-    pcall(function() RemoteEquip:FireServer(1) end) -- Balik ke Slot 1
+local function EquipSlot1()
+    ForceUnequipAll()
+    task.wait(0.2)
+    pcall(function() RemoteEquip:FireServer(1) end)
 end
 
 -- // 3. UI SETUP
@@ -93,7 +92,7 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "MINING HUB V4 (BYPASS)"
+Title.Text = "MINING V5 (BRUTE FORCE)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
@@ -130,62 +129,41 @@ local function Notify(msg, color)
     StatusLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
 end
 
--- // 4. SISTEM BYPASS (FLY & NOCLIP & SAFE TP)
-local NoclipConn = nil
-
-local function SetBypass(bool)
-    local hrp = GetRoot()
-    local hum = GetHum()
-    if not hrp or not hum then return end
-
-    if bool then
-        -- 1. Fly (Velocity 0)
-        if not hrp:FindFirstChild("MiningFly") then
-            local bv = Instance.new("BodyVelocity")
-            bv.Name = "MiningFly"
-            bv.Parent = hrp
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.zero -- Diam total
-        end
-        hum.PlatformStand = true 
-        
-        -- 2. Noclip (Tembus Tembok) agar tidak nyangkut saat TP
-        if not NoclipConn then
-            NoclipConn = Services.RunService.Stepped:Connect(function()
-                if Player.Character then
-                    for _, v in pairs(Player.Character:GetDescendants()) do
-                        if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
-                    end
-                end
-            end)
-        end
-    else
-        -- Matikan Semua
-        if hrp:FindFirstChild("MiningFly") then hrp.MiningFly:Destroy() end
-        hum.PlatformStand = false
-        if NoclipConn then NoclipConn:Disconnect(); NoclipConn = nil end
-    end
-end
-
--- [FUNGSI UTAMA] TELEPORT AMAN
--- Mencegah deteksi dengan mereset fisika sebelum pindah
-local function SafeTeleport(targetCFrame)
+-- // 4. TELEPORT FIX (ANCHOR METHOD)
+-- Menggunakan Anchor sesaat untuk mematikan semua momentum fisika
+local function SafeTeleport(cframeTarget)
     local hrp = GetRoot()
     if not hrp then return end
-
-    -- Reset Kecepatan Fisika (Penting!)
+    
+    -- 1. Matikan Fisika (Freeze)
+    hrp.Anchored = true 
     hrp.AssemblyLinearVelocity = Vector3.zero
     hrp.AssemblyAngularVelocity = Vector3.zero
     
-    -- Teleport
-    hrp.CFrame = targetCFrame
+    -- 2. Pindah
+    hrp.CFrame = cframeTarget
     
-    -- Reset Lagi setelah sampai (Mencegah mental)
-    task.wait(0.05)
-    hrp.AssemblyLinearVelocity = Vector3.zero
+    -- 3. Tunggu sebentar (Agar server sync posisi baru)
+    task.wait(0.2)
+    
+    -- 4. Hidupkan Fisika (Tapi tahan Velocity 0)
+    hrp.Anchored = false
+    hrp.AssemblyLinearVelocity = Vector3.zero -- Reset lagi jaga-jaga
 end
 
--- // 5. LOGIKA MINING CERDAS
+-- Fitur Noclip (Biar gak nyangkut pas TP)
+Services.RunService.Stepped:Connect(function()
+    if States.IsMining then
+        local char = Player.Character
+        if char then
+            for _, v in pairs(char:GetChildren()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
+            end
+        end
+    end
+end)
+
+-- // 5. LOGIKA MINING
 local function GetActiveNodes(folder)
     local activeList = {}
     if not folder then return activeList end
@@ -206,53 +184,51 @@ local function SmartMining(folder, toggleState)
     if not hrp then return false end
 
     States.IsMining = true 
-    local SafeReturnPos = hrp.CFrame
+    local StartPos = hrp.CFrame
     Notify("Found " .. #activeNodes .. " Nodes", Color3.fromRGB(0, 255, 255))
     
-    -- [SWAP ALAT]
-    ForceSwapToPickaxe()
-    task.wait(0.5)
+    -- [STEP 1: SWAP ALAT LEBIH AGRESIF]
+    ForceUnequipAll() -- Paksa lepas Rod
+    task.wait(0.5)    -- Beri waktu
+    EquipSlot2()      -- Ambil Pickaxe
+    task.wait(0.6)    -- Tunggu animasi equip
 
-    -- [AKTIFKAN BYPASS]
-    SetBypass(true)
+    -- Cek ulang apakah sudah pegang pickaxe?
+    local char = Player.Character
+    if char and not char:FindFirstChildWhichIsA("Tool") then
+        -- Jika masih kosong, coba sekali lagi
+        EquipSlot2()
+        task.wait(0.5)
+    end
 
+    -- [STEP 2: LOOP MINING]
     for i, node in ipairs(activeNodes) do
         if not States[toggleState] then break end
         
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
             local targetCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-            
             if targetCF then
-                -- Posisi target (Di atas crystal 4 studs)
-                local dest = targetCF + Vector3.new(0, 4, 0)
-                
-                -- Teleport Aman
-                SafeTeleport(dest)
+                -- Teleport dengan metode Anchor (Lebih aman dari deteksi)
+                SafeTeleport(targetCF + Vector3.new(0, 4, 0))
                 Notify("Mining " .. i .. "/" .. #activeNodes, Color3.fromRGB(255, 200, 50))
-                
-                task.wait(0.5) -- Waktu stabilisasi (JANGAN DIHAPUS)
                 
                 -- Interaksi
                 fireproximityprompt(prompt)
                 
-                -- DELAY EXTRACT (Penting agar item masuk & tidak terdeteksi spam)
-                -- 3.8 detik adalah waktu aman rata-rata animasi mining
-                task.wait(3.8) 
+                -- Delay Extract (3.8 detik adalah waktu rata-rata mining)
+                task.wait(5) 
             end
         end
     end
 
     Notify("Done! Returning...", Color3.fromRGB(100, 255, 100))
     
-    -- Matikan Bypass & Balik
-    SetBypass(false)
-    SafeTeleport(SafeReturnPos)
+    -- [STEP 3: PULANG & RESET]
+    SafeTeleport(StartPos)
     task.wait(1)
     
-    -- Balik ke Pancingan
-    ReturnToRod()
-    
+    EquipSlot1() -- Balik ke Rod
     States.IsMining = false
     return true
 end
@@ -273,9 +249,10 @@ local function CreateSwitch(text, stateKey, posY)
         States[stateKey] = not States[stateKey]
         
         if not States[stateKey] then
-             -- Safety OFF jika dimatikan paksa
-             SetBypass(false) 
              States.IsMining = false
+             -- Kembalikan Fisika jika dimatikan paksa
+             local hrp = GetRoot()
+             if hrp then hrp.Anchored = false end
         end
 
         if States[stateKey] then
@@ -293,7 +270,7 @@ end
 CreateSwitch("Auto Crystal", "AutoCrystal", 40)
 CreateSwitch("Auto Lava", "AutoLava", 75)
 
--- // 7. LOOPS (AUTO SCAN)
+-- // 7. LOOPS
 task.spawn(function()
     local Islands = Services.Workspace:WaitForChild("Islands", 10)
     local CryFolder = Islands and Islands:WaitForChild("Crystal Depths", 10) and Islands["Crystal Depths"]:WaitForChild("Crystals", 10)
