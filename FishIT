@@ -1,5 +1,5 @@
--- [[ MINI MINING HUB V4.5 - FAST ROD RETURN ]]
--- Logika: Unequip Rod -> Equip Pickaxe -> Mine -> Wait 7s -> Selesai -> Langsung Equip Rod (Slot 1)
+-- [[ MINI MINING HUB V4.6 - ROBUST EQUIP ]]
+-- Logika: Force Pickaxe (Loop Check) -> Mine -> Wait 7s -> Selesai -> Equip Rod.
 
 local Services = {
     Players = game:GetService("Players"),
@@ -32,49 +32,59 @@ local function GetChar() return Player.Character or Player.CharacterAdded:Wait()
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 
--- // 2. FORCE SWAP (ROD -> PICKAXE)
+-- // 2. FORCE SWAP (ROD -> PICKAXE) DENGAN PENGECEKAN BERULANG
 local function ForceSwapToPickaxe()
     local char = GetChar()
     local hum = GetHum()
     if not char or not hum then return end
 
-    -- Lepas Rod (Slot 1)
+    -- Fase 1: Pastikan tangan kosong dulu
     pcall(function() RemoteUnequip:FireServer() end)
     hum:UnequipTools()
-    task.wait(0.5)
+    task.wait(0.5) -- Beri nafas sedikit
 
-    -- Equip Pickaxe (Slot 2)
-    pcall(function() RemoteEquip:FireServer(2) end)
-    task.wait(0.5)
-
-    -- Cek Manual jika gagal
-    if not char:FindFirstChildWhichIsA("Tool") then
-        local backpack = Player.Backpack
-        for _, tool in pairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") and string.find(string.lower(tool.Name), "pick") then
-                tool.Parent = char 
-                break
-            end
+    -- Fase 2: Paksa Equip Pickaxe (Coba 5x sampai berhasil)
+    for i = 1, 5 do
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        
+        -- Jika sudah pegang Pickaxe, berhenti looping
+        if tool and string.find(string.lower(tool.Name), "pick") then
+            break 
         end
+
+        -- Jika belum, tembak remote lagi
+        pcall(function() 
+            local args = { 2 } -- Slot 2 (Pickaxe)
+            RemoteEquip:FireServer(unpack(args)) 
+        end)
+        
+        -- Cek backpack manual jika remote gagal visual
+        if i > 2 and not char:FindFirstChildWhichIsA("Tool") then
+             local bp = Player.Backpack
+             for _, t in pairs(bp:GetChildren()) do
+                if t:IsA("Tool") and string.find(string.lower(t.Name), "pick") then
+                    t.Parent = char
+                end
+             end
+        end
+
+        task.wait(0.5) -- Jeda antar percobaan
     end
 end
 
--- // FUNGSI KEMBALI KE ROD (UPDATED REQUEST)
+-- // FUNGSI KEMBALI KE ROD
 local function ReturnToRod()
     local hum = GetHum()
     
-    -- 1. Lepas Pickaxe dulu
+    -- 1. Lepas Pickaxe
     pcall(function() RemoteUnequip:FireServer() end)
     if hum then hum:UnequipTools() end
     task.wait(0.5)
 
-    -- 2. Equip Rod (Slot 1) menggunakan Script Anda
+    -- 2. Equip Rod (Slot 1)
     pcall(function()
-        local args = {
-            1
-        }
-        -- Menggunakan path lengkap sesuai request atau variabel yang sudah didefinisikan
-        Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net"):WaitForChild("RE/EquipToolFromHotbar"):FireServer(unpack(args))
+        local args = { 1 }
+        RemoteEquip:FireServer(unpack(args))
     end)
 end
 
@@ -94,7 +104,7 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundTransparency = 1
-Title.Text = "MINING V4.5 (DELAY 7s)"
+Title.Text = "MINING V4.6 (AUTO EQUIP FIX)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
 Title.TextSize = 12
@@ -205,8 +215,9 @@ local function SmartMining(folder, toggleState)
     local SafeReturnPos = hrp.CFrame
     Notify("Found " .. #activeNodes .. " Nodes", Color3.fromRGB(0, 255, 255))
     
-    -- Mulai Mining: Swap ke Pickaxe
+    -- // STEP PENTING: SWAP KE PICKAXE SEBELUM BERGERAK
     ForceSwapToPickaxe()
+    
     SetBypass(true)
 
     for i, node in ipairs(activeNodes) do
@@ -223,9 +234,16 @@ local function SmartMining(folder, toggleState)
                 Notify("Mining Node " .. i .. "/" .. #activeNodes, Color3.fromRGB(255, 200, 50))
                 task.wait(0.5) 
                 
+                -- Pastikan Pickaxe masih terpegang (Safety Check)
+                local char = Player.Character
+                if not char:FindFirstChildWhichIsA("Tool") then
+                     pcall(function() RemoteEquip:FireServer(2) end)
+                     task.wait(0.2)
+                end
+                
                 fireproximityprompt(prompt)
                 
-                -- DELAY DIGANTI JADI 7 DETIK
+                -- DELAY 7 DETIK
                 for cd = 7, 1, -1 do
                     if not States[toggleState] then break end
                     Notify("Next in... " .. cd .. "s", Color3.fromRGB(100, 255, 100))
@@ -239,7 +257,7 @@ local function SmartMining(folder, toggleState)
     SafeTween(SafeReturnPos)
     SetBypass(false)
     
-    -- SELESAI MINING -> LANGSUNG EQUIP ROD
+    -- KEMBALI KE ROD
     ReturnToRod()
     
     States.IsMining = false
@@ -264,7 +282,6 @@ local function CreateSwitch(text, stateKey, posY)
         if not States[stateKey] then
              SetBypass(false) 
              States.IsMining = false
-             -- Jika dimatikan paksa, kembalikan ke Rod juga
              ReturnToRod()
         end
 
