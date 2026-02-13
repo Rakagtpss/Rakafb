@@ -108,7 +108,7 @@ local function FlyToCrystal(targetCFrame)
     if not hrp then return end
 
     local distance = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = 60 -- Kecepatan Fly (Studs per second)
+    local speed = 40 -- Kecepatan Fly (Studs per second)
     local duration = distance / speed
     
     -- Gunakan Tween agar mulus (seperti fly)
@@ -189,14 +189,14 @@ local function MineCrystalsInFolder(folderName)
             
             -- [GANTI KE FLY] Bukan Instant TP
             FlyToCrystal(lookAtPos)
-            task.wait(0.2)
+            task.wait(1)
             
             -- Interaksi
             fireproximityprompt(prompt)
             
             -- [DELAY 7 DETIK] Setelah ambil, sebelum pindah ke crystal lain
             Notify("Cooldown: 7s", Color3.fromRGB(150, 150, 150))
-            task.wait(7)
+            task.wait(8.5)
         end
     end
 end
@@ -311,3 +311,4 @@ task.spawn(function()
         end
     end
 end)
+
