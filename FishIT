@@ -1,105 +1,170 @@
---[[
-    SIMPLE AUTO TOOL CLICKER (UI VERSION)
-    Fungsi: Otomatis mengaktifkan tool (pedang/mining/pancingan)
-]]
+-- [[ DELTA COORDINATE TOOL - MOBILE SUPPORT ]]
+-- Fitur: Touch Drag (HP), Copy Support Delta, Realtime XYZ.
 
-local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
-local LocalPlayer = Players.LocalPlayer
-
--- Konfigurasi Awal
-getgenv().AutoClick = {
-    Enabled = false,
-    Delay = 0.1 -- Kecepatan klik (detik)
+local Services = {
+    Players = game:GetService("Players"),
+    RunService = game:GetService("RunService"),
+    CoreGui = game:GetService("CoreGui"),
+    UserInputService = game:GetService("UserInputService"),
+    TweenService = game:GetService("TweenService")
 }
 
--- Hapus UI lama jika ada
-if getgenv().ClickUI then getgenv().ClickUI:Destroy() end
+local Player = Services.Players.LocalPlayer
 
--- 1. Membuat UI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SimpleAutoClicker"
-ScreenGui.Parent = CoreGui
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 200, 0, 100)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true -- Bisa digeser
-MainFrame.Parent = ScreenGui
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = MainFrame
-
--- Judul
-local Title = Instance.new("TextLabel")
-Title.Text = "⚔️ AUTO TOOL"
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundTransparency = 1
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.Parent = MainFrame
-
--- Input Delay
-local DelayInput = Instance.new("TextBox")
-DelayInput.Size = UDim2.new(0, 180, 0, 25)
-DelayInput.Position = UDim2.new(0, 10, 0, 35)
-DelayInput.PlaceholderText = "Speed (0.1)"
-DelayInput.Text = tostring(getgenv().AutoClick.Delay)
-DelayInput.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
-DelayInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-DelayInput.Font = Enum.Font.Gotham
-DelayInput.Parent = MainFrame
-local InputCorner = Instance.new("UICorner"); InputCorner.Parent = DelayInput
-
-DelayInput.FocusLost:Connect(function()
-    local num = tonumber(DelayInput.Text)
-    if num then getgenv().AutoClick.Delay = num end
-end)
-
--- Tombol Toggle
-local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0, 180, 0, 30)
-ToggleBtn.Position = UDim2.new(0, 10, 0, 65)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-ToggleBtn.Text = "START"
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Parent = MainFrame
-local BtnCorner = Instance.new("UICorner"); BtnCorner.Parent = ToggleBtn
-
--- 2. Logika Utama
-local function StartClicking()
-    task.spawn(function()
-        while getgenv().AutoClick.Enabled do
-            local Char = LocalPlayer.Character
-            if Char then
-                -- Cari tool yang sedang dipegang
-                local Tool = Char:FindFirstChildWhichIsA("Tool")
-                if Tool then
-                    Tool:Activate() -- Fungsi bawaan Roblox untuk menggunakan alat
-                end
-            end
-            task.wait(getgenv().AutoClick.Delay)
-        end
-    end)
+-- // 1. UI SETUP (RESET)
+if Services.CoreGui:FindFirstChild("DeltaCoordTool") then 
+    Services.CoreGui.DeltaCoordTool:Destroy() 
 end
 
-ToggleBtn.MouseButton1Click:Connect(function()
-    getgenv().AutoClick.Enabled = not getgenv().AutoClick.Enabled
-    
-    if getgenv().AutoClick.Enabled then
-        ToggleBtn.Text = "STOP"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
-        StartClicking()
-    else
-        ToggleBtn.Text = "START"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaCoordTool"
+ScreenGui.Parent = Services.CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Name = "MainFrame"
+-- Ukuran disesuaikan agar pas di HP
+MainFrame.Size = UDim2.new(0, 200, 0, 120) 
+-- Posisi Tengah Atas (Aman untuk Mobile)
+MainFrame.Position = UDim2.new(0.5, -100, 0.15, 0) 
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+-- Header
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, -30, 0, 25)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "COORD TOOL (DELTA)"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 11
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -25, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(200, 50, 50)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+-- Display Koordinat
+local CoordLabel = Instance.new("TextLabel", MainFrame)
+CoordLabel.Size = UDim2.new(1, 0, 0, 20)
+CoordLabel.Position = UDim2.new(0, 0, 0, 25)
+CoordLabel.BackgroundTransparency = 1
+CoordLabel.Text = "Waiting..."
+CoordLabel.TextColor3 = Color3.fromRGB(0, 255, 255) 
+CoordLabel.Font = Enum.Font.Code
+CoordLabel.TextSize = 10
+
+-- // 2. MOBILE DRAG FUNCTION (PENTING UNTUK DELTA)
+local dragging, dragInput, dragStart, startPos
+local function UpdateDrag(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+MainFrame.InputBegan:Connect(function(input)
+    -- Support Touch (Jari) dan MouseButton1 (Klik Kiri)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
     end
 end)
 
-getgenv().ClickUI = ScreenGui
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if dragging then
+            UpdateDrag(input)
+        end
+    end
+end)
+
+-- // 3. FITUR COPY (SAFE DELTA)
+local function CopyToClipboard(str)
+    -- Cek support setclipboard
+    if setclipboard then
+        setclipboard(str)
+        return true
+    elseif toclipboard then
+        toclipboard(str)
+        return true
+    else
+        -- Fallback jika Delta error (Print ke console F9)
+        print("COPY RESULT: " .. str)
+        return false
+    end
+end
+
+local function FlashBtn(btn, text)
+    local oldText = btn.Text
+    local oldColor = btn.BackgroundColor3
+    btn.Text = "COPIED!"
+    btn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    task.wait(0.8)
+    btn.Text = oldText
+    btn.BackgroundColor3 = oldColor
+end
+
+local function CreateBtn(text, posY, callback)
+    local Btn = Instance.new("TextButton", MainFrame)
+    Btn.Size = UDim2.new(0.9, 0, 0, 25)
+    Btn.Position = UDim2.new(0.05, 0, 0, posY)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+    Btn.Font = Enum.Font.Gotham
+    Btn.TextSize = 9
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+    
+    Btn.MouseButton1Click:Connect(function() callback(Btn) end)
+end
+
+-- Button 1: Copy CFrame (Lengkap)
+CreateBtn("COPY CFRAME (Posisi+Arah)", 55, function(btn)
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local cf = hrp.CFrame
+        local str = string.format("CFrame.new(%s)", tostring(cf))
+        CopyToClipboard(str)
+        FlashBtn(btn)
+    end
+end)
+
+-- Button 2: Copy Vector3 (Posisi Saja)
+CreateBtn("COPY VECTOR3 (Posisi)", 85, function(btn)
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local pos = hrp.Position
+        local str = string.format("Vector3.new(%.2f, %.2f, %.2f)", pos.X, pos.Y, pos.Z)
+        CopyToClipboard(str)
+        FlashBtn(btn)
+    end
+end)
+
+-- // 4. REALTIME MONITOR
+Services.RunService.RenderStepped:Connect(function()
+    local char = Player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local p = hrp.Position
+        CoordLabel.Text = string.format("X:%.0f  Y:%.0f  Z:%.0f", p.X, p.Y, p.Z)
+    else
+        CoordLabel.Text = "No Character"
+    end
+end)
