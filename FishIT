@@ -130,7 +130,7 @@ end
 local function EquipTool(slot)
     local hum = GetHum()
     if hum then hum:UnequipTools() end
-    task.wait(0.5)
+    task.wait(0.1)
     
     local RemoteEquip = Services.ReplicatedStorage:FindFirstChild("Packages") 
         and Services.ReplicatedStorage.Packages:FindFirstChild("_Index") 
@@ -223,12 +223,12 @@ local function ProcessFolder(folderName)
             
             FlyTo(lookAtPos)
             Notify("Extracting...", Color3.fromRGB(200, 200, 200))
-            task.wait(2) -- Delay sampai
+            task.wait(3.5) -- Delay sampai
             
             fireproximityprompt(prompt)
             
             Notify("Cooldown: 7s", Color3.fromRGB(150, 150, 150))
-            task.wait(7) -- Delay antar crystal
+            task.wait(10) -- Delay antar crystal
         end
     end
 end
@@ -255,14 +255,14 @@ local function FullMiningRoutine()
     -- 3. EQUIP PICKAXE (Slot 2)
     Notify("Equip Pickaxe...", Color3.fromRGB(255, 255, 255))
     EquipTool(2) 
-    task.wait(1.5)
+    task.wait(0.1)
     
     -- 4. SCAN & MINE LAVA
     ProcessFolder("Lava")
     
     -- 5. JEDA TRANSISI
     Notify("Lava Done. Wait 7s...", Color3.fromRGB(200, 200, 200))
-    task.wait(7)
+    task.wait(6)
     
     if States.AutoCrystal then
         -- 6. TP CRYSTAL DEPTHS
@@ -344,3 +344,4 @@ task.spawn(function()
         end
     end
 end)
+
