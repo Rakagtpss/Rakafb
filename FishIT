@@ -1,5 +1,5 @@
 -- ====================================================
--- [FINAL V5] AUTO MINING + REMOTE AUTO FISHING
+-- [FINAL V6] ANTI-FLING FIX + REMOTE FISHING
 -- ====================================================
 
 local Services = {
@@ -16,12 +16,11 @@ local NetPath = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"
 
 -- Global State
 getgenv().States = {
-    AutoCrystal = false, -- Master Switch
-    IsMining = false,    -- Penanda sedang Mining
-    IsFishing = false    -- Penanda sedang Fishing
+    AutoCrystal = false,
+    IsMining = false,
+    IsFishing = false
 }
 
--- Lokasi Pulau
 local Locations = {
     LavaBasin = CFrame.new(860.08, 85.86, -10094.87),
     CrystalDepths = CFrame.new(5820.14, -907.79, 15424.53)
@@ -30,8 +29,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV5") then
-    game:GetService("CoreGui").MiniMiningV5:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV6") then
+    game:GetService("CoreGui").MiniMiningV6:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -44,7 +43,7 @@ local StatusLabel = Instance.new("TextLabel")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV5"
+ScreenGui.Name = "MiniMiningV6"
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -61,8 +60,8 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "MINING & REMOTE FISH"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+TitleLabel.Text = "V6: ANTI-FLING + FISH"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 100, 255)
 TitleLabel.TextSize = 12
 
 ToggleBtn.Parent = MainFrame
@@ -102,29 +101,43 @@ local function Notify(msg, color)
     StatusLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
 end
 
+-- [ANCHOR CONTROL]
+local function SetAnchor(bool)
+    local hrp = GetRoot()
+    if hrp then 
+        hrp.Anchored = bool 
+        if bool then hrp.Velocity = Vector3.zero end -- Reset velocity saat anchor
+    end
+end
+
 local function InstantTP(targetCFrame)
+    SetAnchor(false) -- Lepas anchor sebelum TP
     local hrp = GetRoot()
     if hrp then hrp.CFrame = targetCFrame end
 end
 
 local function FlyTo(targetCFrame)
+    SetAnchor(false) -- Lepas anchor sebelum terbang
     local hrp = GetRoot()
     if not hrp then return end
+    
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
     local speed = 65
     local duration = dist / speed
     local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
     local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
+    
+    -- BodyVelocity untuk stability saat terbang (sebelum di-anchor)
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = Vector3.zero
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Parent = hrp
+    
     tween:Play()
     tween.Completed:Wait()
     bv:Destroy()
 end
 
--- [ROBUST EQUIP LOGIC]
 local function EquipTool(targetName)
     local hum = GetHum()
     local char = LocalPlayer.Character
@@ -132,14 +145,12 @@ local function EquipTool(targetName)
 
     Notify("Swap to: "..targetName, Color3.fromRGB(255, 255, 0))
 
-    -- 1. FORCE UNEQUIP (LEPAS PAKSA)
     if hum then hum:UnequipTools() end
     for _, tool in ipairs(char:GetChildren()) do
         if tool:IsA("Tool") then tool.Parent = backpack end
     end
     task.wait(0.8)
 
-    -- 2. CARI ITEM
     local targetTool = nil
     for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") and tool.Name:lower():find(targetName) then
@@ -148,26 +159,23 @@ local function EquipTool(targetName)
         end
     end
 
-    -- 3. EQUIP
     if targetTool then
         if hum then hum:EquipTool(targetTool) end
         Notify("Equipped: "..targetTool.Name, Color3.fromRGB(0, 255, 0))
     else
-        -- Fallback Remote
         local slot = (targetName == "pick" or targetName == "axe") and 2 or 1
         local RE = NetPath:FindFirstChild("RE/EquipToolFromHotbar")
         if RE then RE:FireServer(slot) end
     end
-    task.wait(1) -- Waktu untuk animasi equip selesai
+    task.wait(1.5)
 end
 
 -- ====================================================
--- [FISHING LOGIC (REMOTE)]
+-- [FISHING LOGIC]
 -- ====================================================
 
 local function StopFishing()
     States.IsFishing = false
-    -- Matikan state auto fishing di server
     pcall(function()
         NetPath["RF/UpdateAutoFishingState"]:InvokeServer(false)
         NetPath["RF/CancelFishingInputs"]:InvokeServer()
@@ -179,46 +187,36 @@ local function PerformFishing()
     
     States.IsFishing = true
     Notify("Fishing Mode Active", Color3.fromRGB(0, 180, 255))
+    SetAnchor(true) -- Anchor saat mancing biar aman
 
-    -- 1. Equip Rod
     local char = LocalPlayer.Character
     local rod = char:FindFirstChildWhichIsA("Tool")
     if not rod or not rod.Name:lower():find("rod") then
         EquipTool("rod")
     end
 
-    -- 2. Aktifkan State Fishing
     pcall(function() NetPath["RF/UpdateAutoFishingState"]:InvokeServer(true) end)
 
-    -- 3. Loop Fishing
     while States.AutoCrystal and States.IsFishing and not States.IsMining do
-        -- Pastikan Rod masih di tangan
         if not LocalPlayer.Character:FindFirstChildWhichIsA("Tool") then
              EquipTool("rod")
         end
 
         pcall(function()
-            -- A. Charge Rod (Cast)
-            -- Angka ini dari script yang Anda berikan
             NetPath["RF/ChargeFishingRod"]:InvokeServer(1771018119.504341)
-            task.wait(1) 
-            
-            -- B. Minigame Start (Simulasi Bite)
+            task.wait(2) 
             NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(12.21200942993164, 0.5, 1771018119.609312)
-            task.wait(2.5) -- Delay menangkap
-            
-            -- C. Catch Completed (Dapat Ikan)
+            task.wait(1.5) 
             NetPath["RF/CatchFishCompleted"]:InvokeServer()
-            
             Notify("Fish Caught!", Color3.fromRGB(100, 255, 100))
         end)
-        
-        task.wait(0.5) -- Jeda antar lemparan
+        task.wait(0.5)
     end
+    SetAnchor(false) -- Lepas anchor jika selesai fishing
 end
 
 -- ====================================================
--- [MINING LOGIC]
+-- [MINING LOGIC (ANTI-FLING)]
 -- ====================================================
 
 local function ProcessFolder(folderName)
@@ -246,10 +244,24 @@ local function ProcessFolder(folderName)
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
             local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-            FlyTo(CFrame.lookAt(nodeCF.Position + (nodeCF.LookVector * 4), nodeCF.Position))
+            
+            -- [ANTI-FLING 1] Posisi target DINAINAKAN +3 Stud ke atas
+            local safePos = nodeCF.Position + (nodeCF.LookVector * 5) + Vector3.new(0, 3, 0)
+            local lookAtCF = CFrame.lookAt(safePos, nodeCF.Position)
+            
+            FlyTo(lookAtCF)
+            
+            -- [ANTI-FLING 2] KUNCI POSISI (ANCHOR) SAAT SAMPAI
+            SetAnchor(true) 
+            
+            Notify("Extracting...", Color3.fromRGB(200, 200, 200))
             task.wait(0.5)
+            
             fireproximityprompt(prompt)
-            task.wait(9) -- Cooldown
+            task.wait(9)
+            
+            -- [ANTI-FLING 3] LEPAS KUNCI SEBELUM PINDAH
+            SetAnchor(false)
         end
     end
 end
@@ -258,7 +270,6 @@ local function FullMiningRoutine()
     local hrp = GetRoot()
     if not hrp then return end
     
-    -- 1. STOP FISHING & START MINING
     StopFishing()
     States.IsMining = true
     
@@ -266,31 +277,24 @@ local function FullMiningRoutine()
     Notify("Starting Mining Run...", Color3.fromRGB(255, 255, 0))
     task.wait(0.5)
 
-    -- 2. FORCE EQUIP PICKAXE
     EquipTool("pick") 
     
-    -- 3. MINING LAVA
     InstantTP(Locations.LavaBasin)
     task.wait(5)
     ProcessFolder("Lava")
     
-    -- 4. MINING DEEP
     if States.AutoCrystal then
         InstantTP(Locations.CrystalDepths)
-        task.wait(7)
+        task.wait(5)
         ProcessFolder("Deep")
     end
     
-    -- 5. SELESAI & KEMBALI
     Notify("Mining Done. Going Home...", Color3.fromRGB(0, 255, 0))
     InstantTP(SavedPosition)
     task.wait(2)
     
-    -- 6. START FISHING LAGI
     States.IsMining = false
-    EquipTool("rod") -- Paksa pegang pancingan
-    
-    -- Panggil Fishing di thread baru agar tidak blocking
+    EquipTool("rod")
     task.spawn(PerformFishing)
 end
 
@@ -304,17 +308,14 @@ ToggleBtn.MouseButton1Click:Connect(function()
         ToggleBtn.Text = "ON"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         Notify("System Active", Color3.fromRGB(0, 255, 0))
-        
-        -- Start default action (Fishing)
-        if not States.IsMining then
-            task.spawn(PerformFishing)
-        end
+        if not States.IsMining then task.spawn(PerformFishing) end
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
         Notify("System Stopped", Color3.fromRGB(255, 0, 0))
         States.IsMining = false
         StopFishing()
+        SetAnchor(false) -- Emergency Unanchor
     end
 end)
 
@@ -328,20 +329,17 @@ task.spawn(function()
             local hourWIB = (now.hour + 7) % 24
             local min = now.min
             
-            -- Jadwal: Jam Genap, Menit 00-40
             local isMiningTime = (hourWIB % 2 == 0) and (min >= 0 and min <= 40)
             
             if isMiningTime then
                 if not HasRunCycle and not States.IsMining then
                     HasRunCycle = true
-                    FullMiningRoutine() -- Jalankan Mining Routine
+                    FullMiningRoutine()
                 elseif not States.IsMining and not States.IsFishing then
-                    -- Jika mining selesai, tapi fishing mati (karena bug/reset), nyalakan fishing
                     task.spawn(PerformFishing)
                 end
             else
                 HasRunCycle = false
-                -- Jika diluar jadwal mining dan tidak sedang fishing, nyalakan fishing
                 if not States.IsFishing and not States.IsMining then
                     task.spawn(PerformFishing)
                 end
