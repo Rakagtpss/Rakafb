@@ -110,7 +110,7 @@ local function FlyTo(targetCFrame)
     if not hrp then return end
 
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = 55 -- Speed Fly
+    local speed = 65 -- Speed Fly
     local duration = dist / speed
     
     local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
@@ -130,7 +130,7 @@ end
 local function EquipTool(slot)
     local hum = GetHum()
     if hum then hum:UnequipTools() end
-    task.wait(0.01)
+    task.wait(0)
     
     local RemoteEquip = Services.ReplicatedStorage:FindFirstChild("Packages") 
         and Services.ReplicatedStorage.Packages:FindFirstChild("_Index") 
@@ -158,7 +158,7 @@ local function PerformFishing()
     -- Pastikan Rod dipegang
     if not rod or (rod and not rod.Name:lower():find("rod")) then
         EquipTool(1) -- Paksa equip slot 1
-        task.wait(1)
+        task.wait(2005)
         rod = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
     end
 
@@ -255,14 +255,14 @@ local function FullMiningRoutine()
     -- 3. EQUIP PICKAXE (Slot 2)
     Notify("Equip Pickaxe...", Color3.fromRGB(255, 255, 255))
     EquipTool(2) 
-    task.wait(0.1)
+    task.wait(0.01)
     
     -- 4. SCAN & MINE LAVA
     ProcessFolder("Lava")
     
     -- 5. JEDA TRANSISI
     Notify("Lava Done. Wait 7s...", Color3.fromRGB(200, 200, 200))
-    task.wait(6)
+    task.wait(9)
     
     if States.AutoCrystal then
         -- 6. TP CRYSTAL DEPTHS
@@ -344,5 +344,6 @@ task.spawn(function()
         end
     end
 end)
+
 
 
