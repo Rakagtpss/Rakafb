@@ -1,5 +1,5 @@
 -- ====================================================
--- [FINAL FIXED STRUCTURE] LAVA -> DEEP -> HOME
+-- [FINAL FIXED] LOGIC: INSTANT TP PULAU -> FLY CRYSTAL
 -- ====================================================
 
 local Services = {
@@ -13,13 +13,13 @@ local Services = {
 
 local LocalPlayer = Services.Players.LocalPlayer
 
--- State Global
+-- Global State
 getgenv().States = {
-    AutoCrystal = false, -- Toggle UI
-    IsMining = false     -- State sedang mining atau tidak
+    AutoCrystal = false, -- Diatur oleh Mini UI
+    IsMining = false     -- Mencegah script jalan dobel
 }
 
--- Konfigurasi Lokasi Pulau
+-- Lokasi Pulau (Titik Aman)
 local Locations = {
     LavaBasin = CFrame.new(860.08, 85.86, -10094.87),
     CrystalDepths = CFrame.new(5820.14, -907.79, 15424.53)
@@ -38,29 +38,32 @@ local StatusLabel = Instance.new("TextLabel")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV2"
+ScreenGui.Name = "MiniMiningFixed"
 
+-- Frame Utama
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-MainFrame.Size = UDim2.new(0, 180, 0, 90)
+MainFrame.Size = UDim2.new(0, 180, 0, 95)
 MainFrame.Active = true
 MainFrame.Draggable = true
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
+-- Judul
 TitleLabel.Parent = MainFrame
 TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "AUTO MINING (LAVA/DEEP)"
+TitleLabel.Text = "AUTO CRYSTAL (FLY)"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.TextSize = 11
 
+-- Tombol ON/OFF
 ToggleBtn.Parent = MainFrame
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60) -- Merah
 ToggleBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
 ToggleBtn.Font = Enum.Font.GothamBold
@@ -70,12 +73,13 @@ ToggleBtn.TextSize = 14
 BtnCorner.CornerRadius = UDim.new(0, 6)
 BtnCorner.Parent = ToggleBtn
 
+-- Status Text
 StatusLabel.Parent = MainFrame
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Position = UDim2.new(0, 0, 0.75, 0)
 StatusLabel.Size = UDim2.new(1, 0, 0, 15)
 StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "Idle"
+StatusLabel.Text = "Status: Idle"
 StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 StatusLabel.TextSize = 10
 
@@ -96,58 +100,56 @@ local function Notify(msg, color)
     StatusLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255)
 end
 
--- [A] INSTANT TELEPORT (Hanya antar Pulau)
+-- [A] INSTANT TP (Hanya untuk pindah Pulau)
 local function InstantTP(targetCFrame)
     local hrp = GetRoot()
     if hrp then hrp.CFrame = targetCFrame end
 end
 
--- [B] FLY / TWEEN MENUJU CRYSTAL (Gerakan Halus)
-local function FlyToCrystal(targetCFrame)
+-- [B] FLY / TWEEN (Untuk pindah antar Crystal)
+local function FlyTo(targetCFrame)
     local hrp = GetRoot()
     if not hrp then return end
 
-    local distance = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = 40 -- Kecepatan Fly (Studs per second)
-    local duration = distance / speed
+    local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    local speed = 50 -- Kecepatan terbang
+    local duration = dist / speed
     
-    -- Gunakan Tween agar mulus (seperti fly)
     local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
     local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
     
-    -- Matikan gravitasi sementara agar melayang
-    local bp = Instance.new("BodyVelocity")
-    bp.Velocity = Vector3.new(0,0,0)
-    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bp.Parent = hrp
+    -- Anti Gravity saat terbang
+    local bv = Instance.new("BodyVelocity")
+    bv.Velocity = Vector3.zero
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Parent = hrp
     
     tween:Play()
     tween.Completed:Wait()
-    
-    bp:Destroy() -- Hapus body velocity setelah sampai
+    bv:Destroy()
 end
 
--- [C] EQUIP TOOL (SLOT 1 / SLOT 2)
-local function EquipTool(slotNumber)
+-- [C] EQUIP TOOL (Slot 1 / Slot 2)
+local function EquipTool(slot)
     local hum = GetHum()
     if hum then hum:UnequipTools() end
     task.wait(0.5)
     
-    -- Remote Path (Sesuaikan jika game update)
+    -- Remote Event
     local RemoteEquip = Services.ReplicatedStorage:FindFirstChild("Packages") 
         and Services.ReplicatedStorage.Packages:FindFirstChild("_Index") 
         and Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
     
     if RemoteEquip then
-        pcall(function() RemoteEquip:FireServer(slotNumber) end)
+        pcall(function() RemoteEquip:FireServer(slot) end)
     end
 end
 
 -- ====================================================
--- [CORE LOGIC - STRUKTUR BARU]
+-- [CORE LOGIC - MINING FUNCTION]
 -- ====================================================
 
-local function MineCrystalsInFolder(folderName)
+local function ProcessFolder(folderName)
     local Islands = Services.Workspace:WaitForChild("Islands", 5)
     if not Islands then return end
     
@@ -160,43 +162,47 @@ local function MineCrystalsInFolder(folderName)
 
     if not targetFolder then return end
 
-    -- Ambil semua node
-    local nodes = {}
+    -- Ambil Crystal yang ada Prompt-nya
+    local crystals = {}
     for _, v in ipairs(targetFolder:GetChildren()) do
         if v:FindFirstChildWhichIsA("ProximityPrompt", true) then
-            table.insert(nodes, v)
+            table.insert(crystals, v)
         end
     end
 
-    if #nodes == 0 then
-        Notify("No Crystals: "..folderName, Color3.fromRGB(255, 200, 0))
+    if #crystals == 0 then
+        Notify(folderName..": Empty", Color3.fromRGB(255, 200, 0))
         return
     end
 
-    Notify("Mining "..folderName.." ("..#nodes..")", Color3.fromRGB(0, 255, 255))
+    Notify(folderName..": "..#crystals.." Nodes", Color3.fromRGB(0, 255, 255))
 
-    for i, node in ipairs(nodes) do
-        if not States.AutoCrystal then break end -- Emergency Stop
+    -- LOOP MINING
+    for i, node in ipairs(crystals) do
+        if not States.AutoCrystal then break end -- Stop jika dimatikan
         
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
         if prompt and prompt.Enabled then
-            Notify("Fly to: "..folderName.." #"..i, Color3.fromRGB(255, 255, 0))
+            Notify("Fly to Crystal #"..i, Color3.fromRGB(255, 255, 0))
             
-            -- Hitung Posisi Depan Crystal (Agar tidak nyangkut di dalam batu)
-            local crystalCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-            local frontPos = crystalCF.Position + (crystalCF.LookVector * 4) -- Jarak 4 studs
-            local lookAtPos = CFrame.lookAt(frontPos, crystalCF.Position)
+            -- Hitung Posisi Depan Crystal (Supaya tidak nyangkut)
+            local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
+            local frontPos = nodeCF.Position + (nodeCF.LookVector * 4) 
+            local lookAtPos = CFrame.lookAt(frontPos, nodeCF.Position)
             
-            -- [GANTI KE FLY] Bukan Instant TP
-            FlyToCrystal(lookAtPos)
-            task.wait(1)
+            -- 1. FLY KE CRYSTAL
+            FlyTo(lookAtPos)
             
-            -- Interaksi
+            -- 2. DELAY SETELAH SAMPAI (2 DETIK)
+            Notify("Arrived. Wait 2s...", Color3.fromRGB(200, 200, 200))
+            task.wait(2)
+            
+            -- 3. AMBIL
             fireproximityprompt(prompt)
             
-            -- [DELAY 7 DETIK] Setelah ambil, sebelum pindah ke crystal lain
-            Notify("Cooldown: 7s", Color3.fromRGB(150, 150, 150))
-            task.wait(8.5)
+            -- 4. DELAY SEBELUM LANJUT (7 DETIK)
+            Notify("Cooldown: 7s...", Color3.fromRGB(150, 150, 150))
+            task.wait(7)
         end
     end
 end
@@ -205,73 +211,73 @@ local function FullRoutine()
     local hrp = GetRoot()
     if not hrp then return end
     
-    States.IsMining = true -- Kunci State
+    States.IsMining = true 
     
-    -- 1. SAVE POSITION (HOME)
+    -- [STEP 1] SAVE POSITION
     local SavedPosition = hrp.CFrame
-    Notify("Position Saved", Color3.fromRGB(0, 255, 100))
-    task.wait(1)
-    
-    -- 2. INSTANT TP KE LAVA BASIN
-    Notify("Teleporting to Lava...", Color3.fromRGB(255, 150, 0))
+    Notify("Saving Position...", Color3.fromRGB(0, 255, 100))
+    task.wait(0.5)
+
+    -- [STEP 2] INSTANT TP KE LAVA BASIN
+    Notify("TP: Lava Basin", Color3.fromRGB(255, 150, 0))
     InstantTP(Locations.LavaBasin)
     
-    -- [JEDA 7 DETIK SETELAH TELEPORT]
-    Notify("Wait 7s after TP...", Color3.fromRGB(100, 100, 100))
-    task.wait(7)
+    -- Jeda 5 Detik setelah TP (Request User)
+    Notify("Arrived Lava. Wait 5s...", Color3.fromRGB(200, 200, 200))
+    task.wait(5)
     
-    -- 3. GANTI ALAT (PICKAXE - SLOT 2)
-    Notify("Equipping Pickaxe...", Color3.fromRGB(255, 255, 255))
+    -- [STEP 3] EQUIP PICKAXE (SLOT 2)
+    Notify("Equip Pickaxe...", Color3.fromRGB(255, 255, 255))
     EquipTool(2) 
     task.wait(1.5)
     
-    -- 4. SCAN & MINE LAVA (Looping Crystals)
-    MineCrystalsInFolder("Lava")
+    -- [STEP 4] MINING LAVA
+    ProcessFolder("Lava")
     
-    -- 5. SELESAI LAVA -> JEDA 7 DETIK SEBELUM PINDAH
-    Notify("Lava Done. Wait 7s...", Color3.fromRGB(100, 100, 100))
+    -- [STEP 5] JEDA TRANSISI ANTAR PULAU (7 DETIK)
+    Notify("Lava Done. Wait 7s...", Color3.fromRGB(200, 200, 200))
     task.wait(7)
     
-    if States.AutoCrystal then -- Cek jika user mematikan script
-        -- 6. INSTANT TP KE CRYSTAL DEPTHS
-        Notify("Teleporting to Deep...", Color3.fromRGB(0, 150, 255))
+    if States.AutoCrystal then
+        -- [STEP 6] INSTANT TP KE CRYSTAL DEPTHS
+        Notify("TP: Crystal Depths", Color3.fromRGB(0, 150, 255))
         InstantTP(Locations.CrystalDepths)
         
-        -- [JEDA 7 DETIK SETELAH TELEPORT]
-        Notify("Wait 7s after TP...", Color3.fromRGB(100, 100, 100))
-        task.wait(7)
+        -- Jeda 5 Detik setelah TP (Request User: "jeda pada saat selesai teleport")
+        Notify("Arrived Deep. Wait 5s...", Color3.fromRGB(200, 200, 200))
+        task.wait(5)
         
-        -- 7. SCAN & MINE DEEP (Masih pegang Pickaxe)
-        MineCrystalsInFolder("Deep")
+        -- [STEP 7] MINING DEEP (Pickaxe masih dipegang)
+        ProcessFolder("Deep")
     end
     
-    -- 8. DONE ALL -> BACK TO SAVE POS
-    Notify("All Done. Returning Home...", Color3.fromRGB(0, 255, 0))
+    -- [STEP 8] PULANG
+    Notify("All Done. Going Home...", Color3.fromRGB(0, 255, 0))
     InstantTP(SavedPosition)
     task.wait(2)
     
-    -- 9. EQUIP ROD (SLOT 1)
-    Notify("Equipping Rod...", Color3.fromRGB(255, 255, 255))
+    -- [STEP 9] EQUIP PANCINGAN (SLOT 1)
+    Notify("Equip Rod...", Color3.fromRGB(255, 255, 255))
     EquipTool(1)
     
-    States.IsMining = false -- Buka State
+    States.IsMining = false
     Notify("Waiting Next Schedule...", Color3.fromRGB(150, 150, 150))
 end
 
 -- ====================================================
--- [SCHEDULER & CONTROLLER]
+-- [SCHEDULER & BUTTON HANDLER]
 -- ====================================================
 
--- Toggle Handler
 ToggleBtn.MouseButton1Click:Connect(function()
     States.AutoCrystal = not States.AutoCrystal
     if States.AutoCrystal then
         ToggleBtn.Text = "ON"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100) -- Hijau
+        Notify("Activated", Color3.fromRGB(0, 255, 0))
     else
         ToggleBtn.Text = "OFF"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-        Notify("Script Stopped", Color3.fromRGB(255, 0, 0))
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60) -- Merah
+        Notify("Deactivated", Color3.fromRGB(255, 0, 0))
     end
 end)
 
@@ -281,34 +287,30 @@ task.spawn(function()
     while true do
         task.wait(1)
         if States.AutoCrystal then
-            -- Cek Waktu (UTC+7 / WIB)
+            -- Waktu WIB (UTC+7)
             local now = os.date("!*t")
-            local hour = (now.hour + 7) % 24
+            local hourWIB = (now.hour + 7) % 24
             local min = now.min
             
-            -- Jadwal: Jam Genap (02, 04, 06...) DAN Menit 00-40
-            local isEven = (hour % 2 == 0)
-            local isWindow = (min >= 0 and min <= 40)
+            -- Syarat: Jam Genap (02, 04, ...) DAN Menit 00-40
+            local isEvenHour = (hourWIB % 2 == 0)
+            local isWindowOpen = (min >= 0 and min <= 40)
             
-            if isEven and isWindow then
+            if isEvenHour and isWindowOpen then
                 if not HasRunCycle and not States.IsMining then
-                    HasRunCycle = true
+                    HasRunCycle = true -- Tandai sudah jalan di sesi ini
                     FullRoutine()
-                else
-                   -- Sedang berjalan atau sudah selesai siklus ini
-                   if not States.IsMining then
-                       StatusLabel.Text = string.format("Done. Next: %02d:00", (hour+2)%24)
-                   end
+                elseif not States.IsMining then
+                    StatusLabel.Text = "Done. Next: "..(hourWIB+2)..":00"
                 end
             else
-                -- Reset variable siklus jika sudah lewat waktunya
+                -- Reset cycle jika waktu spawn sudah lewat
                 HasRunCycle = false
-                local nextH = hour
-                if (nextH % 2 ~= 0) then nextH = nextH + 1 else nextH = nextH + 2 end
+                local nextH = hourWIB
+                if nextH % 2 ~= 0 then nextH = nextH + 1 else nextH = nextH + 2 end
                 nextH = nextH % 24
                 StatusLabel.Text = string.format("Wait Schedule (%02d:00)", nextH)
             end
         end
     end
 end)
-
