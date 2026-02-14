@@ -1,6 +1,6 @@
 -- ====================================================
--- [FINAL V13] SMART DETECT ORIENTATION + CLEANING
--- FEATURE: DETECT WALL / FLOOR / CEILING CRYSTALS
+-- [FINAL V14] LOW ALTITUDE FIX + SMART DETECT
+-- FIXED: PLAYER HEIGHT ON FLOOR CRYSTALS (LOWERED)
 -- ====================================================
 
 local Services = {
@@ -29,8 +29,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV13") then
-    game:GetService("CoreGui").MiniMiningV13:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV14") then
+    game:GetService("CoreGui").MiniMiningV14:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -43,7 +43,7 @@ local StatusLabel = Instance.new("TextLabel")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV13"
+ScreenGui.Name = "MiniMiningV14"
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -60,7 +60,7 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "V13: SMART DETECT"
+TitleLabel.Text = "V14: LOW ALTITUDE"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 0, 255)
 TitleLabel.TextSize = 12
 
@@ -112,7 +112,7 @@ local function SetAnchor(bool)
     end
 end
 
--- [FLIGHT LOGIC - STABLE]
+-- [FLIGHT LOGIC]
 local function FlyTo(targetCFrame)
     local hrp = GetRoot()
     local hum = GetHum()
@@ -155,7 +155,7 @@ local function EquipTool(targetName)
 
     if hum then hum:UnequipTools() end
     for _, tool in ipairs(char:GetChildren()) do if tool:IsA("Tool") then tool.Parent = backpack end end
-    task.wait(0.3)
+    task.wait(0.5)
 
     local targetTool = nil
     for _, tool in ipairs(backpack:GetChildren()) do
@@ -169,43 +169,41 @@ local function EquipTool(targetName)
         local RE = NetPath:FindFirstChild("RE/EquipToolFromHotbar")
         if RE then RE:FireServer(slot) end
     end
-    task.wait(0.5)
+    task.wait(1.0)
 end
 
 -- ====================================================
--- [SMART POSITION LOGIC]
+-- [SMART POSITION LOGIC V2 - LOWER ALTITUDE]
 -- ====================================================
 
 local function CalculateSmartPosition(node)
     local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-    local lv = nodeCF.LookVector
+    local lv = nodeCF.LookVector -- Arah hadap Crystal
     local pos = nodeCF.Position
-    
-    -- Analisa Arah Hadap Crystal (LookVector Y)
-    -- Y mendekati 0 = Horizontal (Dinding)
-    -- Y > 0.5 = Menghadap Atas (Lantai)
-    -- Y < -0.5 = Menghadap Bawah (Langit-langit)
     
     local targetPos
     
+    -- Analisa Arah Hadap (LookVector Y)
     if lv.Y > 0.5 then
-        -- [LANTAI] Crystal menghadap ke atas.
-        -- Kita posisikan diri 4 stud DI ATAS crystal.
-        targetPos = pos + Vector3.new(0, 4.0, 0)
+        -- [LANTAI / FLOOR]
+        -- FIX: Jarak diturunkan drastis dari 4.0 jadi 2.5
+        -- Agar player napak/dekat sekali dengan tanah, tidak melayang tinggi
+        targetPos = pos + (lv * 2.5) 
         
     elseif lv.Y < -0.5 then
-        -- [LANGIT-LANGIT] Crystal menghadap ke bawah.
-        -- Kita posisikan diri 4 stud DI BAWAH crystal.
-        targetPos = pos - Vector3.new(0, 4.5, 0)
+        -- [LANGIT-LANGIT / CEILING]
+        -- Tetap di bawah crystal
+        targetPos = pos + (lv * 4.0)
         
     else
-        -- [DINDING/NORMAL] Crystal menghadap samping.
-        -- Kita posisikan diri 3.5 stud DI DEPAN crystal.
-        targetPos = pos + (lv * 3.5)
+        -- [DINDING / WALL]
+        -- Jarak didakatkan sedikit (3.5 -> 3.0) agar prompt pasti kena
+        targetPos = pos + (lv * 3.0)
     end
     
-    -- Selalu melihat ke arah pusat Crystal, tapi kunci rotasi Y agar tidak pusing
-    return CFrame.lookAt(targetPos, Vector3.new(pos.X, targetPos.Y, pos.Z))
+    -- Kunci Rotasi: Selalu melihat ke arah TITIK TENGAH Crystal
+    -- Menggunakan LookAt murni agar karakter menunduk jika crystal di bawah
+    return CFrame.lookAt(targetPos, pos)
 end
 
 -- ====================================================
@@ -225,13 +223,11 @@ local function ProcessFolder(folderName)
 
     if not targetFolder then return end
     
-    -- [LOOP UNTIL EMPTY]
     local iteration = 0
     while States.AutoCrystal do
         iteration = iteration + 1
         local crystals = {}
         
-        -- 1. Scan Valid Crystals
         for _, v in ipairs(targetFolder:GetChildren()) do
             local prompt = v:FindFirstChildWhichIsA("ProximityPrompt", true)
             if prompt and prompt.Enabled then
@@ -246,7 +242,7 @@ local function ProcessFolder(folderName)
 
         Notify("Scan "..iteration..": Found "..#crystals, Color3.fromRGB(255, 150, 0))
         
-        -- 2. SORT: FURTHEST FIRST (Ambil yang paling jauh dulu)
+        -- SORT: FURTHEST FIRST
         local hrp = GetRoot()
         if hrp then
             table.sort(crystals, function(a, b)
@@ -258,20 +254,19 @@ local function ProcessFolder(folderName)
             end)
         end
 
-        -- 3. Execute Mining with Smart Position
         for i, node in ipairs(crystals) do
             if not States.AutoCrystal then break end 
             local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
             
             if prompt and prompt.Enabled then
-                -- HITUNG POSISI PINTAR
+                -- HITUNG POSISI PINTAR (YANG SUDAH DIPERBAIKI)
                 local finalCF = CalculateSmartPosition(node)
                 
                 FlyTo(finalCF) 
                 SetAnchor(true)
                 
                 Notify("Mining ["..i.."/"..#crystals.."]", Color3.fromRGB(200, 200, 200))
-                task.wait(0.4)
+                task.wait(0.3)
                 fireproximityprompt(prompt)
                 task.wait(8.5) 
             end
@@ -307,9 +302,9 @@ local function PerformFishing()
         pcall(function()
             NetPath["RF/UpdateAutoFishingState"]:InvokeServer(true)
             NetPath["RF/ChargeFishingRod"]:InvokeServer()
-            task.wait(1) 
+            task.wait(1.5) 
             NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.987, 0.5, os.time())
-            task.wait(2) 
+            task.wait(2.5) 
             NetPath["RF/CatchFishCompleted"]:InvokeServer()
         end)
         task.wait(0.5)
