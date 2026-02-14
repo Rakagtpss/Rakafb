@@ -1,6 +1,6 @@
 -- ====================================================
--- [FINAL V10] ZERO GRAVITY + DOUBLE CHECK CLEANING
--- FIXED: TELEPORT POSITION (FRONT OF CRYSTAL)
+-- [FINAL V11] STABLE FLIGHT + PERFECT FRONT POSITION
+-- FIXED: NO SPINNING & ACCURATE POSITIONING
 -- ====================================================
 
 local Services = {
@@ -29,8 +29,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV10") then
-    game:GetService("CoreGui").MiniMiningV10:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV11") then
+    game:GetService("CoreGui").MiniMiningV11:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -43,11 +43,11 @@ local StatusLabel = Instance.new("TextLabel")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV10"
+ScreenGui.Name = "MiniMiningV11"
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 40)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, 200, 0, 110)
 MainFrame.Active = true
@@ -60,8 +60,8 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "V10: FIXED POSITION"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+TitleLabel.Text = "V11: STABLE MODE"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 200)
 TitleLabel.TextSize = 12
 
 ToggleBtn.Parent = MainFrame
@@ -106,26 +106,39 @@ end
 
 local function SetAnchor(bool)
     local hrp = GetRoot()
-    if hrp then hrp.Anchored = bool; if bool then hrp.Velocity = Vector3.zero end end
+    if hrp then 
+        hrp.Anchored = bool
+        if bool then hrp.Velocity = Vector3.zero end 
+    end
 end
 
+-- [FIXED] FlyTo Function with Anti-Spin
 local function FlyTo(targetCFrame)
     local hrp = GetRoot()
-    if not hrp then return end
+    local hum = GetHum()
+    if not hrp or not hum then return end
+    
     SetAnchor(false) 
+    hum.AutoRotate = false -- Matikan rotasi otomatis biar gak muter-muter
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = 60 -- Kecepatan Fly
+    local speed = 65 -- Sedikit lebih cepat
     local duration = dist / speed
-    local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
+    
+    -- Menggunakan BodyVelocity untuk kestabilan ekstra
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = Vector3.zero
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Parent = hrp
+
+    local info = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
+    
     tween:Play()
     tween.Completed:Wait()
+    
     bv:Destroy()
+    hum.AutoRotate = true -- Nyalakan lagi
     SetAnchor(true) 
 end
 
@@ -133,7 +146,7 @@ local function InstantTP(targetCFrame)
     SetAnchor(false)
     local hrp = GetRoot()
     if hrp then hrp.CFrame = targetCFrame end
-    task.wait(0.5) -- Tunggu loading
+    task.wait(0.5)
 end
 
 local function EquipTool(targetName)
@@ -198,7 +211,7 @@ local function PerformFishing()
 end
 
 -- ====================================================
--- [MINING LOGIC - ZERO GRAVITY + FIXED POSITION]
+-- [MINING LOGIC - IMPROVED POSITIONING]
 -- ====================================================
 
 local function ProcessFolder(folderName, isCheck)
@@ -214,13 +227,11 @@ local function ProcessFolder(folderName, isCheck)
 
     if not targetFolder then return end
     
-    -- Scan Crystals
     local crystals = {}
     for _, v in ipairs(targetFolder:GetChildren()) do
         if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(crystals, v) end
     end
 
-    -- Jika kosong saat Check, berarti bersih
     if #crystals == 0 then 
         if isCheck then Notify("Check: Clean.", Color3.fromRGB(0, 255, 0)) end
         return 
@@ -235,24 +246,31 @@ local function ProcessFolder(folderName, isCheck)
     for i, node in ipairs(crystals) do
         if not States.AutoCrystal then break end 
         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+        
         if prompt and prompt.Enabled then
             local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
+            local crystalPos = nodeCF.Position
             
-            -- [FIX POSITION] DI SINI PERBAIKANNYA
-            -- Menggunakan Z negatif (-3.5) agar posisinya di DEPAN Crystal (arah LookVector)
-            -- Sebelumnya '4' membuat player berada di BELAKANG Crystal (sering nyangkut di tembok)
-            local targetPos = nodeCF * CFrame.new(0, 0, -3.5) 
+            -- [FIXED POSITION LOGIC]
+            -- 1. Ambil arah "LookVector" dari Crystal (Arah hadap crystal)
+            -- 2. Taruh Player 3.5 stud di arah tersebut (Jadi di depan muka Crystal)
+            local targetPos = crystalPos + (nodeCF.LookVector * 3.5)
             
-            -- Memastikan Player melihat ke arah Crystal
-            local finalCF = CFrame.lookAt(targetPos.Position, nodeCF.Position)
+            -- [FIXED ROTATION LOGIC]
+            -- Menggunakan LookAt tetapi dengan mengunci sumbu Y (Vector3.new(x, Y_PLAYER, z))
+            -- Ini mencegah karakter melihat ke atas/bawah secara ekstrem (yang bikin salto/spin)
+            local finalCF = CFrame.lookAt(
+                targetPos, 
+                Vector3.new(crystalPos.X, targetPos.Y, crystalPos.Z)
+            )
             
             FlyTo(finalCF) 
-            SetAnchor(true) -- Freeze
+            SetAnchor(true)
             
             Notify("Extracting...", Color3.fromRGB(200, 200, 200))
             task.wait(0.3)
             fireproximityprompt(prompt)
-            task.wait(8.5) -- Cooldown
+            task.wait(8.5) 
         end
     end
 end
@@ -269,26 +287,20 @@ local function FullMiningRoutine()
     local NoClipLoop = EnableNoClip()
     EquipTool("pick") 
     
-    -- [1] LAVA BASIN (Main Run)
+    -- [1] LAVA BASIN
     InstantTP(Locations.LavaBasin)
     Notify("TP: Lava (Main)", Color3.fromRGB(255, 150, 0))
     task.wait(5.0) 
     ProcessFolder("Lava", false)
-
-    -- [2] LAVA BASIN (Double Check)
-    Notify("Double Check: Lava...", Color3.fromRGB(255, 200, 0))
-    ProcessFolder("Lava", true)
+    ProcessFolder("Lava", true) -- Double Check langsung
     
-    -- [3] CRYSTAL DEPTHS (Main Run)
+    -- [2] CRYSTAL DEPTHS
     if States.AutoCrystal then
         InstantTP(Locations.CrystalDepths)
         Notify("TP: Deep (Main)", Color3.fromRGB(0, 150, 255))
         task.wait(5.0)
         ProcessFolder("Deep", false)
-        
-        -- [4] CRYSTAL DEPTHS (Double Check)
-        Notify("Double Check: Deep...", Color3.fromRGB(0, 200, 255))
-        ProcessFolder("Deep", true)
+        ProcessFolder("Deep", true) -- Double Check langsung
     end
     
     Notify("Done. Going Home...", Color3.fromRGB(0, 255, 0))
