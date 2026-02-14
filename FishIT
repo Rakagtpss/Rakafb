@@ -1,7 +1,7 @@
 -- ====================================================
--- [FINAL V17] AGGRESSIVE CLOSE RANGE + NO FLOAT FIX
--- FIX: "FLOATING CHARACTER" (MELAYANG) SOLVED
--- FITUR: RAYCAST GROUND DETECTION
+-- [FINAL V20] DOUBLE CHECK SYSTEM
+-- FITUR: Loop Check (Memastikan area bersih 100% sebelum pindah)
+-- PLUS: Semua Delay Keamanan V19 (2s, 5s, 8s)
 -- ====================================================
 
 local Services = {
@@ -31,8 +31,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV17") then
-    game:GetService("CoreGui").MiniMiningV17:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV20") then
+    game:GetService("CoreGui").MiniMiningV20:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -44,10 +44,10 @@ local UICorner = Instance.new("UICorner")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV17"
+ScreenGui.Name = "MiniMiningV20"
 
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 25, 30)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Active = true
@@ -59,9 +59,9 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBlack
-TitleLabel.Text = "AUTO MINING V17 (GRAVITY)"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
-TitleLabel.TextSize = 13
+TitleLabel.Text = "AUTO MINING V20 (DOUBLE CHECK)"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+TitleLabel.TextSize = 12
 
 ToggleBtn.Parent = MainFrame
 ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
@@ -125,7 +125,6 @@ local function FlyTo(targetCFrame)
     tween.Completed:Wait()
     
     hrp.CFrame = targetCFrame 
-    -- Jangan langsung anchor disini, biarkan logika mining yang mengatur agar kaki menapak
 end
 
 local function EquipTool(name)
@@ -147,7 +146,7 @@ local function EquipTool(name)
 end
 
 -- ====================================================
--- [SMART POSITIONING LOGIC V17]
+-- [SMART POSITIONING LOGIC]
 -- ====================================================
 
 local function GetClosePosition(crystalPart)
@@ -159,20 +158,13 @@ local function GetClosePosition(crystalPart)
     local dotY = up:Dot(Vector3.new(0,1,0))
     local finalPos
     
-    -- Ambil tinggi pinggang karakter agar pas di tanah
     local hum = GetHum()
     local hipHeight = (hum and hum.HipHeight > 0) and hum.HipHeight or 2
     
-    if dotY > 0.8 then -- LANTAI (FLOOR)
-        -- FIX: Jangan berdiri DI ATAS crystal, tapi di SAMPINGNYA
-        -- Kita cari posisi aman di sekitar crystal, lalu Raycast ke bawah untuk cari tanah
+    if dotY > 0.8 then -- LANTAI
+        local offsetDir = Vector3.new(1, 0, 1).Unit
+        local checkPos = pos + (offsetDir * 3.5) + Vector3.new(0, 5, 0)
         
-        -- Coba posisi 3 studs di "belakang" arah hadap crystal, atau random di sekeliling
-        -- Kita pakai offset sederhana: Mundur sedikit dari pusat crystal
-        local offsetDir = Vector3.new(1, 0, 1).Unit -- Arah diagonal biar gak pas di tengah
-        local checkPos = pos + (offsetDir * 3.5) + Vector3.new(0, 5, 0) -- 5 studs diatas tanah target
-        
-        -- Raycast Kebawah cari tanah
         local params = RaycastParams.new()
         params.FilterDescendantsInstances = {LocalPlayer.Character, crystalPart}
         params.FilterType = Enum.RaycastFilterType.Exclude
@@ -180,31 +172,26 @@ local function GetClosePosition(crystalPart)
         local ray = Services.Workspace:Raycast(checkPos, Vector3.new(0, -15, 0), params)
         
         if ray then
-            -- KETEMU TANAH: Berdiri pas di atas tanah + HipHeight
             finalPos = ray.Position + Vector3.new(0, hipHeight, 0)
         else
-            -- Gagal Raycast (mungkin crystal melayang sedikit): Pakai logika lama tapi direndahkan
             finalPos = pos + Vector3.new(0, 0, 0) + (Vector3.new(1,0,0) * 3)
         end
         
-        -- LookAt tetap ke crystal, tapi Y-nya disamakan agar tidak nunduk aneh
         local lookPos = Vector3.new(pos.X, finalPos.Y, pos.Z)
         return CFrame.lookAt(finalPos, lookPos)
         
-    elseif dotY < -0.8 then -- Langit-langit (Ceiling)
-        -- Kalau di atap, harus melayang (tidak ada tanah)
+    elseif dotY < -0.8 then -- LANGIT-LANGIT
         finalPos = pos - Vector3.new(0, 4.0, 0)
         return CFrame.lookAt(finalPos, pos)
         
-    else -- Dinding (Wall)
-        -- Kalau di dinding, melayang di depannya
+    else -- DINDING
         finalPos = pos + (look * 3.0) 
         return CFrame.lookAt(finalPos, pos)
     end
 end
 
 -- ====================================================
--- [MINING EXECUTION]
+-- [MINING EXECUTION (DELAY V19 Included)]
 -- ====================================================
 
 local function MineCrystal(node)
@@ -214,44 +201,43 @@ local function MineCrystal(node)
     local part = prompt.Parent
     if not part then return end
 
-    -- 1. Hitung Posisi (Smart Ground Detection)
     local targetCF = GetClosePosition(part)
     FlyTo(targetCF)
     
-    -- 2. Validate Distance Loop & Snap to Ground
     local hrp = GetRoot()
     local maxDist = prompt.MaxActivationDistance
-    
-    -- Pastikan jarak cukup dekat
     if (hrp.Position - part.Position).Magnitude > (maxDist - 1) then
-        hrp.CFrame = targetCF -- Force teleport lagi
+        hrp.CFrame = targetCF
     end
     
-    -- 3. Anchor
     SetAnchor(true)
-    task.wait(0.1)
     
-    -- Lock Position Loop
+    -- [DELAY 2: SAMPAI DEPAN CRYSTAL]
+    Notify("Arrived. Waiting 2s...", Color3.fromRGB(255, 200, 0))
+    task.wait(2.8) 
+    Notify("Mining...", Color3.fromRGB(255, 255, 255))
+    
     local locker = Services.RunService.RenderStepped:Connect(function()
-        if hrp and States.IsMining then 
-            -- Paksa posisi tetap (agar tidak didorong physics)
-            hrp.CFrame = targetCF 
-        end
+        if hrp and States.IsMining then hrp.CFrame = targetCF end
     end)
     
     fireproximityprompt(prompt)
     
     local start = tick()
     repeat 
-        task.wait(0.1)
+        task.wait(0.5)
     until not prompt.Parent or not prompt.Enabled or (tick() - start > 8.5)
     
     if locker then locker:Disconnect() end
 end
 
+-- ====================================================
+-- [LOCATION PROCESSOR (V20: DOUBLE CHECK)]
+-- ====================================================
+
 local function ProcessLocation(folderName)
     local Islands = Services.Workspace:WaitForChild("Islands", 5)
-    if not Islands then return false end
+    if not Islands then return end
 
     local targetFolder
     if folderName == "Lava" then
@@ -260,27 +246,52 @@ local function ProcessLocation(folderName)
         targetFolder = Islands:FindFirstChild("Crystal Depths") and Islands["Crystal Depths"]:FindFirstChild("Crystals")
     end
 
-    if not targetFolder then return false end
+    if not targetFolder then return end
 
-    local crystals = {}
-    for _, v in pairs(targetFolder:GetChildren()) do
-        if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(crystals, v) end
+    -- LOOPING CHECK: Ulangi scan sampai benar-benar kosong
+    local passCount = 0
+    while States.AutoCrystal do
+        passCount = passCount + 1
+        
+        -- 1. Scan Crystals
+        local crystals = {}
+        for _, v in pairs(targetFolder:GetChildren()) do
+            if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(crystals, v) end
+        end
+
+        -- 2. Cek Kosong atau Tidak
+        if #crystals == 0 then
+            Notify("Zone Clean (Double Checked).", Color3.fromRGB(0, 255, 100))
+            task.wait(1)
+            break -- KELUAR DARI LOOP (Pindah Pulau)
+        end
+
+        -- 3. Jika ketemu, mulai mining
+        Notify("Pass "..passCount..": Found "..#crystals.." Crystals.", Color3.fromRGB(255, 255, 0))
+        
+        local hrp = GetRoot()
+        table.sort(crystals, function(a,b)
+            return (a:GetPivot().Position - hrp.Position).Magnitude < (b:GetPivot().Position - hrp.Position).Magnitude
+        end)
+
+        for i, node in ipairs(crystals) do
+            if not States.AutoCrystal then break end
+            
+            MineCrystal(node)
+            
+            -- [DELAY 3: SETELAH EXTRACT]
+            if i < #crystals then 
+                Notify("Cooldown 8s...", Color3.fromRGB(100, 100, 255))
+                task.wait(8)
+            end
+        end
+        
+        -- Jeda sebentar sebelum Double Check ulang
+        if States.AutoCrystal then
+            Notify("Re-scanning area...", Color3.fromRGB(255, 150, 0))
+            task.wait(2) 
+        end
     end
-
-    if #crystals == 0 then return false end 
-
-    local hrp = GetRoot()
-    table.sort(crystals, function(a,b)
-        return (a:GetPivot().Position - hrp.Position).Magnitude < (b:GetPivot().Position - hrp.Position).Magnitude
-    end)
-
-    for i, node in ipairs(crystals) do
-        if not States.AutoCrystal then break end
-        Notify("Mining ["..i.."/"..#crystals.."]", Color3.fromRGB(255, 255, 255))
-        MineCrystal(node)
-        task.wait(0.3)
-    end
-    return true
 end
 
 -- ====================================================
@@ -309,7 +320,7 @@ local function AutoFish()
             NetPath["RF/ChargeFishingRod"]:InvokeServer()
             task.wait(1.5)
             NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.99, 0.5, os.time())
-            task.wait(2.2)
+            task.wait(2.5)
             NetPath["RF/CatchFishCompleted"]:InvokeServer()
         end)
         task.wait(0.2)
@@ -327,20 +338,28 @@ local function FullRoutine(force)
     local noclip = EnableNoClip()
     EquipTool("pick")
 
-    -- 1. Lava
+    -- 1. LAVA BASIN ROUTINE
     hrp.CFrame = Locations.LavaBasin
-    task.wait(1.5)
-    local foundLava = ProcessLocation("Lava")
+    -- [DELAY 1: SAMPAI DI PULAU LAVA]
+    Notify("Arrived Lava. Waiting 5s...", Color3.fromRGB(255, 150, 0))
+    task.wait(5) 
+    
+    ProcessLocation("Lava") -- Didalamnya sudah ada Double Check Loop
 
-    -- 2. Deep
+    -- [DELAY 4: JEDA ANTAR PULAU]
+    if States.AutoCrystal then
+        Notify("Switching Island. Waiting 5s...", Color3.fromRGB(200, 0, 255))
+        task.wait(5)
+    end
+
+    -- 2. CRYSTAL DEPTHS ROUTINE
     if States.AutoCrystal then
         hrp.CFrame = Locations.CrystalDepths
-        task.wait(1.5)
-        local foundDeep = ProcessLocation("Deep")
+        -- [DELAY 1: SAMPAI DI PULAU DEEP]
+        Notify("Arrived Deep. Waiting 5s...", Color3.fromRGB(255, 150, 0))
+        task.wait(5)
         
-        if not foundLava and not foundDeep then
-            Notify("No Crystals Found (ZONK)", Color3.fromRGB(255, 50, 50))
-        end
+        ProcessLocation("Deep") -- Didalamnya sudah ada Double Check Loop
     end
 
     if noclip then noclip:Disconnect() end
@@ -370,7 +389,7 @@ ToggleBtn.MouseButton1Click:Connect(function()
             task.spawn(AutoFish)
         end
     else
-        ToggleBtn.Text = "START"
+        ToggleBtn.Text = "mining"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
         Notify("Stopped.", Color3.fromRGB(255, 0, 0))
         States.IsMining = false
