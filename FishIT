@@ -1,5 +1,6 @@
 -- ====================================================
 -- [FINAL V10] ZERO GRAVITY + DOUBLE CHECK CLEANING
+-- FIXED: TELEPORT POSITION (FRONT OF CRYSTAL)
 -- ====================================================
 
 local Services = {
@@ -59,7 +60,7 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "V10: DOUBLE CHECK"
+TitleLabel.Text = "V10: FIXED POSITION"
 TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
 TitleLabel.TextSize = 12
 
@@ -114,7 +115,7 @@ local function FlyTo(targetCFrame)
     SetAnchor(false) 
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = 60 -- Speed up sedikit
+    local speed = 60 -- Kecepatan Fly
     local duration = dist / speed
     local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
     local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
@@ -197,7 +198,7 @@ local function PerformFishing()
 end
 
 -- ====================================================
--- [MINING LOGIC - ZERO GRAVITY + DOUBLE CHECK]
+-- [MINING LOGIC - ZERO GRAVITY + FIXED POSITION]
 -- ====================================================
 
 local function ProcessFolder(folderName, isCheck)
@@ -237,8 +238,12 @@ local function ProcessFolder(folderName, isCheck)
         if prompt and prompt.Enabled then
             local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
             
-            -- [FIX POSITION] 4 Stud Depan Muka Crystal + LookAt
-            local targetPos = nodeCF * CFrame.new(0, 0, 4) 
+            -- [FIX POSITION] DI SINI PERBAIKANNYA
+            -- Menggunakan Z negatif (-3.5) agar posisinya di DEPAN Crystal (arah LookVector)
+            -- Sebelumnya '4' membuat player berada di BELAKANG Crystal (sering nyangkut di tembok)
+            local targetPos = nodeCF * CFrame.new(0, 0, -3.5) 
+            
+            -- Memastikan Player melihat ke arah Crystal
             local finalCF = CFrame.lookAt(targetPos.Position, nodeCF.Position)
             
             FlyTo(finalCF) 
