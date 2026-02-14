@@ -204,13 +204,13 @@ local function PerformFishing()
 
         pcall(function()
             NetPath["RF/ChargeFishingRod"]:InvokeServer(1771018119.504341)
-            task.wait(0.5) 
-            NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(12.21200942993164, 0.5, 1771018119.609312)
             task.wait(1) 
+            NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(12.21200942993164, 0.5, 1771018119.609312)
+            task.wait(2.5) 
             NetPath["RF/CatchFishCompleted"]:InvokeServer()
             Notify("Fish Caught!", Color3.fromRGB(100, 255, 100))
         end)
-        task.wait(0.3)
+        task.wait(0.7)
     end
     SetAnchor(false) -- Lepas anchor jika selesai fishing
 end
@@ -347,4 +347,5 @@ task.spawn(function()
         end
     end
 end)
+
 
