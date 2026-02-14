@@ -1,6 +1,7 @@
 -- ====================================================
--- [FINAL V14] LOW ALTITUDE FIX + SMART DETECT
--- FIXED: PLAYER HEIGHT ON FLOOR CRYSTALS (LOWERED)
+-- [FINAL V15] ANTI-BUG COORDINATE + STABLE ROTATION
+-- FIXED: SPECIFIC COORDINATE BUG & SPINNING ISSUE
+-- LOGIC: PRIORITY FISHING ON MANUAL TOGGLE
 -- ====================================================
 
 local Services = {
@@ -29,8 +30,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV14") then
-    game:GetService("CoreGui").MiniMiningV14:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV15") then
+    game:GetService("CoreGui").MiniMiningV15:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -43,7 +44,7 @@ local StatusLabel = Instance.new("TextLabel")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV14"
+ScreenGui.Name = "MiniMiningV15"
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
@@ -60,8 +61,8 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "V14: LOW ALTITUDE"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 0, 255)
+TitleLabel.Text = "V15: NO BUG & NO SPIN"
+TitleLabel.TextColor3 = Color3.fromRGB(50, 255, 100)
 TitleLabel.TextSize = 12
 
 ToggleBtn.Parent = MainFrame
@@ -119,17 +120,19 @@ local function FlyTo(targetCFrame)
     if not hrp or not hum then return end
     
     SetAnchor(false) 
-    hum.AutoRotate = false 
+    hum.AutoRotate = false -- Matikan AutoRotate agar Tween tidak bentrok
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
     local speed = 70 
     local duration = dist / speed
     
+    -- BodyVelocity menjaga agar tidak jatuh
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = Vector3.zero
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Parent = hrp
 
+    -- Tween Position & Rotation
     local info = TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
     
@@ -173,37 +176,43 @@ local function EquipTool(targetName)
 end
 
 -- ====================================================
--- [SMART POSITION LOGIC V2 - LOWER ALTITUDE]
+-- [SMART POSITION V3 - ANTI SPIN & BUG FIX]
 -- ====================================================
 
 local function CalculateSmartPosition(node)
     local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-    local lv = nodeCF.LookVector -- Arah hadap Crystal
+    local lv = nodeCF.LookVector 
     local pos = nodeCF.Position
     
     local targetPos
     
-    -- Analisa Arah Hadap (LookVector Y)
+    -- [LOGIC FIX] 
+    -- Koordinat bug (-142..) biasanya terjadi jika LookVector menunjuk ke bawah tanah
+    -- Kita paksa validasi ketinggian (Y).
+    
     if lv.Y > 0.5 then
-        -- [LANTAI / FLOOR]
-        -- FIX: Jarak diturunkan drastis dari 4.0 jadi 2.5
-        -- Agar player napak/dekat sekali dengan tanah, tidak melayang tinggi
-        targetPos = pos + (lv * 2.5) 
+        -- [LANTAI] 
+        -- Memaksa posisi Player di atas Crystal secara Absolute (Global Y)
+        -- Tidak menggunakan LookVector untuk ketinggian, agar tidak masuk tanah
+        targetPos = Vector3.new(pos.X, pos.Y + 3.5, pos.Z)
         
     elseif lv.Y < -0.5 then
-        -- [LANGIT-LANGIT / CEILING]
-        -- Tetap di bawah crystal
-        targetPos = pos + (lv * 4.0)
+        -- [LANGIT-LANGIT]
+        targetPos = Vector3.new(pos.X, pos.Y - 4.5, pos.Z)
         
     else
-        -- [DINDING / WALL]
-        -- Jarak didakatkan sedikit (3.5 -> 3.0) agar prompt pasti kena
+        -- [DINDING]
+        -- Normal Offset
         targetPos = pos + (lv * 3.0)
     end
     
-    -- Kunci Rotasi: Selalu melihat ke arah TITIK TENGAH Crystal
-    -- Menggunakan LookAt murni agar karakter menunduk jika crystal di bawah
-    return CFrame.lookAt(targetPos, pos)
+    -- [ANTI-SPIN SOLUTION]
+    -- Masalah berputar terjadi karena karakter mencoba melihat ke atas/bawah (Pitch).
+    -- Kita kunci pandangan agar hanya berputar Horizontal (Yaw).
+    -- LookAt ke: (Target X, HEIGHT PLAYER, Target Z) -> Kepala tetap rata.
+    
+    local lookAtPos = Vector3.new(pos.X, targetPos.Y, pos.Z)
+    return CFrame.lookAt(targetPos, lookAtPos)
 end
 
 -- ====================================================
@@ -242,7 +251,6 @@ local function ProcessFolder(folderName)
 
         Notify("Scan "..iteration..": Found "..#crystals, Color3.fromRGB(255, 150, 0))
         
-        -- SORT: FURTHEST FIRST
         local hrp = GetRoot()
         if hrp then
             table.sort(crystals, function(a, b)
@@ -259,7 +267,7 @@ local function ProcessFolder(folderName)
             local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
             
             if prompt and prompt.Enabled then
-                -- HITUNG POSISI PINTAR (YANG SUDAH DIPERBAIKI)
+                -- HITUNG POSISI PINTAR V3
                 local finalCF = CalculateSmartPosition(node)
                 
                 FlyTo(finalCF) 
@@ -350,7 +358,7 @@ local function FullMiningRoutine()
 end
 
 -- ====================================================
--- [MAIN LOOP]
+-- [MAIN LOOP & TOGGLE LOGIC FIX]
 -- ====================================================
 
 ToggleBtn.MouseButton1Click:Connect(function()
@@ -359,7 +367,13 @@ ToggleBtn.MouseButton1Click:Connect(function()
         ToggleBtn.Text = "ON"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         Notify("System Active", Color3.fromRGB(0, 255, 0))
-        if not States.IsMining then task.spawn(PerformFishing) end
+        
+        -- [LOGIC FIX]
+        -- Saat dinyalakan manual, JANGAN langsung Mining check.
+        -- Langsung start Fishing. Nanti Loop di bawah yang akan cek jam Mining.
+        if not States.IsMining then 
+            task.spawn(PerformFishing) 
+        end
     else
         ToggleBtn.Text = "OFF"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
@@ -381,16 +395,19 @@ task.spawn(function()
             local min = now.min
             local isMiningTime = (hourWIB % 2 == 0) and (min >= 0 and min <= 40)
             
+            -- Prioritas Utama: Mining Time
             if isMiningTime then
                 if not HasRunCycle and not States.IsMining then
                     HasRunCycle = true
-                    FullMiningRoutine()
+                    FullMiningRoutine() -- Masuk siklus mining
                 elseif not States.IsMining and not States.IsFishing then
-                    task.spawn(PerformFishing)
+                    task.spawn(PerformFishing) -- Kalau sudah selesai mining, mancing lagi
                 end
             else
+                -- Diluar Jam Mining
                 HasRunCycle = false
                 if not States.IsFishing and not States.IsMining then
+                    -- [FIX] Pastikan selalu kembali ke Fishing jika idle
                     task.spawn(PerformFishing)
                 end
             end
