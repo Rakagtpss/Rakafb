@@ -1,6 +1,6 @@
 -- ====================================================
--- [FINAL V17] GRAVITY FIX + GROUND SNAPPING
--- FIX: KARAKTER BERDIRI DI TANAH (TIDAK MELAYANG)
+-- [FINAL V18] ANTI-BLIND (X-RAY) + VISION FIX
+-- FIX: LAYAR TIDAK AKAN JADI WARNA POLOS LAGI
 -- ====================================================
 
 local Services = {
@@ -30,8 +30,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV17") then
-    game:GetService("CoreGui").MiniMiningV17:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV18") then
+    game:GetService("CoreGui").MiniMiningV18:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -43,10 +43,10 @@ local UICorner = Instance.new("UICorner")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV17"
+ScreenGui.Name = "MiniMiningV18"
 
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 15, 25)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Active = true
@@ -58,8 +58,8 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBlack
-TitleLabel.Text = "AUTO MINING V17 (GRAVITY)"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
+TitleLabel.Text = "AUTO MINING V18 (X-RAY)"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
 TitleLabel.TextSize = 13
 
 ToggleBtn.Parent = MainFrame
@@ -146,55 +146,63 @@ local function EquipTool(name)
 end
 
 -- ====================================================
--- [GRAVITY & GROUND CHECK LOGIC]
+-- [VISUAL FIX: X-RAY]
 -- ====================================================
+
+local function MakeTransparent(part)
+    -- Membuat Crystal jadi tembus pandang di Client side
+    if part and part:IsA("BasePart") then
+        part.Transparency = 0.8 -- 80% Transparan
+        part.CanCollide = false
+    elseif part and part:IsA("Model") then
+        for _, p in pairs(part:GetDescendants()) do
+            if p:IsA("BasePart") then
+                p.Transparency = 0.8
+                p.CanCollide = false
+            end
+        end
+    end
+end
 
 local function GetGroundedPosition(crystalPart)
     local cf = crystalPart.CFrame
     local pos = cf.Position
-    local up = cf.UpVector -- Vector Atas Crystal
-    local look = cf.LookVector -- Vector Depan Crystal
+    local up = cf.UpVector 
+    local look = cf.LookVector
     
-    -- Cek arah crystal (Lantai/Dinding/Langit)
     local dotY = up:Dot(Vector3.new(0,1,0))
-    
     local idealPos
     local isCeiling = false
 
     if dotY > 0.8 then 
-        -- [LANTAI] Target awal: Sedikit di atas crystal
-        idealPos = pos + Vector3.new(0, 2, 0) 
+        -- [LANTAI] Target: Di atas crystal
+        idealPos = pos + Vector3.new(0, 4, 0) -- Ditambah tingginya biar kamera ga masuk
     elseif dotY < -0.8 then 
-        -- [LANGIT-LANGIT] Tidak bisa napak tanah
+        -- [LANGIT-LANGIT]
         idealPos = pos - Vector3.new(0, 5, 0)
         isCeiling = true
     else 
-        -- [DINDING] Target awal: Depan crystal sejauh 3.5 stud
-        idealPos = pos + (look * 3.5)
+        -- [DINDING] Mundur 4.5 studs (Lebih jauh dikit dari V17)
+        idealPos = pos + (look * 4.5)
     end
 
     -- [GRAVITY CHECK]
-    -- Jika bukan di langit-langit, kita cari tanah di bawahnya
     if not isCeiling then
-        local rayOrigin = idealPos + Vector3.new(0, 5, 0) -- Mulai raycast dari atas target
-        local rayDirection = Vector3.new(0, -20, 0) -- Tembak ke bawah sejauh 20 stud
+        local rayOrigin = idealPos + Vector3.new(0, 5, 0) 
+        local rayDirection = Vector3.new(0, -20, 0)
         
         local params = RaycastParams.new()
-        params.FilterDescendantsInstances = {LocalPlayer.Character, crystalPart} -- Jangan kena diri sendiri/crystal
+        params.FilterDescendantsInstances = {LocalPlayer.Character, crystalPart}
         params.FilterType = Enum.RaycastFilterType.Exclude
         
         local result = workspace:Raycast(rayOrigin, rayDirection, params)
         
         if result then
-            -- JIKA TANAH KETEMU:
-            -- Set posisi kaki di tanah + HipHeight (sekitar 3 stud agar berdiri pas)
-            local groundY = result.Position.Y + 3.2 
+            local groundY = result.Position.Y + 3.5
             idealPos = Vector3.new(idealPos.X, groundY, idealPos.Z)
         end
     end
 
-    -- Kembalikan CFrame: Posisi di Tanah, Wajah Menghadap Crystal
-    -- Kita kunci Y lookAt agar karakter tidak mendongak aneh, kecuali di ceiling
     if isCeiling then
         return CFrame.lookAt(idealPos, pos)
     else
@@ -213,21 +221,21 @@ local function MineCrystal(node)
     local part = prompt.Parent
     if not part then return end
 
-    -- 1. Hitung Posisi Napak Tanah
+    -- [FIX] AKTIFKAN X-RAY PADA TARGET
+    MakeTransparent(part)
+    MakeTransparent(node) -- Jika node adalah Model
+
     local targetCF = GetGroundedPosition(part)
     FlyTo(targetCF)
     
-    -- 2. Validate Distance (Safety)
     local hrp = GetRoot()
     if (hrp.Position - part.Position).Magnitude > prompt.MaxActivationDistance then
-        -- Jika masih kejauhan, geser paksa mendekat tanpa peduli tanah (darurat)
         hrp.CFrame = CFrame.lookAt(part.Position + (hrp.CFrame.LookVector * -3), part.Position)
     end
     
     SetAnchor(true)
     task.wait(0.1)
     
-    -- 3. Stabilizer Loop
     local locker = Services.RunService.RenderStepped:Connect(function()
         if hrp and States.IsMining then hrp.CFrame = targetCF end
     end)
@@ -335,10 +343,6 @@ local function FullRoutine(force)
     States.IsMining = false
     task.spawn(AutoFish)
 end
-
--- ====================================================
--- [EVENTS]
--- ====================================================
 
 ToggleBtn.MouseButton1Click:Connect(function()
     States.AutoCrystal = not States.AutoCrystal
