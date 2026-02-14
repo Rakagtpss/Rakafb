@@ -1,6 +1,6 @@
 -- ====================================================
--- [FINAL V18] ANTI-BLIND (X-RAY) + VISION FIX
--- FIX: LAYAR TIDAK AKAN JADI WARNA POLOS LAGI
+-- [FINAL V19] CAMERA FIX + VIEW OPTIMIZER
+-- FIX: KAMERA TIDAK AKAN BUG/MASUK BATU SAAT TELE
 -- ====================================================
 
 local Services = {
@@ -30,8 +30,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV18") then
-    game:GetService("CoreGui").MiniMiningV18:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV19") then
+    game:GetService("CoreGui").MiniMiningV19:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -43,10 +43,10 @@ local UICorner = Instance.new("UICorner")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV18"
+ScreenGui.Name = "MiniMiningV19"
 
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 15, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(12, 18, 28)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Active = true
@@ -58,8 +58,8 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBlack
-TitleLabel.Text = "AUTO MINING V18 (X-RAY)"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+TitleLabel.Text = "AUTO MINING V19 (CAM FIX)"
+TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
 TitleLabel.TextSize = 13
 
 ToggleBtn.Parent = MainFrame
@@ -146,13 +146,34 @@ local function EquipTool(name)
 end
 
 -- ====================================================
--- [VISUAL FIX: X-RAY]
+-- [CAMERA FIX LOGIC - NEW FEATURE]
 -- ====================================================
 
+local function ResetCameraAngle()
+    -- Fungsi ini memaksa kamera mundur dan melihat ke karakter dari sudut yang enak
+    local cam = Services.Workspace.CurrentCamera
+    local hrp = GetRoot()
+    
+    if cam and hrp then
+        cam.CameraType = Enum.CameraType.Custom
+        cam.CameraSubject = GetHum()
+        
+        -- Kita paksa kamera mundur 12 stud dan naik 6 stud dari karakter
+        local backPos = hrp.CFrame * CFrame.new(0, 6, 12)
+        local targetLook = hrp.Position
+        
+        -- Gunakan Tween agar transisi kamera halus (tidak bikin pusing)
+        local camTween = Services.TweenService:Create(cam, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
+            CFrame = CFrame.lookAt(backPos.Position, targetLook)
+        })
+        camTween:Play()
+    end
+end
+
 local function MakeTransparent(part)
-    -- Membuat Crystal jadi tembus pandang di Client side
+    -- Membuat Crystal jadi tembus pandang (Anti-Buta)
     if part and part:IsA("BasePart") then
-        part.Transparency = 0.8 -- 80% Transparan
+        part.Transparency = 0.8
         part.CanCollide = false
     elseif part and part:IsA("Model") then
         for _, p in pairs(part:GetDescendants()) do
@@ -174,19 +195,17 @@ local function GetGroundedPosition(crystalPart)
     local idealPos
     local isCeiling = false
 
+    -- [JARAK DIPERLEBAR AGAR KAMERA AMAN]
     if dotY > 0.8 then 
-        -- [LANTAI] Target: Di atas crystal
-        idealPos = pos + Vector3.new(0, 4, 0) -- Ditambah tingginya biar kamera ga masuk
+        idealPos = pos + Vector3.new(0, 5, 0) -- Lebih tinggi
     elseif dotY < -0.8 then 
-        -- [LANGIT-LANGIT]
-        idealPos = pos - Vector3.new(0, 5, 0)
+        idealPos = pos - Vector3.new(0, 6, 0)
         isCeiling = true
     else 
-        -- [DINDING] Mundur 4.5 studs (Lebih jauh dikit dari V17)
-        idealPos = pos + (look * 4.5)
+        -- Jarak 6 Studs (Sebelumnya 4.5). Max Prompt Distance biasanya 10, jadi 6 masih AMAN.
+        idealPos = pos + (look * 6.0)
     end
 
-    -- [GRAVITY CHECK]
     if not isCeiling then
         local rayOrigin = idealPos + Vector3.new(0, 5, 0) 
         local rayDirection = Vector3.new(0, -20, 0)
@@ -221,16 +240,19 @@ local function MineCrystal(node)
     local part = prompt.Parent
     if not part then return end
 
-    -- [FIX] AKTIFKAN X-RAY PADA TARGET
     MakeTransparent(part)
-    MakeTransparent(node) -- Jika node adalah Model
+    MakeTransparent(node) 
 
     local targetCF = GetGroundedPosition(part)
     FlyTo(targetCF)
     
+    -- [NEW] RESET KAMERA SETELAH TELEPORT
+    ResetCameraAngle()
+    
     local hrp = GetRoot()
+    -- Safety Check Jarak
     if (hrp.Position - part.Position).Magnitude > prompt.MaxActivationDistance then
-        hrp.CFrame = CFrame.lookAt(part.Position + (hrp.CFrame.LookVector * -3), part.Position)
+        hrp.CFrame = CFrame.lookAt(part.Position + (hrp.CFrame.LookVector * -4), part.Position)
     end
     
     SetAnchor(true)
