@@ -1,7 +1,6 @@
 -- ====================================================
--- [FINAL V16] ANTI-SINK (ANTI TENGGELAM)
--- FIXED: FORCE HIGH ALTITUDE (6 STUDS UP)
--- LOGIC: SAFETY HEIGHT PRIORITY
+-- [FINAL V14] LOW ALTITUDE FIX + SMART DETECT
+-- FIXED: PLAYER HEIGHT ON FLOOR CRYSTALS (LOWERED)
 -- ====================================================
 
 local Services = {
@@ -30,8 +29,8 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV16") then
-    game:GetService("CoreGui").MiniMiningV16:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV14") then
+    game:GetService("CoreGui").MiniMiningV14:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -44,11 +43,11 @@ local StatusLabel = Instance.new("TextLabel")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV16"
+ScreenGui.Name = "MiniMiningV14"
 
 MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 10, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 15, 25)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, 200, 0, 120)
 MainFrame.Active = true
@@ -61,8 +60,8 @@ TitleLabel.BackgroundTransparency = 1
 TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBold
-TitleLabel.Text = "V16: ANTI-SINK"
-TitleLabel.TextColor3 = Color3.fromRGB(255, 100, 255)
+TitleLabel.Text = "V14: LOW ALTITUDE"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 0, 255)
 TitleLabel.TextSize = 12
 
 ToggleBtn.Parent = MainFrame
@@ -174,43 +173,37 @@ local function EquipTool(targetName)
 end
 
 -- ====================================================
--- [SMART POSITION V4 - ANTI SINK]
+-- [SMART POSITION LOGIC V2 - LOWER ALTITUDE]
 -- ====================================================
 
 local function CalculateSmartPosition(node)
     local nodeCF = node:IsA("Model") and node:GetPivot() or node.CFrame
-    local lv = nodeCF.LookVector 
+    local lv = nodeCF.LookVector -- Arah hadap Crystal
     local pos = nodeCF.Position
     
     local targetPos
     
-    -- CONFIG JARAK AMAN
-    local FLOOR_HEIGHT = 6.0 -- Jarak tinggi untuk crystal di lantai (Biar gak tenggelam)
-    local CEILING_DROP = 6.0 -- Jarak turun untuk crystal di langit-langit
-    local WALL_DIST = 4.0    -- Jarak depan untuk crystal dinding
-    
+    -- Analisa Arah Hadap (LookVector Y)
     if lv.Y > 0.5 then
-        -- [LANTAI] 
-        -- Memaksa posisi Player 6 STUD DI ATAS Crystal.
-        -- Ini mencegah tenggelam meskipun pivot crystal ada di dalam tanah.
-        targetPos = Vector3.new(pos.X, pos.Y + FLOOR_HEIGHT, pos.Z)
+        -- [LANTAI / FLOOR]
+        -- FIX: Jarak diturunkan drastis dari 4.0 jadi 2.5
+        -- Agar player napak/dekat sekali dengan tanah, tidak melayang tinggi
+        targetPos = pos + (lv * 1.5) 
         
     elseif lv.Y < -0.5 then
-        -- [LANGIT-LANGIT]
-        targetPos = Vector3.new(pos.X, pos.Y - CEILING_DROP, pos.Z)
+        -- [LANGIT-LANGIT / CEILING]
+        -- Tetap di bawah crystal
+        targetPos = pos + (lv * 3.0)
         
     else
-        -- [DINDING]
-        -- Mundur 4 stud, TAPI naik 2 stud ke atas.
-        -- Gunanya: Biar kaki karakter tidak masuk tanah jika crystalnya mepet lantai.
-        targetPos = (pos + (lv * WALL_DIST)) + Vector3.new(0, 2.0, 0)
+        -- [DINDING / WALL]
+        -- Jarak didakatkan sedikit (3.5 -> 3.0) agar prompt pasti kena
+        targetPos = pos + (lv * 2.0)
     end
     
-    -- [ANTI-SPIN FINAL]
-    -- Karakter melihat ke arah crystal secara HORIZONTAL saja.
-    -- (Kepala tetap lurus, tidak menunduk/mendongak ekstrem)
-    local lookTarget = Vector3.new(pos.X, targetPos.Y, pos.Z)
-    return CFrame.lookAt(targetPos, lookTarget)
+    -- Kunci Rotasi: Selalu melihat ke arah TITIK TENGAH Crystal
+    -- Menggunakan LookAt murni agar karakter menunduk jika crystal di bawah
+    return CFrame.lookAt(targetPos, pos)
 end
 
 -- ====================================================
@@ -249,6 +242,7 @@ local function ProcessFolder(folderName)
 
         Notify("Scan "..iteration..": Found "..#crystals, Color3.fromRGB(255, 150, 0))
         
+        -- SORT: FURTHEST FIRST
         local hrp = GetRoot()
         if hrp then
             table.sort(crystals, function(a, b)
@@ -265,6 +259,7 @@ local function ProcessFolder(folderName)
             local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
             
             if prompt and prompt.Enabled then
+                -- HITUNG POSISI PINTAR (YANG SUDAH DIPERBAIKI)
                 local finalCF = CalculateSmartPosition(node)
                 
                 FlyTo(finalCF) 
@@ -309,7 +304,7 @@ local function PerformFishing()
             NetPath["RF/ChargeFishingRod"]:InvokeServer()
             task.wait(1.5) 
             NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.987, 0.5, os.time())
-            task.wait(2.5) 
+            task.wait(3) 
             NetPath["RF/CatchFishCompleted"]:InvokeServer()
         end)
         task.wait(0.5)
