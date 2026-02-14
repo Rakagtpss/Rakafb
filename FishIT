@@ -1,5 +1,6 @@
 -- ====================================================
--- [FINAL V15] FIXED POSITION + 8.5s DELAY + UPRIGHT
+-- [FINAL V16] AGGRESSIVE CLOSE RANGE + DISTANCE FIX
+-- FIX: "YOU ARE TOO FAR" ERROR SOLVED
 -- ====================================================
 
 local Services = {
@@ -29,91 +30,80 @@ local Locations = {
 -- ====================================================
 -- [UI SETUP]
 -- ====================================================
-if game:GetService("CoreGui"):FindFirstChild("MiniMiningV15") then
-    game:GetService("CoreGui").MiniMiningV15:Destroy()
+if game:GetService("CoreGui"):FindFirstChild("MiniMiningV16") then
+    game:GetService("CoreGui").MiniMiningV16:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
-local UICorner = Instance.new("UICorner")
 local TitleLabel = Instance.new("TextLabel")
 local ToggleBtn = Instance.new("TextButton")
-local BtnCorner = Instance.new("UICorner")
 local StatusLabel = Instance.new("TextLabel")
+local UICorner = Instance.new("UICorner")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Parent = Services.CoreGui
-ScreenGui.Name = "MiniMiningV15"
+ScreenGui.Name = "MiniMiningV16"
 
-MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MainFrame.Size = UDim2.new(0, 220, 0, 130)
 MainFrame.Active = true
 MainFrame.Draggable = true
-UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
 TitleLabel.Parent = MainFrame
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Position = UDim2.new(0, 0, 0, 8)
+TitleLabel.Position = UDim2.new(0, 0, 0, 5)
 TitleLabel.Size = UDim2.new(1, 0, 0, 20)
 TitleLabel.Font = Enum.Font.GothamBlack
-TitleLabel.Text = "AUTO MINING V15 (FIXED)"
-TitleLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
-TitleLabel.TextSize = 14
+TitleLabel.Text = "AUTO MINING V16 (FIX)"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 0, 255)
+TitleLabel.TextSize = 13
 
 ToggleBtn.Parent = MainFrame
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.35, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
 ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Text = "START SYSTEM"
+ToggleBtn.Text = "START"
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleBtn.TextSize = 14
-BtnCorner.CornerRadius = UDim.new(0, 6)
-BtnCorner.Parent = ToggleBtn
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
 StatusLabel.Parent = MainFrame
 StatusLabel.BackgroundTransparency = 1
-StatusLabel.Position = UDim2.new(0, 0, 0.75, 0)
+StatusLabel.Position = UDim2.new(0, 0, 0.7, 0)
 StatusLabel.Size = UDim2.new(1, 0, 0, 15)
 StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.Text = "Status: Idle"
-StatusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-StatusLabel.TextSize = 11
+StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusLabel.TextSize = 10
 
 -- ====================================================
--- [CORE PHYSICS & UTILS]
+-- [CORE FUNCTIONS]
 -- ====================================================
 
 local function GetRoot() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") end
 local function GetHum() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") end
-local function Notify(msg, color) 
-    StatusLabel.Text = msg
-    StatusLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255) 
-end
+local function Notify(msg, color) StatusLabel.Text = msg; StatusLabel.TextColor3 = color or Color3.fromRGB(255, 255, 255) end
 
 local function SetAnchor(bool)
     local hrp = GetRoot()
     if hrp then 
-        hrp.Anchored = bool
-        if bool then 
-            hrp.Velocity = Vector3.zero 
-            hrp.RotVelocity = Vector3.zero
-        end 
+        hrp.Anchored = bool 
+        if bool then hrp.Velocity = Vector3.zero end
     end
 end
 
+-- [NOCLIP WAJIB: Agar bisa masuk dekat crystal tanpa mental]
 local function EnableNoClip()
     local Connection = Services.RunService.Stepped:Connect(function()
         if not States.AutoCrystal then return end 
         if LocalPlayer.Character then
             for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide == true then 
-                    part.CanCollide = false 
-                end
+                if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
             end
         end
     end)
@@ -122,97 +112,120 @@ end
 
 local function FlyTo(targetCFrame)
     local hrp = GetRoot()
-    local hum = GetHum()
-    if not hrp or not hum then return end
-    
-    SetAnchor(false) 
-    hum.AutoRotate = false 
+    if not hrp then return end
+    SetAnchor(false)
     
     local dist = (hrp.Position - targetCFrame.Position).Magnitude
-    local speed = dist > 150 and 90 or 60 
-    local duration = dist / speed
+    local speed = dist > 100 and 100 or 60
+    local tweenInfo = TweenInfo.new(dist/speed, Enum.EasingStyle.Linear)
     
-    local bv = Instance.new("BodyVelocity")
-    bv.Velocity = Vector3.zero
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Parent = hrp
-
-    local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local tween = Services.TweenService:Create(hrp, info, {CFrame = targetCFrame})
-    
+    local tween = Services.TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
     tween:Play()
     tween.Completed:Wait()
     
-    if bv then bv:Destroy() end
-    hum.AutoRotate = true
-    SetAnchor(true) 
+    hrp.CFrame = targetCFrame 
+    SetAnchor(true)
 end
 
-local function InstantTP(targetCFrame)
-    SetAnchor(false)
-    local hrp = GetRoot()
-    if hrp then hrp.CFrame = targetCFrame end
-    task.wait(0.5)
-end
-
-local function EquipTool(targetName)
-    local hum = GetHum()
-    local char = LocalPlayer.Character
+local function EquipTool(name)
     local backpack = LocalPlayer.Backpack
-
-    if hum then hum:UnequipTools() end
-    local targetTool = nil
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") and tool.Name:lower():find(targetName) then targetTool = tool; break end
-    end
-    if targetTool then targetTool.Parent = char else
-        local slot = (targetName == "pick" or targetName == "axe") and 2 or 1
-        local RE = NetPath:FindFirstChild("RE/EquipToolFromHotbar")
-        if RE then RE:FireServer(slot) end
-    end
-    task.wait(0.8)
-end
-
--- ====================================================
--- [SMART DETECT LOGIC (FIXED UPRIGHT)]
--- ====================================================
-
-local function CalculateSmartPosition(node)
-    local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-    if not prompt then return nil end
-    local part = prompt.Parent
-    if not part then return nil end
+    local char = LocalPlayer.Character
+    local tool
     
-    local cf = part.CFrame
-    local pos = cf.Position
-    local upVec = cf.UpVector 
-    local dotY = upVec:Dot(Vector3.new(0, 1, 0))
-    
-    local finalPos
-    -- Tentukan posisi berdiri
-    if dotY > 0.7 then
-        finalPos = pos + Vector3.new(0, 5.5, 0)
-    elseif dotY < -0.7 then
-        finalPos = pos - Vector3.new(0, 6.0, 0)
+    -- Cari tool
+    for _, t in pairs(char:GetChildren()) do if t:IsA("Tool") and t.Name:lower():find(name) then tool = t break end end
+    if not tool then
+        for _, t in pairs(backpack:GetChildren()) do if t:IsA("Tool") and t.Name:lower():find(name) then tool = t break end end
+    end
+
+    if tool then
+        if tool.Parent ~= char then GetHum():EquipTool(tool) end
     else
-        finalPos = pos + (cf.LookVector * 4.5)
+        local slot = (name == "pick" or name == "axe") and 2 or 1
+        NetPath["RE/EquipToolFromHotbar"]:FireServer(slot)
     end
-    
-    -- [FIX] BERDIRI TEGAK LOGIC
-    -- Kita buat target pandangan berada di Y yang sama dengan posisi berdiri (finalPos.Y)
-    -- Ini mencegah karakter menunduk (tilting down) atau mendongak.
-    local lookAtTarget = Vector3.new(pos.X, finalPos.Y, pos.Z)
-    return CFrame.lookAt(finalPos, lookAtTarget)
 end
 
 -- ====================================================
--- [MINING LOGIC (WITH 8.5s DELAY)]
+-- [CLOSE RANGE LOGIC V16]
 -- ====================================================
 
-local function ProcessFolder(folderName)
-    local Islands = Services.Workspace:WaitForChild("Islands", 5)
-    if not Islands then return false end 
+local function GetClosePosition(crystalPart)
+    local cf = crystalPart.CFrame
+    local pos = cf.Position
+    local up = cf.UpVector
+    local look = cf.LookVector
     
+    local dotY = up:Dot(Vector3.new(0,1,0))
+    local finalPos
+    
+    -- JARAK DIBUAT SANGAT DEKAT (3 - 4 Studs Max)
+    -- Ini menjamin prompt terbaca oleh server
+    
+    if dotY > 0.8 then -- Lantai
+        finalPos = pos + Vector3.new(0, 3.5, 0) 
+        -- Sedikit mundur agar karakter menunduk
+        return CFrame.lookAt(finalPos, pos)
+        
+    elseif dotY < -0.8 then -- Langit-langit
+        finalPos = pos - Vector3.new(0, 4.0, 0)
+        return CFrame.lookAt(finalPos, pos)
+        
+    else -- Dinding
+        -- Posisi tepat di depan wajah crystal (LookVector) sejauh 3 studs
+        finalPos = pos + (look * 3.0) 
+        return CFrame.lookAt(finalPos, pos)
+    end
+end
+
+-- ====================================================
+-- [MINING EXECUTION]
+-- ====================================================
+
+local function MineCrystal(node)
+    local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if not prompt then return end
+    
+    local part = prompt.Parent
+    if not part then return end
+
+    -- 1. Hitung Posisi Dekat
+    local targetCF = GetClosePosition(part)
+    FlyTo(targetCF)
+    
+    -- 2. Validate Distance Loop (PENTING)
+    -- Jika masih kejauhan ( > MaxDistance), paksa maju
+    local hrp = GetRoot()
+    local maxDist = prompt.MaxActivationDistance
+    
+    if (hrp.Position - part.Position).Magnitude > (maxDist - 1) then
+        -- Koreksi: Maju mendekat ke pusat part
+        hrp.CFrame = CFrame.lookAt(part.Position + (hrp.CFrame.LookVector * -3), part.Position)
+    end
+    
+    -- 3. Anchor & Mine
+    SetAnchor(true)
+    task.wait(0.1)
+    
+    -- Lock Position Loop (Biar gak mental)
+    local locker = Services.RunService.RenderStepped:Connect(function()
+        if hrp and States.IsMining then hrp.CFrame = targetCF end
+    end)
+    
+    fireproximityprompt(prompt)
+    
+    local start = tick()
+    repeat 
+        task.wait(0.1)
+    until not prompt.Parent or not prompt.Enabled or (tick() - start > 8.5)
+    
+    if locker then locker:Disconnect() end
+end
+
+local function ProcessLocation(folderName)
+    local Islands = Services.Workspace:WaitForChild("Islands", 5)
+    if not Islands then return false end
+
     local targetFolder
     if folderName == "Lava" then
         targetFolder = Islands:FindFirstChild("Lava Basin") and Islands["Lava Basin"]:FindFirstChild("Crystals")
@@ -221,207 +234,137 @@ local function ProcessFolder(folderName)
     end
 
     if not targetFolder then return false end
-    
+
     local crystals = {}
-    for _, v in ipairs(targetFolder:GetChildren()) do
-        if v:FindFirstChildWhichIsA("ProximityPrompt", true) then
-            table.insert(crystals, v)
-        end
+    for _, v in pairs(targetFolder:GetChildren()) do
+        if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(crystals, v) end
     end
 
-    if #crystals == 0 then 
-        Notify(folderName.." Empty (Zonk)", Color3.fromRGB(255, 100, 100))
-        return false 
-    end
+    if #crystals == 0 then return false end 
 
+    -- Sort Terdekat
     local hrp = GetRoot()
-    if hrp then
-        table.sort(crystals, function(a, b)
-            local posA = a:IsA("Model") and a:GetPivot().Position or a.Position
-            local posB = b:IsA("Model") and b:GetPivot().Position or b.Position
-            return (hrp.Position - posA).Magnitude < (hrp.Position - posB).Magnitude
-        end)
-    end
+    table.sort(crystals, function(a,b)
+        return (a:GetPivot().Position - hrp.Position).Magnitude < (b:GetPivot().Position - hrp.Position).Magnitude
+    end)
 
     for i, node in ipairs(crystals) do
-        if not States.AutoCrystal then break end 
-        local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-        
-        if prompt and prompt.Enabled then
-            local targetCF = CalculateSmartPosition(node)
-            if targetCF then
-                Notify("Mining ["..i.."/"..#crystals.."] Waiting 8.5s...", Color3.fromRGB(255, 255, 255))
-                
-                FlyTo(targetCF) 
-                SetAnchor(true)
-                
-                -- [DOUBLE CHECK POSITION] Pastikan tegak lurus
-                local currentHRP = GetRoot()
-                if currentHRP then
-                    -- Reset rotasi X dan Z agar tegak sempurna
-                    local rx, ry, rz = currentHRP.CFrame:ToOrientation()
-                    currentHRP.CFrame = CFrame.new(currentHRP.Position) * CFrame.fromOrientation(0, ry, 0)
-                end
-                
-                task.wait(0.2)
-                fireproximityprompt(prompt)
-                
-                -- [REQUEST] DELAY 8.5 DETIK
-                -- Mengganti loop check dengan hard wait sesuai request
-                task.wait(8.5)
-            end
-        end
+        if not States.AutoCrystal then break end
+        Notify("Mining ["..i.."/"..#crystals.."]", Color3.fromRGB(255, 255, 255))
+        MineCrystal(node)
+        task.wait(0.3)
     end
     return true
 end
 
 -- ====================================================
--- [FISHING LOGIC]
+-- [FISHING & ROUTINE]
 -- ====================================================
 
-local function StopFishing()
-    States.IsFishing = false
-    pcall(function()
-        NetPath["RF/UpdateAutoFishingState"]:InvokeServer(false)
-        NetPath["RF/CancelFishingInputs"]:InvokeServer()
-    end)
-end
-
-local function PerformFishing()
-    if States.IsMining or not States.AutoCrystal or States.IsFishing then return end
+local function AutoFish()
+    if States.IsMining then return end
     States.IsFishing = true
     
     local hrp = GetRoot()
-    if States.SavedHomeCFrame and hrp then
-        local dist = (hrp.Position - States.SavedHomeCFrame.Position).Magnitude
-        if dist > 500 then
-            Notify("Returning Home...", Color3.fromRGB(0, 255, 0))
-            InstantTP(States.SavedHomeCFrame)
-            task.wait(2)
-        end
+    if States.SavedHomeCFrame and hrp and (hrp.Position - States.SavedHomeCFrame.Position).Magnitude > 500 then
+        Notify("Returning Home...", Color3.fromRGB(0, 255, 0))
+        SetAnchor(false)
+        hrp.CFrame = States.SavedHomeCFrame + Vector3.new(0,2,0)
+        task.wait(1)
     end
 
-    Notify("Fishing Mode Active", Color3.fromRGB(0, 180, 255))
-    SetAnchor(true) 
+    Notify("Fishing Mode", Color3.fromRGB(0, 200, 255))
+    SetAnchor(true)
     EquipTool("rod")
 
     while States.AutoCrystal and States.IsFishing and not States.IsMining do
         pcall(function()
             NetPath["RF/UpdateAutoFishingState"]:InvokeServer(true)
             NetPath["RF/ChargeFishingRod"]:InvokeServer()
-            task.wait(1.5) 
-            NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.987, 0.5, os.time())
-            task.wait(2.5) 
+            task.wait(1.5)
+            NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.99, 0.5, os.time())
+            task.wait(2.2)
             NetPath["RF/CatchFishCompleted"]:InvokeServer()
         end)
-        task.wait(0.5)
+        task.wait(0.2)
     end
-    SetAnchor(false)
 end
 
--- ====================================================
--- [MAIN ROUTINE]
--- ====================================================
-
-local function FullMiningRoutine(forceStart)
-    local hrp = GetRoot()
-    if not hrp then return end
-    
+local function FullRoutine(force)
     if States.IsMining then return end
-    
-    StopFishing()
     States.IsMining = true
+    States.IsFishing = false
     
-    if not States.SavedHomeCFrame or forceStart then
-        States.SavedHomeCFrame = hrp.CFrame
-    end
-
-    Notify("Checking Locations...", Color3.fromRGB(255, 255, 0))
-    local NoClipLoop = EnableNoClip()
-    EquipTool("pick") 
+    local hrp = GetRoot()
+    if not States.SavedHomeCFrame or force then States.SavedHomeCFrame = hrp.CFrame end
     
-    local foundLava = false
-    local foundDeep = false
+    local noclip = EnableNoClip()
+    EquipTool("pick")
 
-    InstantTP(Locations.LavaBasin)
-    Notify("Checking Lava Basin...", Color3.fromRGB(255, 150, 0))
-    task.wait(2.0) 
-    foundLava = ProcessFolder("Lava")
+    -- 1. Lava
+    hrp.CFrame = Locations.LavaBasin
+    task.wait(1.5)
+    local foundLava = ProcessLocation("Lava")
 
+    -- 2. Deep
     if States.AutoCrystal then
-        InstantTP(Locations.CrystalDepths)
-        Notify("Checking Deep Caverns...", Color3.fromRGB(0, 150, 255))
-        task.wait(2.0)
-        foundDeep = ProcessFolder("Deep")
+        hrp.CFrame = Locations.CrystalDepths
+        task.wait(1.5)
+        local foundDeep = ProcessLocation("Deep")
+        
+        if not foundLava and not foundDeep then
+            Notify("No Crystals Found (ZONK)", Color3.fromRGB(255, 50, 50))
+        end
     end
-    
-    if not foundLava and not foundDeep then
-        Notify("ZONK! No Crystals Found.", Color3.fromRGB(255, 0, 0))
-        task.wait(1)
-    else
-        Notify("Mining Cycle Done.", Color3.fromRGB(0, 255, 0))
-    end
-    
-    if States.SavedHomeCFrame then
-        Notify("Returning to Spot...", Color3.fromRGB(255, 255, 0))
-        InstantTP(States.SavedHomeCFrame)
-    end
-    task.wait(2.0)
-    
-    if NoClipLoop then NoClipLoop:Disconnect() end
-    SetAnchor(false)
+
+    if noclip then noclip:Disconnect() end
     States.IsMining = false
     
-    EquipTool("rod")
-    task.spawn(PerformFishing)
+    -- Back to Fishing
+    task.spawn(AutoFish)
 end
 
 -- ====================================================
--- [INTELLIGENT BUTTON LOGIC]
+-- [BUTTONS & TIME]
 -- ====================================================
 
 ToggleBtn.MouseButton1Click:Connect(function()
     States.AutoCrystal = not States.AutoCrystal
-    
     if States.AutoCrystal then
-        ToggleBtn.Text = "SYSTEM ACTIVE"
+        ToggleBtn.Text = "STOP"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
         
-        local now = os.date("!*t")
-        local min = now.min
-        
-        if GetRoot() then States.SavedHomeCFrame = GetRoot().CFrame end
-
+        local min = os.date("!*t").min
         if min >= 0 and min <= 45 then
-            Notify("Mining Time Detected!", Color3.fromRGB(255, 215, 0))
-            task.spawn(function() FullMiningRoutine(true) end)
+            Notify("Mining Cycle Started", Color3.fromRGB(255, 215, 0))
+            task.spawn(function() FullRoutine(true) end)
         else
-            Notify("Not Mining Time. Fishing...", Color3.fromRGB(0, 200, 255))
-            task.spawn(PerformFishing)
+            Notify("Fishing Time...", Color3.fromRGB(0, 200, 255))
+            if GetRoot() then States.SavedHomeCFrame = GetRoot().CFrame end
+            task.spawn(AutoFish)
         end
-        
     else
-        ToggleBtn.Text = "START SYSTEM"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-        Notify("System Stopped", Color3.fromRGB(255, 0, 0))
+        ToggleBtn.Text = "START"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        Notify("Stopped.", Color3.fromRGB(255, 0, 0))
         States.IsMining = false
-        StopFishing()
+        States.IsFishing = false
         SetAnchor(false)
+        if LocalPlayer.Character then
+             for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = true end
+            end
+        end
     end
 end)
 
 task.spawn(function()
     while true do
-        task.wait(10)
+        task.wait(5)
         if States.AutoCrystal and not States.IsMining then
-            local now = os.date("!*t")
-            local min = now.min
-            
+            local min = os.date("!*t").min
             if min >= 0 and min <= 5 and States.IsFishing then
-                Notify("Scheduled Mining Started!", Color3.fromRGB(255, 215, 0))
-                FullMiningRoutine(false)
-            elseif min > 45 and not States.IsFishing then
-                 task.spawn(PerformFishing)
+                FullRoutine(false)
             end
         end
     end
