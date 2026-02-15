@@ -123,7 +123,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "Loading ....", nil, 4)
+Notify("SERAPHIN", "V22 Strict Mining", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -640,6 +640,7 @@ local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt
 -- [NEW] MINING & FISHING VARS
 local SavedMinePosition = nil
 
+-- FUNGSI AUTO FISH (SESUAI REQUEST REMOTE SPECIFIC)
 local function StartAutoFishRoutine()
     if States.AutoFishActive then return end
     States.AutoFishActive = true
@@ -649,7 +650,8 @@ local function StartAutoFishRoutine()
         local Net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
         
         -- 1. Update State
-        Net["RF/UpdateAutoFishingState"]:InvokeServer({true})
+        local argsState = { true }
+        Net["RF/UpdateAutoFishingState"]:InvokeServer(unpack(argsState))
         
         while States.AutoFishActive and not States.AutoMiningV20 do
             pcall(function()
@@ -657,13 +659,17 @@ local function StartAutoFishRoutine()
                 Net["RF/ChargeFishingRod"]:InvokeServer()
                 task.wait(1)
                 
-                -- 3. Request Minigame
-                local args = { -0.9879989624023438, 0.5, 1771061230.063116 }
-                Net["RF/RequestFishingMinigameStarted"]:InvokeServer(unpack(args))
+                -- 3. Request Minigame (Kode Spesifik Anda)
+                local argsGame = {
+                    -0.9879989624023438,
+                    0.5,
+                    1771061230.063116
+                }
+                Net["RF/RequestFishingMinigameStarted"]:InvokeServer(unpack(argsGame))
                 
-                task.wait(2.5) -- Minigame duration
+                task.wait(2.5) -- Waktu simulasi minigame
                 
-                -- 4. Catch
+                -- 4. Catch Fish
                 Net["RF/CatchFishCompleted"]:InvokeServer()
             end)
             task.wait(0.5)
@@ -1163,7 +1169,7 @@ MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
     end
 end)
 
--- [NEW] AUTO MINE CYCLE V21 (LAVA/CRYSTAL + STRICT DELAY + AUTO FISH)
+-- [NEW] AUTO MINE CYCLE V22 (ROD RESET + DEEPS DELAY 8S)
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
     States.AutoMiningV20 = val
     
@@ -1175,23 +1181,30 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
              local hrp = GetRoot()
              if not hrp then return end
 
-             -- [A] SAVE POSITION & PREPARATION
+             -- [A] SAVE POSITION
              SavedMinePosition = hrp.CFrame
              Notify("MINING", "Position Saved. Starting...", Color3.fromRGB(255, 200, 0))
              
-             -- Unequip Tool Slot 1 (Rod) -> Equip Slot 2 (Pickaxe)
+             -- [LOGIKA BARU] EQUIP ROD DULU SEBELUM KE LAVA
              local char = Player.Character
              if char then
                 local tool = char:FindFirstChildWhichIsA("Tool")
                 if tool then tool.Parent = Player.Backpack end
              end
              task.wait(0.5)
+             
+             -- 1. Equip Rod (Slot 1) Sesuai Request
+             Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+             Notify("MINING", "Reset: Equip Rod...", nil)
+             task.wait(1.5)
+             
+             -- 2. Equip Pickaxe (Slot 2) Agar bisa Mining
              Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(2)
-             Notify("MINING", "Pickaxe Equipped.", nil)
+             Notify("MINING", "Ready: Equip Pickaxe.", nil)
              task.wait(1)
 
              -- FUNGSI LOGIKA MINING PER AREA
-             local function RunMiningZone(zoneName, warpCFrame, folderIslands)
+             local function RunMiningZone(zoneName, warpCFrame, folderIslands, startDelay)
                  if not States.AutoMiningV20 then return end
                  
                  -- 1. Instan Teleport ke Area
@@ -1203,9 +1216,9 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
                  end
                  Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
                  
-                 -- 2. Diam 5 Detik Setelah Teleport
-                 Notify("MINING", "Waiting 5s...", nil)
-                 task.wait(5)
+                 -- [LOGIKA BARU] CUSTOM DELAY SETELAH TELEPORT (Lava: 5s, Deeps: 8s)
+                 Notify("MINING", "Waiting " .. startDelay .. "s...", nil)
+                 task.wait(startDelay)
 
                  -- 3. Scanning & Mining Loop
                  while States.AutoMiningV20 do
@@ -1256,7 +1269,7 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
                                  r.CFrame = CFrame.lookAt(r.Position, part.Position) 
                                  
                                  Notify("MINING", "Aligning 5s...", Color3.fromRGB(255, 200, 200))
-                                 task.wait(5)
+                                 task.wait(3.5)
                                  
                                  -- 5. Extract
                                  if prompt.Parent then 
@@ -1278,11 +1291,13 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
              local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
              local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
              
-             RunMiningZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder)
+             -- Zona 1: Lava Basin (Delay standar 5 detik)
+             RunMiningZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5)
 
              if States.AutoMiningV20 then
+                 -- Zona 2: Crystal Depths ([LOGIKA BARU] Delay 8 Detik)
                  Notify("MINING", "Switching to Depths...", Color3.fromRGB(200, 0, 255))
-                 RunMiningZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder)
+                 RunMiningZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 8)
              end
 
              -- [C] SELESAI -> KEMBALI -> AUTO FISH
