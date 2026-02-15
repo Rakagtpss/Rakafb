@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V23 Strict Mining & Time Check", nil, 4)
+Notify("SERAPHIN", "V25 ZigZag & Silent Delay", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -1169,7 +1169,7 @@ MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
 end)
 
 -- ====================================================
--- [NEW] AUTO MINE CYCLE (TIME BASED + STRICT STRUCTURE)
+-- [UPDATED] MINING ROUTINE (ZIG-ZAG + CLEAN NOTIF + SCHEDULER)
 -- ====================================================
 
 -- Function: Cek Waktu WIB (UTC+7)
@@ -1203,8 +1203,9 @@ local function MiningRoutine()
     Notify("MINING", "Equipped Pickaxe (Slot 2).", nil)
     task.wait(1.5) -- Pastikan memegang sebelum TP
     
-    -- Function to Run Specific Zone
-    local function RunZone(zoneName, tpCFrame, folderIslands, delayStart, delayBetween)
+    -- Function to Run Specific Zone with SORT MODE
+    -- sortMode: "Near" (Terdekat) atau "Far" (Terjauh/ZigZag)
+    local function RunZone(zoneName, tpCFrame, folderIslands, delayStart, delayBetween, sortMode)
         -- Instan Teleport
         local r = GetRoot()
         if r then
@@ -1214,8 +1215,7 @@ local function MiningRoutine()
         end
         Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
         
-        -- Diam 5 Detik
-        Notify("MINING", "Wait " .. delayStart .. "s (Scan)...", nil)
+        -- Diam (Scan)
         task.wait(delayStart)
         
         -- Loop Double Check (Until No Crystals)
@@ -1232,12 +1232,21 @@ local function MiningRoutine()
             
             if #crystals == 0 then
                 scanAgain = false
-                Notify("MINING", zoneName .. " Clean. Done.", Color3.fromRGB(0, 255, 100))
+                -- No Spam Notification
             else
-                Notify("MINING", "Found " .. #crystals .. " Crystals.", Color3.fromRGB(255, 255, 0))
+                Notify("MINING", "Found " .. #crystals .. " Crystals ("..sortMode..")", Color3.fromRGB(255, 255, 0))
                 local myPos = GetRoot().Position
+                
+                -- LOGIKA SORTING (Near vs Far)
                 table.sort(crystals, function(a,b)
-                    return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude
+                    local distA = (a:GetPivot().Position - myPos).Magnitude
+                    local distB = (b:GetPivot().Position - myPos).Magnitude
+                    
+                    if sortMode == "Far" then
+                        return distA > distB -- Ambil yang PALING JAUH dulu (Zig-Zag)
+                    else
+                        return distA < distB -- Ambil yang PALING DEKAT dulu (Normal)
+                    end
                 end)
                 
                 for _, node in ipairs(crystals) do
@@ -1271,9 +1280,9 @@ local function MiningRoutine()
                             -- Delay 2 Detik (Post-Extract)
                             task.wait(2)
                             
-                            -- Delay 8.5 Detik Sebelum ke Next Crystal
-                            Notify("MINING", "Delay 8.5s...", nil)
-                            task.wait(8.5)
+                            -- Delay Antar Crystal (Sesuai Parameter)
+                            -- Silent wait
+                            task.wait(delayBetween)
                         end
                     end
                 end
@@ -1285,21 +1294,21 @@ local function MiningRoutine()
     local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
     local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
     
-    -- [3] ZONA 1: LAVA BASIN
-    RunZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5, 8.5)
+    -- [3] ZONA 1: LAVA BASIN (Normal / Near, Delay 5s)
+    RunZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5, 5, "Near")
     
     if States.IsMining then
         -- [4] TRANSITION (Delay 5 Detik Sebelum Deeps)
-        Notify("MINING", "Wait 5s before Deeps...", Color3.fromRGB(200, 0, 255))
         task.wait(5)
         
-        -- [5] ZONA 2: CRYSTAL DEPTHS
-        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 8.5)
+        -- [5] ZONA 2: CRYSTAL DEPTHS (Zig-Zag / Far, Delay 9s)
+        -- Parameter terakhir "Far" akan membuat bot mengambil crystal terjauh dulu
+        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 9, "Far")
     end
     
-    -- [6] FINISH -> RETURN -> FISHING
+    -- [6] FINISH -> RETURN -> FISHING ONCE
     Notify("MINING", "Cycle Done. Returning...", Color3.fromRGB(0, 255, 0))
-    States.IsMining = false -- Stop Active Mining Flag (But Switch remains ON for monitoring)
+    States.IsMining = false -- Stop Active Mining Flag
     
     local finalRoot = GetRoot()
     if finalRoot and SavedMinePosition then
@@ -1312,7 +1321,11 @@ local function MiningRoutine()
     Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
     Notify("GEAR", "Rod Equipped - Auto Fish", nil)
     task.wait(1)
-    StartAutoFishRoutine()
+    
+    -- Trigger Auto Fish One Time Only (Safe for user toggle)
+    if not States.AutoFishActive then
+        StartAutoFishRoutine()
+    end
 end
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
@@ -1320,20 +1333,28 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
     
     if val then
         task.spawn(function()
-            Notify("SYSTEM", "Auto Mine: ON (Checking Time)", nil)
+            Notify("SYSTEM", "Auto Mine: ON (Time Check Active)", nil)
+            
+            -- Tracker agar auto fishing tidak dipaksa nyala terus menerus
+            -- Hanya nyala otomatis SAAT transisi dari Mining selesai
+            
             while States.AutoMiningV20 do
                 local timeValid = IsMiningTime()
                 
-                -- Jika waktu mining dan kita tidak sedang mining (Idle/Fishing)
-                if timeValid and not States.IsMining then
-                    States.AutoFishActive = false -- Stop Fishing
-                    States.IsMining = true -- Flag Active
-                    MiningRoutine() -- Jalankan 1 Siklus Penuh
-                elseif not timeValid and not States.IsMining then
-                    -- Jika bukan jam mining, pastikan fishing jalan
-                    if not States.AutoFishActive then
-                        StartAutoFishRoutine()
+                -- Jika WAKTUNYA MINING
+                if timeValid then
+                    if not States.IsMining then
+                        -- Matikan Fishing kalau sedang aktif, lalu mulai Mining
+                        States.AutoFishActive = false 
+                        States.IsMining = true
+                        MiningRoutine()
                     end
+                else
+                    -- JIKA BUKAN WAKTU MINING (Idle)
+                    -- Script diam saja.
+                    -- User bebas on/off fishing manual.
+                    -- Auto Fish otomatis menyala di akhir fungsi MiningRoutine() di atas.
+                    -- Jadi di sini kita tidak memaksa on/off.
                 end
                 
                 task.wait(5) -- Cek setiap 5 detik
@@ -1814,7 +1835,7 @@ CharmBtn.MouseButton1Click:Connect(function()
         CharmListFrame.Visible = false
         Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
     end
-end)
+end
 
 -- 2. QUANTITY INPUT & BUY BUTTON
 local ActionFrame = Instance.new("Frame", CharmContainer)
@@ -2213,7 +2234,7 @@ end)
 -- [AUTO EXECUTE] MAX FPS UNLOCKER
 task.spawn(function()
     if setfpscap then
-          setfpscap(999)
+          setfpscap(9999)
       end
 end)
 
