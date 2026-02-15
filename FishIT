@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V25 ZigZag & Silent Delay", nil, 4)
+Notify("SERAPHIN", "V25 ZigZag & Silent Mode", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -1169,7 +1169,7 @@ MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
 end)
 
 -- ====================================================
--- [UPDATED] MINING ROUTINE (ZIG-ZAG + CLEAN NOTIF + SCHEDULER)
+-- [UPDATED] MINING ROUTINE (ZIG-ZAG DEEPS + 9s DELAY)
 -- ====================================================
 
 -- Function: Cek Waktu WIB (UTC+7)
@@ -1215,7 +1215,7 @@ local function MiningRoutine()
         end
         Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
         
-        -- Diam (Scan)
+        -- Diam (Scan) - Notifikasi dihapus agar silent
         task.wait(delayStart)
         
         -- Loop Double Check (Until No Crystals)
@@ -1232,7 +1232,7 @@ local function MiningRoutine()
             
             if #crystals == 0 then
                 scanAgain = false
-                -- No Spam Notification
+                Notify("MINING", zoneName .. " Clean. Done.", Color3.fromRGB(0, 255, 100))
             else
                 Notify("MINING", "Found " .. #crystals .. " Crystals ("..sortMode..")", Color3.fromRGB(255, 255, 0))
                 local myPos = GetRoot().Position
@@ -1280,8 +1280,7 @@ local function MiningRoutine()
                             -- Delay 2 Detik (Post-Extract)
                             task.wait(2)
                             
-                            -- Delay Antar Crystal (Sesuai Parameter)
-                            -- Silent wait
+                            -- Delay Antar Crystal (Silent)
                             task.wait(delayBetween)
                         end
                     end
@@ -1299,6 +1298,7 @@ local function MiningRoutine()
     
     if States.IsMining then
         -- [4] TRANSITION (Delay 5 Detik Sebelum Deeps)
+        Notify("MINING", "Moving to Deeps...", Color3.fromRGB(200, 0, 255))
         task.wait(5)
         
         -- [5] ZONA 2: CRYSTAL DEPTHS (Zig-Zag / Far, Delay 9s)
@@ -1306,7 +1306,7 @@ local function MiningRoutine()
         RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 9, "Far")
     end
     
-    -- [6] FINISH -> RETURN -> FISHING ONCE
+    -- [6] FINISH -> RETURN -> FISHING
     Notify("MINING", "Cycle Done. Returning...", Color3.fromRGB(0, 255, 0))
     States.IsMining = false -- Stop Active Mining Flag
     
@@ -1322,10 +1322,8 @@ local function MiningRoutine()
     Notify("GEAR", "Rod Equipped - Auto Fish", nil)
     task.wait(1)
     
-    -- Trigger Auto Fish One Time Only (Safe for user toggle)
-    if not States.AutoFishActive then
-        StartAutoFishRoutine()
-    end
+    -- START FISHING ONCE (Jangan diloop paksa di luar fungsi ini)
+    StartAutoFishRoutine()
 end
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
@@ -1334,27 +1332,20 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
     if val then
         task.spawn(function()
             Notify("SYSTEM", "Auto Mine: ON (Time Check Active)", nil)
-            
-            -- Tracker agar auto fishing tidak dipaksa nyala terus menerus
-            -- Hanya nyala otomatis SAAT transisi dari Mining selesai
-            
             while States.AutoMiningV20 do
                 local timeValid = IsMiningTime()
                 
-                -- Jika WAKTUNYA MINING
-                if timeValid then
-                    if not States.IsMining then
-                        -- Matikan Fishing kalau sedang aktif, lalu mulai Mining
-                        States.AutoFishActive = false 
-                        States.IsMining = true
-                        MiningRoutine()
-                    end
-                else
-                    -- JIKA BUKAN WAKTU MINING (Idle)
-                    -- Script diam saja.
-                    -- User bebas on/off fishing manual.
-                    -- Auto Fish otomatis menyala di akhir fungsi MiningRoutine() di atas.
-                    -- Jadi di sini kita tidak memaksa on/off.
+                -- Jika waktu mining dan kita tidak sedang mining (Idle/Fishing)
+                if timeValid and not States.IsMining then
+                    States.AutoFishActive = false -- Matikan Fishing untuk Mining
+                    States.IsMining = true -- Flag Active
+                    MiningRoutine() -- Jalankan 1 Siklus Penuh (Di akhir fungsi ini Fishing dinyalakan lagi)
+                elseif not timeValid and not States.IsMining then
+                    -- IDLE TIME:
+                    -- Di sini kita TIDAK MEMAKSA StartAutoFishRoutine().
+                    -- Jika user ingin mematikan fishing manual, script tidak akan menyalakannya lagi.
+                    -- Jika cycle mining baru selesai, fishing sudah dinyalakan oleh MiningRoutine.
+                    task.wait(5)
                 end
                 
                 task.wait(5) -- Cek setiap 5 detik
@@ -1825,18 +1816,6 @@ for _, cName in pairs(CharmData) do
 end
 CharmListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CharmData * 26))
 
-local IsCharmOpen = false
-CharmBtn.MouseButton1Click:Connect(function()
-    IsCharmOpen = not IsCharmOpen
-    if IsCharmOpen then
-        CharmListFrame.Visible = true
-        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 140)}):Play()
-    else
-        CharmListFrame.Visible = false
-        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
-    end
-end
-
 -- 2. QUANTITY INPUT & BUY BUTTON
 local ActionFrame = Instance.new("Frame", CharmContainer)
 ActionFrame.Name = "Action"
@@ -2200,7 +2179,9 @@ task.spawn(function()
             pcall(function()
                 local ls = Player:FindFirstChild("leaderstats")
                 local c = ls and ls:FindFirstChild("Caught") and ls.Caught.Value or 0
-                LblFishVal.Text = tostring(c):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")    
+                
+                LblFishVal.Text = tostring(c):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
+                
                 local bagText = "0/?"
                 local backpackGui = Player:FindFirstChild("PlayerGui") and Player.PlayerGui:FindFirstChild("Backpack")
                 if backpackGui then
@@ -2239,5 +2220,4 @@ end)
 task.delay(1, function()
     Main.Visible = true
     FloatHUD.Visible = States.Panel
-
 end)
