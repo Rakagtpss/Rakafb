@@ -13,6 +13,7 @@ local Services = {
     Stats = game:GetService("Stats"),
     TextChatService = game:GetService("TextChatService")
 }
+
 local Player = Services.Players.LocalPlayer
 local Cam = Services.Workspace.CurrentCamera
 local NetPath = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
@@ -25,17 +26,17 @@ local function GetHum() local c = Player.Character; return c and c:FindFirstChil
 -- // KONFIGURASI VISUAL (MODERN DARK TRANSPARENT)
 local UI_THEME = {
     Width = 400,
-    Height = 270,     
-    Color = Color3.fromRGB(12, 12, 14),        
-    SidebarColor = Color3.fromRGB(8, 8, 8), 
-    SidebarTransparency = 0.5, 
-    Transparency = 0.15, 
-    Accent = Color3.fromRGB(255, 255, 255), 
-    TextMain = Color3.fromRGB(240, 240, 240), 
+    Height = 270,
+    Color = Color3.fromRGB(12, 12, 14),
+    SidebarColor = Color3.fromRGB(8, 8, 8),
+    SidebarTransparency = 0.5,
+    Transparency = 0.15,
+    Accent = Color3.fromRGB(255, 255, 255),
+    TextMain = Color3.fromRGB(240, 240, 240),
     TextDim = Color3.fromRGB(160, 160, 170),
     FontUI = Enum.Font.GothamBlack,
     FontBtn = Enum.Font.GothamBold,
-    CornerRadius = UDim.new(0, 10) 
+    CornerRadius = UDim.new(0, 10)
 }
 
 -- Bersihkan UI Lama
@@ -52,7 +53,7 @@ ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 -- ====================================================
 local NotifyContainer = Instance.new("Frame", ScreenGui)
 NotifyContainer.Name = "NotificationContainer"
-NotifyContainer.Size = UDim2.new(0, 220, 0.5, 0) 
+NotifyContainer.Size = UDim2.new(0, 220, 0.5, 0)
 NotifyContainer.AnchorPoint = Vector2.new(1, 1)
 NotifyContainer.Position = UDim2.new(1, -20, 1, -20)
 NotifyContainer.BackgroundTransparency = 1
@@ -65,28 +66,28 @@ NotifyLayout.SortOrder = Enum.SortOrder.LayoutOrder
 NotifyLayout.Padding = UDim.new(0, 5)
 
 local function Notify(title, text, colorOverride, duration)
-    local color = colorOverride or Color3.fromRGB(200, 200, 200) 
-    local timeTime = duration or 3 
+    local color = colorOverride or Color3.fromRGB(200, 200, 200)
+    local timeTime = duration or 3
     
     local Frame = Instance.new("Frame")
     Frame.Name = "NotifyItem"
-    Frame.Size = UDim2.new(1, 0, 0, 0) 
+    Frame.Size = UDim2.new(1, 0, 0, 0)
     Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     Frame.BackgroundTransparency = 0.1
-    Frame.BorderSizePixel = 0 
+    Frame.BorderSizePixel = 0
     Frame.Parent = NotifyContainer
     
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
     
     local Bar = Instance.new("Frame", Frame)
-    Bar.Size = UDim2.new(0, 3, 1, -10) 
+    Bar.Size = UDim2.new(0, 3, 1, -10)
     Bar.Position = UDim2.new(0, 0, 0, 5)
     Bar.BackgroundColor3 = color
     Bar.BorderSizePixel = 0
     Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 4)
 
     local LblTitle = Instance.new("TextLabel", Frame)
-    LblTitle.Size = UDim2.new(1, -15, 0, 14) 
+    LblTitle.Size = UDim2.new(1, -15, 0, 14)
     LblTitle.Position = UDim2.new(0, 10, 0, 6)
     LblTitle.BackgroundTransparency = 1
     LblTitle.Text = string.upper(title)
@@ -97,7 +98,7 @@ local function Notify(title, text, colorOverride, duration)
     
     local LblMsg = Instance.new("TextLabel", Frame)
     LblMsg.Size = UDim2.new(1, -15, 0, 14)
-    LblMsg.Position = UDim2.new(0, 10, 0, 20) 
+    LblMsg.Position = UDim2.new(0, 10, 0, 20)
     LblMsg.BackgroundTransparency = 1
     LblMsg.Text = text
     LblMsg.TextColor3 = UI_THEME.TextMain
@@ -111,7 +112,7 @@ local function Notify(title, text, colorOverride, duration)
     task.delay(timeTime, function()
         if Frame then
             local TweenOut = Services.TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Size = UDim2.new(1, 20, 0, 0), 
+                Size = UDim2.new(1, 20, 0, 0),
                 BackgroundTransparency = 1
             })
             TweenOut:Play()
@@ -123,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V26: Smart Schedule & Recovery", nil, 4)
+Notify("SERAPHIN", "V23 Strict Mining & Time Check", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -162,48 +163,47 @@ end
 -- ====================================================
 local MonitorHUD = Instance.new("Frame", ScreenGui)
 MonitorHUD.Name = "LiveMonitor"
--- Diperlebar sedikit untuk muat jam
-MonitorHUD.Size = UDim2.new(0, 180, 0, 24) 
-MonitorHUD.Position = UDim2.new(0.5, -90, 0, 10) 
-MonitorHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18) 
+MonitorHUD.Size = UDim2.new(0, 180, 0, 24)
+MonitorHUD.Position = UDim2.new(0.5, -90, 0, 10)
+MonitorHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 MonitorHUD.BackgroundTransparency = 0.2
-MonitorHUD.BorderSizePixel = 0 
-MonitorHUD.Active = true 
+MonitorHUD.BorderSizePixel = 0
+MonitorHUD.Active = true
 Instance.new("UICorner", MonitorHUD).CornerRadius = UDim.new(0, 6)
 
 local MonLabel = Instance.new("TextLabel", MonitorHUD)
 MonLabel.Size = UDim2.new(1, 0, 1, 0)
 MonLabel.BackgroundTransparency = 1
 MonLabel.Text = "FPS: -- | CPU: --.-- | TIME: --:--:--"
-MonLabel.TextColor3 = Color3.fromRGB(255, 255, 255) 
-MonLabel.Font = UI_THEME.FontUI 
+MonLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+MonLabel.Font = UI_THEME.FontUI
 MonLabel.TextSize = 10
-EnableDrag(MonitorHUD, MonitorHUD) 
+EnableDrag(MonitorHUD, MonitorHUD)
 
 -- ====================================================
 -- [1] MINI FLOATING HUD (FISH STATS) - CENTERED
 -- ====================================================
 local FloatHUD = Instance.new("Frame", ScreenGui)
 FloatHUD.Name = "FloatingStats"
-FloatHUD.AnchorPoint = Vector2.new(0.5, 0) 
-FloatHUD.Size = UDim2.new(0, 150, 0, 100) 
-FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0) -- Tengah Layar
-FloatHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18) 
+FloatHUD.AnchorPoint = Vector2.new(0.5, 0)
+FloatHUD.Size = UDim2.new(0, 150, 0, 100)
+FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0)
+FloatHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 FloatHUD.BackgroundTransparency = 0.3
-FloatHUD.BorderSizePixel = 0 
-FloatHUD.Visible = false 
-FloatHUD.Active = true 
+FloatHUD.BorderSizePixel = 0
+FloatHUD.Visible = false
+FloatHUD.Active = true
 Instance.new("UICorner", FloatHUD).CornerRadius = UDim.new(0, 8)
 
 local ListLayout = Instance.new("UIListLayout", FloatHUD)
 ListLayout.FillDirection = Enum.FillDirection.Vertical
-ListLayout.Padding = UDim.new(0, 0) 
+ListLayout.Padding = UDim.new(0, 0)
 ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-ListLayout.SortOrder = Enum.SortOrder.LayoutOrder 
+ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local Padding = Instance.new("UIPadding", FloatHUD)
-Padding.PaddingTop = UDim.new(0, 8) 
+Padding.PaddingTop = UDim.new(0, 8)
 Padding.PaddingBottom = UDim.new(0, 8)
 Padding.PaddingLeft = UDim.new(0, 8)
 Padding.PaddingRight = UDim.new(0, 8)
@@ -212,10 +212,10 @@ local TitleLabel = Instance.new("TextLabel", FloatHUD)
 TitleLabel.LayoutOrder = 1
 TitleLabel.Size = UDim2.new(1, 0, 0, 18)
 TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "PANEL SERAPHIN" 
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255) 
-TitleLabel.Font = UI_THEME.FontUI 
-TitleLabel.TextSize = 12 
+TitleLabel.Text = "PANEL SERAPHIN"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = UI_THEME.FontUI
+TitleLabel.TextSize = 12
 TitleLabel.TextStrokeTransparency = 1
 
 local Div = Instance.new("Frame", FloatHUD)
@@ -241,7 +241,7 @@ local function CreateStatBlock(titleText, defaultVal, order)
     LblTitle.Text = string.upper(titleText)
     LblTitle.TextColor3 = UI_THEME.TextDim
     LblTitle.Font = Enum.Font.GothamBold
-    LblTitle.TextSize = 9 
+    LblTitle.TextSize = 9
     
     local LblValue = Instance.new("TextLabel", Block)
     LblValue.Name = "Value"
@@ -250,12 +250,12 @@ local function CreateStatBlock(titleText, defaultVal, order)
     LblValue.BackgroundTransparency = 1
     LblValue.Text = defaultVal
     LblValue.TextColor3 = UI_THEME.TextMain
-    LblValue.Font = UI_THEME.FontUI 
-    LblValue.TextSize = 12 
-    return LblValue 
+    LblValue.Font = UI_THEME.FontUI
+    LblValue.TextSize = 12
+    return LblValue
 end
 
-local LblFishVal = CreateStatBlock("FISH CAUGHT", "Loading...", 3) 
+local LblFishVal = CreateStatBlock("FISH CAUGHT", "Loading...", 3)
 local LblInvVal  = CreateStatBlock("INVENTORY", "0 / 0", 4)
 EnableDrag(FloatHUD, FloatHUD)
 
@@ -265,15 +265,15 @@ EnableDrag(FloatHUD, FloatHUD)
 local Main = Instance.new("Frame", ScreenGui)
 Main.Name = "Main"
 Main.Size = UDim2.new(0, UI_THEME.Width, 0, UI_THEME.Height)
-Main.Position = UDim2.new(0, 50, 0.5, -UI_THEME.Height/2) 
+Main.Position = UDim2.new(0, 50, 0.5, -UI_THEME.Height/2)
 Main.BackgroundColor3 = UI_THEME.Color
 Main.BackgroundTransparency = UI_THEME.Transparency
 Main.Active = true
-Main.ClipsDescendants = true 
-Main.Visible = false 
-Main.BorderSizePixel = 0 
+Main.ClipsDescendants = true
+Main.Visible = false
+Main.BorderSizePixel = 0
 local MainCorner = Instance.new("UICorner", Main)
-MainCorner.CornerRadius = UI_THEME.CornerRadius 
+MainCorner.CornerRadius = UI_THEME.CornerRadius
 
 -- Logo (Minimized)
 local LogoContainer = Instance.new("Frame", Main)
@@ -282,11 +282,10 @@ LogoContainer.Size = UDim2.new(0, 32, 0, 32)
 LogoContainer.Position = UDim2.new(0.5, -16, 0.5, -16)
 LogoContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 LogoContainer.BackgroundTransparency = 0
-LogoContainer.BorderSizePixel = 0 
+LogoContainer.BorderSizePixel = 0
 LogoContainer.Visible = false
 LogoContainer.ZIndex = 11
-Instance.new("UICorner", LogoContainer).CornerRadius = UDim.new(0, 8) 
-
+Instance.new("UICorner", LogoContainer).CornerRadius = UDim.new(0, 8)
 local LogoR = Instance.new("TextButton", LogoContainer)
 LogoR.Name = "LogoBtn"
 LogoR.Size = UDim2.new(1, 0, 1, 0)
@@ -300,26 +299,25 @@ LogoR.ZIndex = 12
 -- HEADER
 local Header = Instance.new("Frame", Main)
 Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 32) 
-Header.BackgroundColor3 = UI_THEME.SidebarColor 
+Header.Size = UDim2.new(1, 0, 0, 32)
+Header.BackgroundColor3 = UI_THEME.SidebarColor
 Header.BackgroundTransparency = UI_THEME.SidebarTransparency
-Header.BorderSizePixel = 0 
-
+Header.BorderSizePixel = 0
 local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(1, -40, 1, 0) 
-Title.Position = UDim2.new(0, 12, 0, 0) 
-Title.Text = "SERA <font color=\"rgb(255, 255, 255)\">HELPER</font>" 
+Title.Size = UDim2.new(1, -40, 1, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
+Title.Text = "SERA <font color=\"rgb(255, 255, 255)\">HELPER</font>"
 Title.RichText = true
 Title.TextColor3 = UI_THEME.TextMain
-Title.Font = UI_THEME.FontUI 
+Title.Font = UI_THEME.FontUI
 Title.TextSize = 12
 Title.BackgroundTransparency = 1
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
 local HideBtn = Instance.new("TextButton", Header)
-HideBtn.Size = UDim2.new(0, 22, 0, 22) 
+HideBtn.Size = UDim2.new(0, 22, 0, 22)
 HideBtn.Position = UDim2.new(1, -28, 0.5, -11)
-HideBtn.Text = "_" 
+HideBtn.Text = "_"
 HideBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 HideBtn.BackgroundTransparency = 0.95
 HideBtn.TextColor3 = UI_THEME.TextDim
@@ -327,7 +325,8 @@ HideBtn.Font = UI_THEME.FontUI
 HideBtn.TextSize = 14
 HideBtn.AutoButtonColor = true
 Instance.new("UICorner", HideBtn).CornerRadius = UDim.new(0, 6)
-EnableDrag(Main, Main) 
+
+EnableDrag(Main, Main)
 EnableDrag(Main, LogoR)
 
 -- ====================================================
@@ -342,10 +341,10 @@ ContentContainer.BorderSizePixel = 0
 
 local Sidebar = Instance.new("Frame", ContentContainer)
 Sidebar.Name = "Sidebar"
-Sidebar.Size = UDim2.new(0, 95, 1, 0) 
-Sidebar.BackgroundColor3 = UI_THEME.SidebarColor 
+Sidebar.Size = UDim2.new(0, 95, 1, 0)
+Sidebar.BackgroundColor3 = UI_THEME.SidebarColor
 Sidebar.BackgroundTransparency = UI_THEME.SidebarTransparency
-Sidebar.BorderSizePixel = 0 
+Sidebar.BorderSizePixel = 0
 
 local SidebarLayout = Instance.new("UIListLayout", Sidebar)
 SidebarLayout.FillDirection = Enum.FillDirection.Vertical
@@ -359,20 +358,20 @@ SidebarPad.PaddingTop = UDim.new(0, 8)
 local function CreateSideTab(name, text, isActive)
     local btn = Instance.new("TextButton", Sidebar)
     btn.Name = name
-    btn.Size = UDim2.new(0.85, 0, 0, 26) 
+    btn.Size = UDim2.new(0.85, 0, 0, 26)
     
     if isActive then
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50) 
+        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         btn.BackgroundTransparency = 0.3
-        btn.TextColor3 = Color3.new(1,1,1) 
+        btn.TextColor3 = Color3.new(1,1,1)
     else
         btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         btn.BackgroundTransparency = 1
         btn.TextColor3 = UI_THEME.TextDim
     end
     btn.Text = text
-    btn.Font = UI_THEME.FontBtn 
-    btn.TextSize = 10 
+    btn.Font = UI_THEME.FontBtn
+    btn.TextSize = 10
     btn.AutoButtonColor = true
     btn.BorderSizePixel = 0
     
@@ -383,8 +382,8 @@ local function CreateSideTab(name, text, isActive)
 end
 
 local TabMainBtn   = CreateSideTab("TabMain", "MAIN", true)
-local TabEventBtn  = CreateSideTab("TabEvent", "EVENT", false) 
-local TabPlayerBtn = CreateSideTab("TabPlayer", "PLAYER", false) 
+local TabEventBtn  = CreateSideTab("TabEvent", "EVENT", false)
+local TabPlayerBtn = CreateSideTab("TabPlayer", "PLAYER", false)
 local TabMiscBtn   = CreateSideTab("TabMisc", "MISC", false)
 
 -- ====================================================
@@ -392,7 +391,7 @@ local TabMiscBtn   = CreateSideTab("TabMisc", "MISC", false)
 -- ====================================================
 local PageArea = Instance.new("Frame", ContentContainer)
 PageArea.Name = "PageArea"
-PageArea.Size = UDim2.new(1, -105, 1, -10) 
+PageArea.Size = UDim2.new(1, -105, 1, -10)
 PageArea.Position = UDim2.new(0, 100, 0, 5)
 PageArea.BackgroundTransparency = 1
 PageArea.BorderSizePixel = 0
@@ -417,18 +416,18 @@ local function CreatePage(name, visible, isList)
         ll.SortOrder = Enum.SortOrder.LayoutOrder
     else
         local gl = Instance.new("UIGridLayout", pg)
-        gl.CellSize = UDim2.new(0.48, 0, 0, 26) 
+        gl.CellSize = UDim2.new(0.48, 0, 0, 26)
         gl.CellPadding = UDim2.new(0, 5, 0, 5)
         gl.SortOrder = Enum.SortOrder.LayoutOrder
     end
     return pg
 end
 
--- PAGE INIT 
+-- PAGE INIT
 local PageMain   = CreatePage("PageMain", true, false)
-local PageEvent  = CreatePage("PageEvent", false, true) -- [UPDATED] Event Page is ListLayout
-local PagePlayer = CreatePage("PagePlayer", false, true) -- LIST LAYOUT ENABLED
-local PageMisc   = CreatePage("PageMisc", false, true)   -- [MODIFIED] LIST LAYOUT
+local PageEvent  = CreatePage("PageEvent", false, true)
+local PagePlayer = CreatePage("PagePlayer", false, true)
+local PageMisc   = CreatePage("PageMisc", false, true)
 
 local function SwitchTab(tabName)
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
@@ -439,16 +438,16 @@ local function SwitchTab(tabName)
         local isActive = (name == tabName)
         pages[name].Visible = isActive
         
-        if isActive then 
-             Services.TweenService:Create(btn, tweenInfo, {
+        if isActive then
+              Services.TweenService:Create(btn, tweenInfo, {
                 BackgroundTransparency = 0.3,
                 TextColor3 = Color3.new(1,1,1),
-                BackgroundColor3 = Color3.fromRGB(40, 40, 50) 
-             }):Play()
+                BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+              }):Play()
         else
             Services.TweenService:Create(btn, tweenInfo, {
                 BackgroundTransparency = 1,
-                TextColor3 = UI_THEME.TextDim, 
+                TextColor3 = UI_THEME.TextDim,
                 BackgroundColor3 = Color3.fromRGB(255,255,255)
             }):Play()
         end
@@ -464,7 +463,7 @@ TabMiscBtn.MouseButton1Click:Connect(function() SwitchTab("Misc") end)
 -- [5] LOGIC & FUNCTIONAL UI
 -- ====================================================
 local IsMinimized = false
-HideBtn.MouseButton1Click:Connect(function() 
+HideBtn.MouseButton1Click:Connect(function()
     if not IsMinimized then
         IsMinimized = true
         Header.Visible = false
@@ -491,41 +490,36 @@ end)
 local function MakeBtn(parent, text)
     local b = Instance.new("TextButton", parent)
     b.Text = text
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 40) 
+    b.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     b.BackgroundTransparency = 0.3
     b.TextColor3 = UI_THEME.TextMain
-    b.Font = UI_THEME.FontBtn 
-    b.TextScaled = true 
+    b.Font = UI_THEME.FontBtn
+    b.TextScaled = true
     b.BorderSizePixel = 0
     
-    -- ADJUST WIDTH FOR LIST LAYOUT PAGES
     if parent == PageMisc or parent == PageEvent then
         b.Size = UDim2.new(0.95, 0, 0, 26)
     end
     
     local constraint = Instance.new("UITextSizeConstraint", b)
-    constraint.MaxTextSize = 10 
+    constraint.MaxTextSize = 10
     constraint.MinTextSize = 8
     
     b.AutoButtonColor = true
     b.ClipsDescendants = true
     b.TextStrokeTransparency = 1
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6) 
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
     
     return b
 end
 
 -- [STYLE SWITCH]
--- Global ref agar bisa diupdate oleh Scheduler
-local SwitchElements = {} 
-
 local function MakeSwitch(parent, text, defaultState, callback)
     local Frame = Instance.new("Frame")
     Frame.Name = "Switch_" .. text
     
-    -- ADJUST SIZE FOR PLAYER/MISC/EVENT TAB
     if parent == PagePlayer or parent == PageMisc or parent == PageEvent then
-        Frame.Size = UDim2.new(0.95, 0, 0, 26) -- Full width for List Layout
+        Frame.Size = UDim2.new(0.95, 0, 0, 26)
     else
         -- Grid Layout handled by parent UIGridLayout
     end
@@ -537,40 +531,42 @@ local function MakeSwitch(parent, text, defaultState, callback)
     
     local Corner = Instance.new("UICorner", Frame)
     Corner.CornerRadius = UDim.new(0, 6)
-
     local Label = Instance.new("TextLabel", Frame)
     Label.Size = UDim2.new(0.65, 0, 1, 0)
     Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
     Label.Text = text
     Label.TextColor3 = UI_THEME.TextMain
-    Label.Font = UI_THEME.FontBtn 
-    Label.TextSize = 9 
+    Label.Font = UI_THEME.FontBtn
+    Label.TextSize = 9
     Label.TextXAlignment = Enum.TextXAlignment.Left
-
+    
     local ToggleBtn = Instance.new("TextButton", Frame)
-    ToggleBtn.Size = UDim2.new(0, 28, 0, 14) 
+    ToggleBtn.Size = UDim2.new(0, 28, 0, 14)
     ToggleBtn.Position = UDim2.new(1, -34, 0.5, -7)
     ToggleBtn.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(50, 50, 60)
     ToggleBtn.AutoButtonColor = false
     ToggleBtn.Text = ""
     
     local ToggleCorner = Instance.new("UICorner", ToggleBtn)
-    ToggleCorner.CornerRadius = UDim.new(1, 0) 
+    ToggleCorner.CornerRadius = UDim.new(1, 0)
     
     local Circle = Instance.new("Frame", ToggleBtn)
     Circle.Size = UDim2.new(0, 10, 0, 10)
     Circle.Position = defaultState and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
     Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
-
+    
     local IsOn = defaultState
     local Debounce = false
     
-    -- Function Update Visual agar bisa dipanggil luar
-    local function UpdateVisual(state)
-        IsOn = state
+    ToggleBtn.MouseButton1Click:Connect(function()
+        if Debounce then return end
+        Debounce = true
+        IsOn = not IsOn
+        
         local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+        
         if IsOn then
             Services.TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
             Services.TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(1, -12, 0.5, -5)}):Play()
@@ -578,21 +574,12 @@ local function MakeSwitch(parent, text, defaultState, callback)
             Services.TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
             Services.TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5)}):Play()
         end
-    end
-
-    ToggleBtn.MouseButton1Click:Connect(function()
-        if Debounce then return end
-        Debounce = true
-        IsOn = not IsOn
-        UpdateVisual(IsOn)
+        
         if callback then callback(IsOn) end
+        
         task.wait(0.2)
         Debounce = false
     end)
-    
-    -- Simpan referensi update visual
-    SwitchElements[text] = UpdateVisual
-    
     return Frame
 end
 
@@ -600,9 +587,9 @@ local function ToggleVisual(btn, on)
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     if on then
         Services.TweenService:Create(btn, tweenInfo, {
-            TextColor3 = Color3.new(255,255,255), 
+            TextColor3 = Color3.new(255,255,255),
             BackgroundTransparency = 0.2,
-            BackgroundColor3 = Color3.fromRGB(40, 40, 50) 
+            BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         }):Play()
     else
         Services.TweenService:Create(btn, tweenInfo, {
@@ -615,19 +602,18 @@ end
 
 -- States
 local States = {
-    Freeze=false, WoW=false, Boost=false, NoRender=false, 
+    Freeze=false, WoW=false, Boost=false, NoRender=false,
     Noclip=false, Panel=true, AutoEquip=false,
-    AutoEvent=false, 
-    Speed=false, SpeedVal=50, NoDmg=false, 
+    AutoEvent=false,
+    Speed=false, SpeedVal=50, NoDmg=false,
     AutoFollow=false, FollowTarget=nil,
     AutoCoral=false,
-    AutoFarmRelic=false, 
-    AutoMiningV20=false, 
-    AutoSchedule=true, -- [NEW]
+    AutoFarmRelic=false,
+    AutoMiningV20=false,
     Busy=false,
-    IsMining=false, 
+    IsMining=false,
     HasTank=false,
-    RelicSel="Blacktide", 
+    RelicSel="Blacktide",
     RelicSpot=1,
     HideRod=false,
     StreamerMode=false,
@@ -635,21 +621,21 @@ local States = {
     AutoFishActive=false
 }
 
-local SavedCFrame = nil 
-local EventStartCFrame = nil 
+local SavedCFrame = nil
+local EventStartCFrame = nil
 local CoralReturnCFrame = nil
-local IsInEvent = false 
+local IsInEvent = false
 local IsLootingCoral = false
 local Connections = {}
 local BodyV = nil
 local LastFishCaughtTime = tick()
 local LastFishCount = 0
 local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt", "Megalodon Hunt"}
-
--- [NEW] MINING & FISHING VARS
 local SavedMinePosition = nil
 
--- FUNGSI AUTO FISH
+-- ====================================================
+-- [UPDATED] AUTO FISHING - SPECIFIC CODE
+-- ====================================================
 local function StartAutoFishRoutine()
     if States.AutoFishActive then return end
     States.AutoFishActive = true
@@ -658,17 +644,17 @@ local function StartAutoFishRoutine()
     task.spawn(function()
         local Net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
         
-        -- 1. Update State
-        local argsState = { true }
-        Net["RF/UpdateAutoFishingState"]:InvokeServer(unpack(argsState))
-        
-        while States.AutoFishActive and not States.AutoMiningV20 do
+        while States.AutoFishActive and not States.IsMining do
             pcall(function()
+                -- 1. Update State (True)
+                local argsState = { true }
+                Net["RF/UpdateAutoFishingState"]:InvokeServer(unpack(argsState))
+                
                 -- 2. Charge Rod
                 Net["RF/ChargeFishingRod"]:InvokeServer()
                 task.wait(1)
                 
-                -- 3. Request Minigame
+                -- 3. Request Minigame (Specific Args)
                 local argsGame = {
                     -0.9879989624023438,
                     0.5,
@@ -676,7 +662,7 @@ local function StartAutoFishRoutine()
                 }
                 Net["RF/RequestFishingMinigameStarted"]:InvokeServer(unpack(argsGame))
                 
-                task.wait(2.5) 
+                task.wait(2.5) -- Minigame Duration
                 
                 -- 4. Catch Fish
                 Net["RF/CatchFishCompleted"]:InvokeServer()
@@ -687,9 +673,10 @@ local function StartAutoFishRoutine()
 end
 
 -- Force Re-Equip
-local function ForceEquipRod()
+local function ForceEquipRod(slot)
     pcall(function()
-        local args = { [1] = 1 }
+        local s = slot or 1
+        local args = { [1] = s }
         local pkgs = Services.ReplicatedStorage:FindFirstChild("Packages")
         if pkgs then
             local idx = pkgs:FindFirstChild("_Index")
@@ -706,16 +693,16 @@ end
 -- ====================================================
 -- [UPDATED] HIDE ROD LOGIC (GHOST MODE)
 -- ====================================================
-getgenv().RemoveRodEnabled = false 
+getgenv().RemoveRodEnabled = false
 local function NukeVisuals(tool)
-    task.wait() 
+    task.wait()
     for _, obj in pairs(tool:GetDescendants()) do
         if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Light") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-            obj:Destroy() 
+            obj:Destroy()
         elseif obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
-            obj.Transparency = 1 
-            obj.CanCollide = false 
-            obj.CastShadow = false 
+            obj.Transparency = 1
+            obj.CanCollide = false
+            obj.CastShadow = false
         elseif obj:IsA("Texture") or obj:IsA("Decal") then
             obj.Transparency = 1
         end
@@ -734,19 +721,19 @@ local function SetHideRod(bool)
             
             if Connections["GhostRod"] then Connections["GhostRod"]:Disconnect() end
             Connections["GhostRod"] = char.ChildAdded:Connect(function(child)
-                if getgenv().RemoveRodEnabled and (child:IsA("Tool") or child.Name == "!!!EQUIPPED_TOOL!!!") then 
-                     NukeVisuals(child) 
-                     child.DescendantAdded:Connect(function(descendant)
+                if getgenv().RemoveRodEnabled and (child:IsA("Tool") or child.Name == "!!!EQUIPPED_TOOL!!!") then
+                      NukeVisuals(child)
+                      child.DescendantAdded:Connect(function(descendant)
                         if getgenv().RemoveRodEnabled then
                             task.wait()
                             if descendant:IsA("BasePart") then descendant.Transparency = 1 end
                             if descendant:IsA("ParticleEmitter") then descendant:Destroy() end
-                        end 
-                     end)
+                        end
+                      end)
                 end
             end)
         end
-        Notify("MAIN", "Hide Rod: ON (Re-Equip)", nil) 
+        Notify("MAIN", "Hide Rod: ON (Re-Equip)", nil)
     else
         if Connections["GhostRod"] then Connections["GhostRod"]:Disconnect() end
         Notify("MAIN", "Ghost Rod: OFF", nil)
@@ -757,19 +744,18 @@ end
 local function SetWoW(bool)
     States.WoW = bool
     
-    if States.WoW then 
+    if States.WoW then
         local hrp = GetRoot()
-        if not hrp then return end 
-        if not BodyV then 
+        if not hrp then return end
+        if not BodyV then
             BodyV = Instance.new("BodyVelocity")
             BodyV.Name = "WoW_Velocity"
             BodyV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
             BodyV.Velocity = Vector3.zero
         end
         BodyV.Parent = hrp
-
-        if Connections["WoW"] then Connections["WoW"]:Disconnect() end 
-        Connections["WoW"] = Services.RunService.RenderStepped:Connect(function() 
+        if Connections["WoW"] then Connections["WoW"]:Disconnect() end
+        Connections["WoW"] = Services.RunService.RenderStepped:Connect(function()
             local hrpNow = GetRoot()
             local humNow = GetHum()
             if hrpNow and humNow and BodyV and BodyV.Parent then
@@ -780,12 +766,12 @@ local function SetWoW(bool)
                 else
                     BodyV.Velocity = Vector3.zero
                 end
-            end 
-        end) 
-    else 
-        if Connections["WoW"] then Connections["WoW"]:Disconnect() end 
-        if BodyV then BodyV:Destroy(); BodyV = nil end 
-    end 
+            end
+        end)
+    else
+        if Connections["WoW"] then Connections["WoW"]:Disconnect() end
+        if BodyV then BodyV:Destroy(); BodyV = nil end
+    end
 end
 
 local function SetAutoEquip(bool)
@@ -804,11 +790,11 @@ local function ToggleBoost(enable)
             local l = Services.Lighting
             l.GlobalShadows = false
             l.FogEnd = 9e9
-            l.Brightness = 2 
-            l.ClockTime = 14 
+            l.Brightness = 2
+            l.ClockTime = 14
             l.EnvironmentDiffuseScale = 0
             l.EnvironmentSpecularScale = 0
-            l.Ambient = Color3.fromRGB(200, 200, 200) 
+            l.Ambient = Color3.fromRGB(200, 200, 200)
             l.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
             
             for _, v in pairs(l:GetChildren()) do
@@ -820,7 +806,7 @@ local function ToggleBoost(enable)
         
         if Services.Workspace.Terrain then
             Services.Workspace.Terrain.WaterReflectance = 0
-            Services.Workspace.Terrain.WaterTransparency = 1 
+            Services.Workspace.Terrain.WaterTransparency = 1
             Services.Workspace.Terrain.WaterWaveSize = 0
             Services.Workspace.Terrain.WaterWaveSpeed = 0
             pcall(function() Services.Workspace.Terrain.Material = Enum.Material.SmoothPlastic end)
@@ -835,11 +821,11 @@ local function ToggleBoost(enable)
                     if v:IsA("MeshPart") then v.TextureID = "" end
                     if v.Name == "Water" then v.Transparency = 1 end
                 elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1 
+                    v.Transparency = 1
                 elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Smoke") or v:IsA("Explosion") then
-                    v.Enabled = false 
+                    v.Enabled = false
                 elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
-                    v.Enabled = false 
+                    v.Enabled = false
                 elseif v:IsA("Clothing") then
                     v:Destroy()
                 end
@@ -865,9 +851,9 @@ end
 -- ====================================================
 -- [NEW] STREAMER MODE LOGIC (NAME & CHAT SPOOF)
 -- ====================================================
-local RAW_NAME = "discord.gg/getseraphin VISUAL" 
+local RAW_NAME = "discord.gg/getseraphin VISUAL"
 local SPOOF_NAME = '<font face="GothamBold"><b>' .. RAW_NAME .. '</b></font>'
-local NAME_COLOR = "#00ffff" 
+local NAME_COLOR = "#00ffff"
 local OVERHEAD_HTML = string.format('<font color="#FFFFFF">%s</font>', SPOOF_NAME)
 local NameSpoof = {
     Active = false,
@@ -923,7 +909,7 @@ local function EnableNameSpoof(bool)
         end
         if NameSpoof.CharConn then NameSpoof.CharConn:Disconnect() end
         NameSpoof.CharConn = Player.CharacterAdded:Connect(function(char)
-            task.wait(1) 
+            task.wait(1)
             ApplyNameSpoof()
         end)
     else
@@ -935,7 +921,7 @@ end
 local function CustomizeMessage(message)
     if not States.StreamerMode then return nil end
     local properties = Instance.new("TextChatMessageProperties")
-    local msgText = message.Text 
+    local msgText = message.Text
     
     if string.find(msgText, "caught") or string.find(msgText, "obtained") or string.find(msgText, "found") then
         local newText = string.gsub(msgText, "^%S+", function(originalName)
@@ -981,18 +967,18 @@ end)
 MakeSwitch(PageMain, "No Clip", States.Noclip, function(val)
     States.Noclip = val
     Notify("MAIN", "Noclip: "..(val and "ON" or "OFF"), nil)
-    if States.Noclip then 
-        Connections["Noclip"] = Services.RunService.Stepped:Connect(function() 
+    if States.Noclip then
+        Connections["Noclip"] = Services.RunService.Stepped:Connect(function()
             local char = GetChar()
-            if char then 
-                for _,v in pairs(char:GetDescendants()) do 
-                    if v:IsA("BasePart") then v.CanCollide = false end 
-                end 
-            end 
-        end) 
-    else 
-        if Connections["Noclip"] then Connections["Noclip"]:Disconnect() end 
-    end 
+            if char then
+                for _,v in pairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") then v.CanCollide = false end
+                end
+            end
+        end)
+    else
+        if Connections["Noclip"] then Connections["Noclip"]:Disconnect() end
+    end
 end)
 MakeSwitch(PageMain, "CPU Booster (Bright)", States.Boost, function(val)
     ToggleBoost(val)
@@ -1004,14 +990,15 @@ MakeSwitch(PageMain, "3D No Render", States.NoRender, function(val)
 end)
 
 -- [TAB EVENT]
+
 -- ====================================================
 -- [ADDON] AUTO CRAFT CHARM (DRAWER STYLE)
 -- ====================================================
 local CraftContainer = Instance.new("Frame", PageEvent)
 CraftContainer.Name = "CraftSystem"
-CraftContainer.Size = UDim2.new(0.95, 0, 0, 85) 
+CraftContainer.Size = UDim2.new(0.95, 0, 0, 85)
 CraftContainer.BackgroundTransparency = 1
-CraftContainer.ClipsDescendants = true 
+CraftContainer.ClipsDescendants = true
 
 -- Dropdown Header
 local CraftDropdown = Instance.new("Frame", CraftContainer)
@@ -1053,12 +1040,14 @@ local CraftData = {
     "Hook Charm",
     "Winged Charm"
 }
+
 local function UpdateCraftSelect(name)
     SelectedCraft = name
     CraftBtn.Text = "Craft: " .. name
     CraftListFrame.Visible = false
     Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
 end
+
 for _, cName in pairs(CraftData) do
     local btn = Instance.new("TextButton", CraftListFrame)
     btn.Size = UDim2.new(0.95, 0, 0, 24)
@@ -1129,9 +1118,10 @@ StartCraftBtn.MouseButton1Click:Connect(function()
         StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
         return
     end
-    if not SelectedCraft then 
-        Notify("CRAFT", "Select Charm!", Color3.fromRGB(255, 50, 50)) 
-        return 
+    
+    if not SelectedCraft then
+        Notify("CRAFT", "Select Charm!", Color3.fromRGB(255, 50, 50))
+        return
     end
     
     local amount = tonumber(QtyInputC.Text) or 1
@@ -1152,7 +1142,7 @@ StartCraftBtn.MouseButton1Click:Connect(function()
                 task.wait(0.2)
                 ConfirmCraftRF:InvokeServer()
             end)
-            task.wait(0.5) 
+            task.wait(0.5)
         end
         IsCrafting = false
         StartCraftBtn.Text = "START CRAFT"
@@ -1166,193 +1156,202 @@ MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
     States.AutoEvent = val
     Notify("EVENT", "Auto Hunt: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
     
-    if not val then 
+    if not val then
         local hrp = GetRoot()
-        if IsInEvent and EventStartCFrame and hrp then 
-             hrp.CFrame = EventStartCFrame 
-             EventStartCFrame = nil
+        if IsInEvent and EventStartCFrame and hrp then
+              hrp.CFrame = EventStartCFrame
+              EventStartCFrame = nil
             Notify("AUTO HUNT", "Returning...", nil)
         end
         IsInEvent = false
-        SetWoW(false) 
+        SetWoW(false)
     end
 end)
 
--- [NEW SYSTEM] MINING LOGIC REFACTOR
-local function StartMiningLogic()
-    if States.IsMining then return end
-    States.IsMining = true
-    States.AutoFishActive = false
-    
-    task.spawn(function()
-         local hrp = GetRoot()
-         if not hrp then return end
+-- ====================================================
+-- [NEW] AUTO MINE CYCLE (TIME BASED + STRICT STRUCTURE)
+-- ====================================================
 
-         -- [A] SAVE POSITION
-         SavedMinePosition = hrp.CFrame
-         Notify("MINING", "Started. Pos Saved.", Color3.fromRGB(255, 200, 0))
-         
-         -- EQUIP ROD SLOT 1
-         local char = Player.Character
-         if char then
-            local tool = char:FindFirstChildWhichIsA("Tool")
-            if tool then tool.Parent = Player.Backpack end
-         end
-         task.wait(0.5)
-         
-         Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-         Notify("MINING", "Reset: Equip Rod...", nil)
-         task.wait(1.5)
-         
-         -- EQUIP PICKAXE SLOT 2
-         Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(2)
-         Notify("MINING", "Ready: Equip Pickaxe.", nil)
-         task.wait(1)
-
-         -- FUNGSI LOGIKA MINING PER AREA
-         local function RunMiningZone(zoneName, warpCFrame, folderIslands, startDelay)
-             if not States.AutoMiningV20 then return end
-             
-             local root = GetRoot()
-             if root then 
-                root.Velocity = Vector3.zero
-                root.Anchored = false
-                root.CFrame = warpCFrame 
-             end
-             Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
-             
-             -- DELAY KHUSUS (Lava 5s, Deeps 8s)
-             Notify("MINING", "Waiting " .. startDelay .. "s...", nil)
-             task.wait(startDelay)
-
-             while States.AutoMiningV20 do
-                 local targetFolder = folderIslands
-                 if not targetFolder then break end
-                 
-                 local crystals = {}
-                 for _, v in pairs(targetFolder:GetChildren()) do
-                     if v:FindFirstChildWhichIsA("ProximityPrompt", true) then 
-                         table.insert(crystals, v) 
-                     end
-                 end
-
-                 if #crystals == 0 then 
-                     Notify("MINING", zoneName .. " Clean. Next...", Color3.fromRGB(0, 255, 100))
-                     break 
-                 end
-
-                 Notify("MINING", "Found " .. #crystals .. " Crystals.", Color3.fromRGB(255, 255, 0))
-
-                 local myPos = GetRoot().Position
-                 table.sort(crystals, function(a,b) 
-                     return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude 
-                 end)
-
-                 for _, node in ipairs(crystals) do
-                     if not States.AutoMiningV20 then break end
-                     
-                     local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-                     if prompt then
-                         local part = prompt.Parent
-                         local r = GetRoot()
-                         
-                         if r and part then
-                             r.Anchored = false
-                             local dist = (r.Position - part.Position).Magnitude
-                             local tweenTime = dist / 60 
-                             if tweenTime < 0.5 then tweenTime = 0.5 end
-                             
-                             local targetPos = part.CFrame * CFrame.new(0, 0, 3) 
-                             local tween = Services.TweenService:Create(r, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetPos})
-                             tween:Play()
-                             tween.Completed:Wait()
-
-                             r.Velocity = Vector3.zero
-                             r.Anchored = true 
-                             r.CFrame = CFrame.lookAt(r.Position, part.Position) 
-                             
-                             Notify("MINING", "Aligning 5s...", Color3.fromRGB(255, 200, 200))
-                             task.wait(2.5)
-                             
-                             if prompt.Parent then 
-                                 Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
-                                 fireproximityprompt(prompt)
-                             end
-                             
-                             Notify("MINING", "Delay 8.5s...", nil)
-                             task.wait(8.5)
-                         end
-                     end
-                 end
-                 task.wait(1)
-             end
-         end
-
-         local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
-         local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
-         
-         RunMiningZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5)
-
-         if States.AutoMiningV20 then
-             Notify("MINING", "Switching to Depths...", Color3.fromRGB(200, 0, 255))
-             RunMiningZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 8)
-         end
-
-         Notify("MINING", "Cycle Done. Return.", Color3.fromRGB(0, 255, 0))
-         States.IsMining = false
-         States.AutoMiningV20 = false 
-         
-         -- Update visual tombol jika dimatikan script
-         if SwitchElements["Auto Mine Lava/Crystal"] then
-             SwitchElements["Auto Mine Lava/Crystal"](false)
-         end
-         
-         local finalRoot = GetRoot()
-         if finalRoot and SavedMinePosition then
-             finalRoot.Anchored = false
-             finalRoot.Velocity = Vector3.zero
-             finalRoot.CFrame = SavedMinePosition
-         end
-         
-         for _, part in pairs(Player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = true end
-         end
-
-         task.wait(1)
-         Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-         Notify("GEAR", "Rod Equipped - Fish", nil)
-         task.wait(1)
-         StartAutoFishRoutine()
-    end)
+-- Function: Cek Waktu WIB (UTC+7)
+local function IsMiningTime()
+    local utcNow = os.date("!*t")
+    local wibHour = (utcNow.hour + 7) % 24
+    local wibMin = utcNow.min
+    -- Jadwal: Jam Genap (02, 04, dst) Menit 00-40
+    local isEven = (wibHour % 2 == 0)
+    local inWindow = (wibMin >= 0 and wibMin <= 40)
+    return isEven and inWindow
 end
 
-local function StopMiningLogic()
-    States.IsMining = false
-    States.AutoMiningV20 = false
-    States.AutoFishActive = false 
-    
+local function MiningRoutine()
     local hrp = GetRoot()
-    if hrp then 
-        hrp.Anchored = false 
-        for _, part in pairs(Player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = true end
+    if not hrp then return end
+    
+    -- [1] SAVE POSITION
+    SavedMinePosition = hrp.CFrame
+    Notify("MINING", "Start: Position Saved.", Color3.fromRGB(255, 200, 0))
+    
+    -- [2] PREPARE GEAR (Unequip 1, Equip 2)
+    local char = Player.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool then tool.Parent = Player.Backpack end
+    end
+    task.wait(0.5)
+    
+    Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(2)
+    Notify("MINING", "Equipped Pickaxe (Slot 2).", nil)
+    task.wait(1.5) -- Pastikan memegang sebelum TP
+    
+    -- Function to Run Specific Zone
+    local function RunZone(zoneName, tpCFrame, folderIslands, delayStart, delayBetween)
+        -- Instan Teleport
+        local r = GetRoot()
+        if r then
+            r.Velocity = Vector3.zero
+            r.Anchored = false
+            r.CFrame = tpCFrame
+        end
+        Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
+        
+        -- Diam 5 Detik
+        Notify("MINING", "Wait " .. delayStart .. "s (Scan)...", nil)
+        task.wait(delayStart)
+        
+        -- Loop Double Check (Until No Crystals)
+        local scanAgain = true
+        while scanAgain and States.IsMining do
+            local crystals = {}
+            if folderIslands then
+                 for _, v in pairs(folderIslands:GetChildren()) do
+                    if v:FindFirstChildWhichIsA("ProximityPrompt", true) then
+                        table.insert(crystals, v)
+                    end
+                end
+            end
+            
+            if #crystals == 0 then
+                scanAgain = false
+                Notify("MINING", zoneName .. " Clean. Done.", Color3.fromRGB(0, 255, 100))
+            else
+                Notify("MINING", "Found " .. #crystals .. " Crystals.", Color3.fromRGB(255, 255, 0))
+                local myPos = GetRoot().Position
+                table.sort(crystals, function(a,b)
+                    return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude
+                end)
+                
+                for _, node in ipairs(crystals) do
+                    if not States.IsMining then return end
+                    local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    if prompt then
+                        local part = prompt.Parent
+                        local r2 = GetRoot()
+                        if r2 and part then
+                            -- Fly to Crystal
+                            r2.Anchored = false
+                            local dist = (r2.Position - part.Position).Magnitude
+                            local tTime = dist / 60
+                            if tTime < 0.5 then tTime = 0.5 end
+                            local tw = Services.TweenService:Create(r2, TweenInfo.new(tTime, Enum.EasingStyle.Linear), {CFrame = part.CFrame * CFrame.new(0,0,3)})
+                            tw:Play()
+                            tw.Completed:Wait()
+                            
+                            -- Delay 3 Detik (Stabilize)
+                            r2.Velocity = Vector3.zero
+                            r2.Anchored = true
+                            r2.CFrame = CFrame.lookAt(r2.Position, part.Position)
+                            task.wait(3)
+                            
+                            -- Extract
+                            if prompt.Parent then
+                                fireproximityprompt(prompt)
+                                Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
+                            end
+                            
+                            -- Delay 2 Detik (Post-Extract)
+                            task.wait(2)
+                            
+                            -- Delay 8.5 Detik Sebelum ke Next Crystal
+                            Notify("MINING", "Delay 8.5s...", nil)
+                            task.wait(8.5)
+                        end
+                    end
+                end
+                task.wait(1) -- Short pause before rescan
+            end
         end
     end
-    Notify("MINING", "Stopped Manual.", Color3.fromRGB(255, 50, 50))
+    
+    local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
+    local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
+    
+    -- [3] ZONA 1: LAVA BASIN
+    RunZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5, 8.5)
+    
+    if States.IsMining then
+        -- [4] TRANSITION (Delay 5 Detik Sebelum Deeps)
+        Notify("MINING", "Wait 5s before Deeps...", Color3.fromRGB(200, 0, 255))
+        task.wait(5)
+        
+        -- [5] ZONA 2: CRYSTAL DEPTHS
+        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 8.5)
+    end
+    
+    -- [6] FINISH -> RETURN -> FISHING
+    Notify("MINING", "Cycle Done. Returning...", Color3.fromRGB(0, 255, 0))
+    States.IsMining = false -- Stop Active Mining Flag (But Switch remains ON for monitoring)
+    
+    local finalRoot = GetRoot()
+    if finalRoot and SavedMinePosition then
+        finalRoot.Anchored = false
+        finalRoot.Velocity = Vector3.zero
+        finalRoot.CFrame = SavedMinePosition
+    end
+    
+    task.wait(1)
+    Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+    Notify("GEAR", "Rod Equipped - Auto Fish", nil)
+    task.wait(1)
+    StartAutoFishRoutine()
 end
-
--- [SWITCHES MINING]
-MakeSwitch(PageEvent, "Auto Schedule (Time)", States.AutoSchedule, function(val)
-    States.AutoSchedule = val
-    Notify("SCHEDULE", "Auto Time: " .. (val and "ON" or "OFF"), val and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
-end)
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
     States.AutoMiningV20 = val
+    
     if val then
-        StartMiningLogic()
+        task.spawn(function()
+            Notify("SYSTEM", "Auto Mine: ON (Checking Time)", nil)
+            while States.AutoMiningV20 do
+                local timeValid = IsMiningTime()
+                
+                -- Jika waktu mining dan kita tidak sedang mining (Idle/Fishing)
+                if timeValid and not States.IsMining then
+                    States.AutoFishActive = false -- Stop Fishing
+                    States.IsMining = true -- Flag Active
+                    MiningRoutine() -- Jalankan 1 Siklus Penuh
+                elseif not timeValid and not States.IsMining then
+                    -- Jika bukan jam mining, pastikan fishing jalan
+                    if not States.AutoFishActive then
+                        StartAutoFishRoutine()
+                    end
+                end
+                
+                task.wait(5) -- Cek setiap 5 detik
+            end
+        end)
     else
-        StopMiningLogic()
+        States.IsMining = false
+        States.AutoMiningV20 = false
+        States.AutoFishActive = false
+        
+        local hrp = GetRoot()
+        if hrp then
+            hrp.Anchored = false
+             for _, part in pairs(Player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = true end
+            end
+        end
+        Notify("MINING", "Stopped Completely.", Color3.fromRGB(255, 50, 50))
     end
 end)
 
@@ -1370,12 +1369,12 @@ MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
         end
     end
     
-    if not val then 
+    if not val then
         local hrp = GetRoot()
-        if IsLootingCoral and CoralReturnCFrame and hrp then 
-             hrp.CFrame = CoralReturnCFrame 
-             Notify("CORAL", "Returning...", nil) 
-        end
+        if IsLootingCoral and CoralReturnCFrame and hrp then
+              hrp.CFrame = CoralReturnCFrame
+              Notify("CORAL", "Returning...", nil)
+         end
         IsLootingCoral = false
         SetWoW(false)
     end
@@ -1391,19 +1390,22 @@ local function ProcessRelicWithSpots(relicContainer)
     
     local validNames = {["Sunken Eye Relic"]=true, ["Burntflame Relic"]=true, ["Blacktide Relic"]=true}
     if not validNames[relicContainer.Name] then return end
+
     local hrp = GetRoot()
     if not hrp then return end
+
     if not States.HasTank then
         pcall(function() TankRemote:InvokeServer(575) end)
         States.HasTank = true
         Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
     end
     
-    SetWoW(true) 
+    SetWoW(true)
     local spots = relicContainer:GetChildren()
     for i, spotPart in ipairs(spots) do
-        if not States.AutoFarmRelic then break end 
-        if States.Busy then break end 
+        if not States.AutoFarmRelic then break end
+        if States.Busy then break end
+        
         local target = spotPart:FindFirstChild("Part") or (spotPart:IsA("BasePart") and spotPart)
         if target then
             States.Busy = true
@@ -1411,7 +1413,7 @@ local function ProcessRelicWithSpots(relicContainer)
             task.wait(0.6)
             ClaimRemote:FireServer(relicContainer.Name)
             Notify("RELIC", "Checked Spot " .. i .. " (" .. relicContainer.Name .. ")", Color3.fromRGB(0, 255, 100), 1)
-            task.wait(1.5) 
+            task.wait(1.5)
             States.Busy = false
         end
     end
@@ -1419,7 +1421,7 @@ end
 
 RelicsFolder.ChildAdded:Connect(function(child)
     if States.AutoFarmRelic then
-        task.wait(1) 
+        task.wait(1)
         ProcessRelicWithSpots(child)
     end
 end)
@@ -1438,7 +1440,7 @@ MakeSwitch(PageEvent, "Auto Take Relics", States.AutoFarmRelic, function(val)
     else
         SetWoW(false)
         States.Busy = false
-        States.HasTank = false 
+        States.HasTank = false
     end
 end)
 
@@ -1459,7 +1461,7 @@ BtnRelicSel.MouseButton1Click:Connect(function()
 end)
 
 BtnSpotSel.MouseButton1Click:Connect(function()
-    local maxSpot = 3 
+    local maxSpot = 3
     if States.RelicSel == "Sunken Eye" or States.RelicSel == "Blacktide" then maxSpot = 4 end
     States.RelicSpot = States.RelicSpot + 1
     if States.RelicSpot > maxSpot then States.RelicSpot = 1 end
@@ -1493,6 +1495,7 @@ BtnTpRelic.MouseButton1Click:Connect(function()
         local children = targetRelic:GetChildren()
         if children[spot] then targetPart = children[spot] end
     end
+
     if targetPart then
         hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
         Notify("RELIC", "Teleported to Spot " .. spot, nil)
@@ -1506,7 +1509,7 @@ BtnQuestNPC.MouseButton1Click:Connect(function()
     local hrp = GetRoot()
     if npc and hrp then
         local pivot = npc:GetPivot()
-        hrp.CFrame = pivot + Vector3.new(0, 0, 4) 
+        hrp.CFrame = pivot + Vector3.new(0, 0, 4)
         Notify("QUEST", "Teleported to Archaeologist", nil)
     else
         Notify("QUEST", "Archaeologist Not Found!", Color3.fromRGB(255, 50, 50))
@@ -1526,8 +1529,8 @@ BtnSpeedToggle.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 BtnSpeedToggle.BackgroundTransparency = 0.3
 BtnSpeedToggle.Text = "Speed: OFF"
 BtnSpeedToggle.TextColor3 = UI_THEME.TextMain
-BtnSpeedToggle.Font = UI_THEME.FontBtn 
-BtnSpeedToggle.TextScaled = true 
+BtnSpeedToggle.Font = UI_THEME.FontBtn
+BtnSpeedToggle.TextScaled = true
 BtnSpeedToggle.BorderSizePixel = 0
 Instance.new("UITextSizeConstraint", BtnSpeedToggle).MaxTextSize = 10
 BtnSpeedToggle.TextStrokeTransparency = 1
@@ -1539,10 +1542,10 @@ BoxSpeedInput.Size = UDim2.new(0.35, 0, 1, 0)
 BoxSpeedInput.Position = UDim2.new(0.65, 0, 0, 0)
 BoxSpeedInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 BoxSpeedInput.BackgroundTransparency = 0.3
-BoxSpeedInput.Text = "80" 
+BoxSpeedInput.Text = "80"
 BoxSpeedInput.PlaceholderText = "Val"
 BoxSpeedInput.TextColor3 = UI_THEME.Accent
-BoxSpeedInput.Font = UI_THEME.FontUI 
+BoxSpeedInput.Font = UI_THEME.FontUI
 BoxSpeedInput.TextSize = 10
 BoxSpeedInput.BorderSizePixel = 0
 Instance.new("UICorner", BoxSpeedInput).CornerRadius = UDim.new(0, 6)
@@ -1559,8 +1562,8 @@ BtnFollowToggle.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 BtnFollowToggle.BackgroundTransparency = 0.3
 BtnFollowToggle.Text = "Follow Player: OFF"
 BtnFollowToggle.TextColor3 = UI_THEME.TextMain
-BtnFollowToggle.Font = UI_THEME.FontBtn 
-BtnFollowToggle.TextScaled = true 
+BtnFollowToggle.Font = UI_THEME.FontBtn
+BtnFollowToggle.TextScaled = true
 BtnFollowToggle.BorderSizePixel = 0
 Instance.new("UITextSizeConstraint", BtnFollowToggle).MaxTextSize = 10
 BtnFollowToggle.TextStrokeTransparency = 1
@@ -1572,10 +1575,10 @@ BoxFollowInput.Size = UDim2.new(0.5, 0, 1, 0)
 BoxFollowInput.Position = UDim2.new(0.5, 0, 0, 0)
 BoxFollowInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 BoxFollowInput.BackgroundTransparency = 0.3
-BoxFollowInput.Text = "" 
+BoxFollowInput.Text = ""
 BoxFollowInput.PlaceholderText = "Input Name"
 BoxFollowInput.TextColor3 = UI_THEME.Accent
-BoxFollowInput.Font = UI_THEME.FontUI 
+BoxFollowInput.Font = UI_THEME.FontUI
 BoxFollowInput.TextSize = 10
 BoxFollowInput.BorderSizePixel = 0
 Instance.new("UICorner", BoxFollowInput).CornerRadius = UDim.new(0, 6)
@@ -1598,7 +1601,7 @@ local AnimContainer = Instance.new("Frame", PagePlayer)
 AnimContainer.Name = "AnimDropdown"
 AnimContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Ukuran awal (Tertutup)
 AnimContainer.BackgroundTransparency = 1
-AnimContainer.ClipsDescendants = true 
+AnimContainer.ClipsDescendants = true
 
 -- 2. Header (Tombol Pemicu)
 local AnimHeader = Instance.new("TextButton", AnimContainer)
@@ -1633,7 +1636,7 @@ local AnimationList = {
     ["Soul Scythe"] = "Soul Scythe - FishCaught",
     ["Eclipse Katana"] = "Eclipse Katana - FishCaught",
     ["Ban Hammer"] = "1x1x1x1 Ban Hammer - FishCaught",
-    ["Trident"] = "Holy Trident - FishCaught" 
+    ["Trident"] = "Holy Trident - FishCaught"
 }
 
 -- Buat Tombol dalam List
@@ -1701,12 +1704,13 @@ local function PlaySelectedAnim()
         
         if AnimObj then
             local track = animator:LoadAnimation(AnimObj)
-            track.Priority = Enum.AnimationPriority.Action4 
+            track.Priority = Enum.AnimationPriority.Action4
             track:Play()
             track.Stopped:Connect(function() track:Destroy() end)
         end
     end
 end
+
 if FishEvent then
     FishEvent.OnClientEvent:Connect(PlaySelectedAnim)
 end
@@ -1715,7 +1719,6 @@ end
 local BtnSave   = MakeBtn(PageMisc, "Save Position")
 local BtnLoad   = MakeBtn(PageMisc, "Load Position")
 local BtnRejoin = MakeBtn(PageMisc, "Rejoin Server")
-
 MakeSwitch(PageMisc, "Panel Fishing", States.Panel, function(val)
     States.Panel = val
     FloatHUD.Visible = val
@@ -1727,9 +1730,9 @@ end)
 local PurchaseCharmRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/PurchaseCharm")
 local CharmContainer = Instance.new("Frame", PageMisc)
 CharmContainer.Name = "CharmSystem"
-CharmContainer.Size = UDim2.new(0.95, 0, 0, 85) 
+CharmContainer.Size = UDim2.new(0.95, 0, 0, 85)
 CharmContainer.BackgroundTransparency = 1
-CharmContainer.ClipsDescendants = true 
+CharmContainer.ClipsDescendants = true
 
 -- 1. HEADER & DROPDOWN (LACI)
 local CharmDropdown = Instance.new("Frame", CharmContainer)
@@ -1786,6 +1789,7 @@ local function UpdateCharmSelect(name)
     CharmListFrame.Visible = false
     Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
 end
+
 for _, cName in pairs(CharmData) do
     local btn = Instance.new("TextButton", CharmListFrame)
     btn.Size = UDim2.new(0.95, 0, 0, 24)
@@ -1816,7 +1820,7 @@ end)
 local ActionFrame = Instance.new("Frame", CharmContainer)
 ActionFrame.Name = "Action"
 ActionFrame.Size = UDim2.new(1, 0, 0, 26)
-ActionFrame.Position = UDim2.new(0, 0, 1, -26) 
+ActionFrame.Position = UDim2.new(0, 0, 1, -26)
 ActionFrame.BackgroundTransparency = 1
 
 local QtyInput = Instance.new("TextBox", ActionFrame)
@@ -1834,7 +1838,7 @@ Instance.new("UICorner", QtyInput).CornerRadius = UDim.new(0, 6)
 local BuyBtn = Instance.new("TextButton", ActionFrame)
 BuyBtn.Size = UDim2.new(0.65, 0, 1, 0)
 BuyBtn.Position = UDim2.new(0.35, 0, 0, 0)
-BuyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 100) 
+BuyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
 BuyBtn.BackgroundTransparency = 0.2
 BuyBtn.Text = "PURCHASE"
 BuyBtn.TextColor3 = Color3.new(1,1,1)
@@ -1843,9 +1847,9 @@ BuyBtn.TextSize = 10
 Instance.new("UICorner", BuyBtn).CornerRadius = UDim.new(0, 6)
 
 BuyBtn.MouseButton1Click:Connect(function()
-    if not SelectedCharm then 
-        Notify("SHOP", "Please Select a Charm!", Color3.fromRGB(255, 50, 50)) 
-        return 
+    if not SelectedCharm then
+        Notify("SHOP", "Please Select a Charm!", Color3.fromRGB(255, 50, 50))
+        return
     end
     
     local amount = tonumber(QtyInput.Text) or 1
@@ -1868,7 +1872,7 @@ BuyBtn.MouseButton1Click:Connect(function()
                 Notify("ERROR", "Failed to buy!", Color3.fromRGB(255, 0, 0))
                 break
             end
-            task.wait(0.1) 
+            task.wait(0.1)
         end
         Notify("SHOP", "Purchase Complete!", Color3.fromRGB(0, 255, 100))
     end)
@@ -1877,17 +1881,17 @@ end)
 -- ====================================================
 -- [UPDATED] SYSTEM MONITOR (REALTIME MS + COLOR + TIME)
 -- ====================================================
-local StatsService = game:GetService("Stats") 
+local StatsService = game:GetService("Stats")
 local fpsT = 0
 Services.RunService.RenderStepped:Connect(function(dt)
-    fpsT = fpsT + (1/dt - fpsT) * 0.1 
+    fpsT = fpsT + (1/dt - fpsT) * 0.1
     local currentFps = math.floor(fpsT)
     local cpuMs = StatsService.PerformanceStats.CPU:GetValue()
     local serverTime = DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us")
     
     if MonLabel then
         MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", currentFps, cpuMs, serverTime)
-        MonLabel.TextColor3 = Color3.fromRGB(255, 255, 255) 
+        MonLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     end
 end)
 
@@ -1911,6 +1915,7 @@ BtnSpeedToggle.MouseButton1Click:Connect(function()
         if hum then hum.WalkSpeed = 16 end
     end
 end)
+
 BoxSpeedInput.FocusLost:Connect(function()
     local val = tonumber(BoxSpeedInput.Text)
     if val then States.SpeedVal = val else BoxSpeedInput.Text = tostring(States.SpeedVal) end
@@ -1919,8 +1924,8 @@ end)
 local function FindPlayer(namePart)
     for _, p in pairs(Services.Players:GetPlayers()) do
         if p ~= Player then
-            if string.sub(string.lower(p.Name), 1, string.len(namePart)) == string.lower(namePart) or 
-               string.sub(string.lower(p.DisplayName), 1, string.len(namePart)) == string.lower(namePart) then
+            if string.sub(string.lower(p.Name), 1, string.len(namePart)) == string.lower(namePart) or
+                string.sub(string.lower(p.DisplayName), 1, string.len(namePart)) == string.lower(namePart) then
                 return p
             end
         end
@@ -1935,7 +1940,7 @@ BtnFollowToggle.MouseButton1Click:Connect(function()
         local target = FindPlayer(targetName)
         if target then
             States.FollowTarget = target
-            BoxFollowInput.Text = target.Name 
+            BoxFollowInput.Text = target.Name
             BtnFollowToggle.Text = "Following"
             ToggleVisual(BtnFollowToggle, true)
             Notify("FOLLOW", "Target: " .. target.Name, Color3.fromRGB(0, 255, 100))
@@ -1971,9 +1976,9 @@ task.spawn(function()
                     myHRP.CFrame = tHRP.CFrame
                 end
             end)
-            task.wait() 
+            task.wait()
         else
-            task.wait(1) 
+            task.wait(1)
         end
     end
 end)
@@ -1987,8 +1992,8 @@ task.spawn(function()
                     if hum.Sit then
                         local seat = hum.SeatPart
                         if seat then
-                            if seat.AssemblyLinearVelocity.Magnitude > 0 then 
-                                 seat.AssemblyLinearVelocity = seat.CFrame.LookVector * States.SpeedVal
+                            if seat.AssemblyLinearVelocity.Magnitude > 0 then
+                                  seat.AssemblyLinearVelocity = seat.CFrame.LookVector * States.SpeedVal
                             end
                         end
                     else
@@ -2021,25 +2026,25 @@ end)
 -- [BUTTON LOGIC - MAIN/MISC/EVENT]
 -- ====================================================
 BtnRejoin.MouseButton1Click:Connect(function() Services.TeleportService:Teleport(game.PlaceId, Player) end)
-BtnSave.MouseButton1Click:Connect(function() 
+BtnSave.MouseButton1Click:Connect(function()
     local hrp = GetRoot()
-    if hrp then SavedCFrame = hrp.CFrame; BtnSave.Text="SAVED"; Notify("POSITION", "Location Saved!", nil); task.delay(1, function() BtnSave.Text="Save Position" end) end 
+    if hrp then SavedCFrame = hrp.CFrame; BtnSave.Text="SAVED"; Notify("POSITION", "Location Saved!", nil); task.delay(1, function() BtnSave.Text="Save Position" end) end
 end)
-BtnLoad.MouseButton1Click:Connect(function() 
+BtnLoad.MouseButton1Click:Connect(function()
     local hrp = GetRoot()
-    if SavedCFrame and hrp then hrp.CFrame = SavedCFrame; Notify("POSITION", "Location Loaded!", nil) end 
+    if SavedCFrame and hrp then hrp.CFrame = SavedCFrame; Notify("POSITION", "Location Loaded!", nil) end
 end)
 
--- [FIXED] AUTO EQUIP BACKGROUND LOOP
-task.spawn(function() 
-    while true do 
-        if States.AutoEquip and not States.IsMining then 
-            ForceEquipRod() 
+-- [FIXED] AUTO EQUIP BACKGROUND LOOP (DISABLE SAAT MINING)
+task.spawn(function()
+    while true do
+        if States.AutoEquip and not States.IsMining then
+            ForceEquipRod()
             task.wait(2)
         else
             task.wait(2)
         end
-    end 
+    end
 end)
 
 -- [AUTO TAKE CORAL - SMART LOOP]
@@ -2072,32 +2077,32 @@ task.spawn(function()
                                 SetWoW(true)
                             end
                         end
-                        if IsLootingCoral then 
-                             local v = validCorals[1]
-                             if v and v.Parent then 
-                                 local prompt = v:FindFirstChildWhichIsA("ProximityPrompt", true)
+                        if IsLootingCoral then
+                              local v = validCorals[1]
+                             if v and v.Parent then
+                                  local prompt = v:FindFirstChildWhichIsA("ProximityPrompt", true)
                                  local hrp = GetRoot()
-                                 if prompt and hrp then 
-                                     hrp.CFrame = v:GetPivot() + Vector3.new(0, 3, 0)
+                                 if prompt and hrp then
+                                      hrp.CFrame = v:GetPivot() + Vector3.new(0, 3, 0)
                                      task.wait(0.2)
                                      fireproximityprompt(prompt)
-                                 end 
-                             end
+                                 end
+                              end
                         end
-                    else 
-                         if IsLootingCoral then
+                    else
+                          if IsLootingCoral then
                             IsLootingCoral = false
                             local hrp = GetRoot()
                             if CoralReturnCFrame and hrp then hrp.CFrame = CoralReturnCFrame end
-                            SetWoW(false) 
-                         end
+                            SetWoW(false)
+                          end
                     end
                 end
             end)
             task.wait(1.5)
         else
             if IsLootingCoral then IsLootingCoral = false; SetWoW(false) end
-            task.wait(3) 
+            task.wait(3)
         end
     end
 end)
@@ -2118,6 +2123,7 @@ local function FindInFolders(targetName)
     end
     return nil
 end
+
 local function ScanEvent()
     for _, name in pairs(EventList) do
         local t = FindInFolders(name)
@@ -2125,6 +2131,7 @@ local function ScanEvent()
     end
     return nil
 end
+
 task.spawn(function()
     while true do
         if States.AutoEvent then
@@ -2135,14 +2142,14 @@ task.spawn(function()
                 local FoundEvent = ScanEvent()
                 if FoundEvent then
                     if not IsInEvent then
-                        EventStartCFrame = hrp.CFrame 
+                        EventStartCFrame = hrp.CFrame
                         IsInEvent = true
                         Notify("AUTO HUNT", "Teleport To ( " .. FoundEvent.Name .. " )", Color3.fromRGB(0, 255, 255))
                         SetWoW(true)
                     end
                     local targetPos = FoundEvent:GetPivot().Position
                     local destPos = Vector3.new(targetPos.X, 4, targetPos.Z)
-                     
+                    
                     if (hrp.Position - destPos).Magnitude > 5 then
                         hrp.CFrame = CFrame.new(destPos)
                     end
@@ -2150,12 +2157,12 @@ task.spawn(function()
                     if IsInEvent then
                         IsInEvent = false
                         Notify("AUTO HUNT", "Event Finished ", Color3.fromRGB(0, 255, 100))
-                        if EventStartCFrame and hrp then 
-                             hrp.CFrame = EventStartCFrame 
-                             EventStartCFrame = nil 
-                         end
-                        SetWoW(false) 
-                     end
+                        if EventStartCFrame and hrp then
+                              hrp.CFrame = EventStartCFrame
+                              EventStartCFrame = nil
+                          end
+                        SetWoW(false)
+                      end
                 end
             end)
             task.wait(1)
@@ -2165,43 +2172,11 @@ task.spawn(function()
     end
 end)
 
--- [NEW] SCHEDULER LOOP (WIB DETECTOR)
+-- [STATUS DETECTOR]
 task.spawn(function()
     while true do
-        if States.AutoSchedule then
-            -- Get Time in UTC
-            local date = os.date("!*t")
-            -- Convert to WIB (UTC+7)
-            local wib_hour = (date.hour + 7) % 24
-            local wib_min  = date.min
-            
-            -- Logic: Jam Genap (2,4,6...) & Menit 0-40
-            local isSpawnTime = (wib_hour % 2 == 0) and (wib_min >= 0 and wib_min < 40)
-            
-            if isSpawnTime then
-                -- Jika Mining MATI saat jam spawn, nyalakan otomatis (Fitur Anti-Of)
-                if not States.AutoMiningV20 then
-                    Notify("SCHEDULE", "Waktu Spawn! Mining ON.", Color3.fromRGB(0, 255, 0))
-                    States.AutoMiningV20 = true
-                    
-                    -- Update visual tombol switch
-                    if SwitchElements["Auto Mine Lava/Crystal"] then
-                        SwitchElements["Auto Mine Lava/Crystal"](true)
-                    end
-                    
-                    StartMiningLogic()
-                end
-            end
-        end
-        task.wait(1) 
-    end
-end)
-
--- [STATUS DETECTOR]
-task.spawn(function() 
-    while true do 
-        if States.Panel then 
-            pcall(function() 
+        if States.Panel then
+            pcall(function()
                 local ls = Player:FindFirstChild("leaderstats")
                 local c = ls and ls:FindFirstChild("Caught") and ls.Caught.Value or 0
                 
@@ -2212,37 +2187,37 @@ task.spawn(function()
                 if backpackGui then
                     local foundLabel = false
                     for _, v in pairs(backpackGui:GetDescendants()) do
-                        if v:IsA("TextLabel") and string.find(v.Text, "/") then 
-                             bagText = v.Text 
-                             foundLabel = true
-                            break 
-                         end
+                        if v:IsA("TextLabel") and string.find(v.Text, "/") then
+                              bagText = v.Text
+                              foundLabel = true
+                            break
+                          end
                     end
                     if not foundLabel and Player:FindFirstChild("Backpack") then
                         bagText = tostring(#Player.Backpack:GetChildren())
                     end
-                else 
-                     if Player:FindFirstChild("Backpack") then 
-                         bagText = tostring(#Player.Backpack:GetChildren())
+                else
+                      if Player:FindFirstChild("Backpack") then
+                          bagText = tostring(#Player.Backpack:GetChildren())
                     end
                 end
                 LblInvVal.Text = bagText
-            end) 
+            end)
             task.wait(1)
         else
             task.wait(3)
-        end 
-    end 
+        end
+    end
 end)
 
 -- [AUTO EXECUTE] MAX FPS UNLOCKER
 task.spawn(function()
-    if setfpscap then 
-         setfpscap(999) 
-     end
+    if setfpscap then
+          setfpscap(999)
+      end
 end)
 
 task.delay(1, function()
     Main.Visible = true
-    FloatHUD.Visible = States.Panel 
+    FloatHUD.Visible = States.Panel
 end)
