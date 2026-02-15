@@ -123,7 +123,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V22 Strict Mining", nil, 4)
+Notify("SERAPHIN", "V26: Smart Schedule & Recovery", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -516,6 +516,9 @@ local function MakeBtn(parent, text)
 end
 
 -- [STYLE SWITCH]
+-- Global ref agar bisa diupdate oleh Scheduler
+local SwitchElements = {} 
+
 local function MakeSwitch(parent, text, defaultState, callback)
     local Frame = Instance.new("Frame")
     Frame.Name = "Switch_" .. text
@@ -564,13 +567,10 @@ local function MakeSwitch(parent, text, defaultState, callback)
     local IsOn = defaultState
     local Debounce = false
     
-    ToggleBtn.MouseButton1Click:Connect(function()
-        if Debounce then return end
-        Debounce = true
-        IsOn = not IsOn
-        
+    -- Function Update Visual agar bisa dipanggil luar
+    local function UpdateVisual(state)
+        IsOn = state
         local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        
         if IsOn then
             Services.TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
             Services.TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(1, -12, 0.5, -5)}):Play()
@@ -578,12 +578,20 @@ local function MakeSwitch(parent, text, defaultState, callback)
             Services.TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
             Services.TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5)}):Play()
         end
-        
+    end
+
+    ToggleBtn.MouseButton1Click:Connect(function()
+        if Debounce then return end
+        Debounce = true
+        IsOn = not IsOn
+        UpdateVisual(IsOn)
         if callback then callback(IsOn) end
-        
         task.wait(0.2)
         Debounce = false
     end)
+    
+    -- Simpan referensi update visual
+    SwitchElements[text] = UpdateVisual
     
     return Frame
 end
@@ -615,6 +623,7 @@ local States = {
     AutoCoral=false,
     AutoFarmRelic=false, 
     AutoMiningV20=false, 
+    AutoSchedule=true, -- [NEW]
     Busy=false,
     IsMining=false, 
     HasTank=false,
@@ -623,7 +632,7 @@ local States = {
     HideRod=false,
     StreamerMode=false,
     AnimSkin="Off",
-    AutoFishActive=false -- [NEW]
+    AutoFishActive=false
 }
 
 local SavedCFrame = nil 
@@ -640,7 +649,7 @@ local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt
 -- [NEW] MINING & FISHING VARS
 local SavedMinePosition = nil
 
--- FUNGSI AUTO FISH (SESUAI REQUEST REMOTE SPECIFIC)
+-- FUNGSI AUTO FISH
 local function StartAutoFishRoutine()
     if States.AutoFishActive then return end
     States.AutoFishActive = true
@@ -659,7 +668,7 @@ local function StartAutoFishRoutine()
                 Net["RF/ChargeFishingRod"]:InvokeServer()
                 task.wait(1)
                 
-                -- 3. Request Minigame (Kode Spesifik Anda)
+                -- 3. Request Minigame
                 local argsGame = {
                     -0.9879989624023438,
                     0.5,
@@ -667,7 +676,7 @@ local function StartAutoFishRoutine()
                 }
                 Net["RF/RequestFishingMinigameStarted"]:InvokeServer(unpack(argsGame))
                 
-                task.wait(2.5) -- Waktu simulasi minigame
+                task.wait(2.5) 
                 
                 -- 4. Catch Fish
                 Net["RF/CatchFishCompleted"]:InvokeServer()
@@ -1169,172 +1178,181 @@ MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
     end
 end)
 
--- [NEW] AUTO MINE CYCLE V22 (ROD RESET + DEEPS DELAY 8S)
+-- [NEW SYSTEM] MINING LOGIC REFACTOR
+local function StartMiningLogic()
+    if States.IsMining then return end
+    States.IsMining = true
+    States.AutoFishActive = false
+    
+    task.spawn(function()
+         local hrp = GetRoot()
+         if not hrp then return end
+
+         -- [A] SAVE POSITION
+         SavedMinePosition = hrp.CFrame
+         Notify("MINING", "Started. Pos Saved.", Color3.fromRGB(255, 200, 0))
+         
+         -- EQUIP ROD SLOT 1
+         local char = Player.Character
+         if char then
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            if tool then tool.Parent = Player.Backpack end
+         end
+         task.wait(0.5)
+         
+         Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+         Notify("MINING", "Reset: Equip Rod...", nil)
+         task.wait(1.5)
+         
+         -- EQUIP PICKAXE SLOT 2
+         Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(2)
+         Notify("MINING", "Ready: Equip Pickaxe.", nil)
+         task.wait(1)
+
+         -- FUNGSI LOGIKA MINING PER AREA
+         local function RunMiningZone(zoneName, warpCFrame, folderIslands, startDelay)
+             if not States.AutoMiningV20 then return end
+             
+             local root = GetRoot()
+             if root then 
+                root.Velocity = Vector3.zero
+                root.Anchored = false
+                root.CFrame = warpCFrame 
+             end
+             Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
+             
+             -- DELAY KHUSUS (Lava 5s, Deeps 8s)
+             Notify("MINING", "Waiting " .. startDelay .. "s...", nil)
+             task.wait(startDelay)
+
+             while States.AutoMiningV20 do
+                 local targetFolder = folderIslands
+                 if not targetFolder then break end
+                 
+                 local crystals = {}
+                 for _, v in pairs(targetFolder:GetChildren()) do
+                     if v:FindFirstChildWhichIsA("ProximityPrompt", true) then 
+                         table.insert(crystals, v) 
+                     end
+                 end
+
+                 if #crystals == 0 then 
+                     Notify("MINING", zoneName .. " Clean. Next...", Color3.fromRGB(0, 255, 100))
+                     break 
+                 end
+
+                 Notify("MINING", "Found " .. #crystals .. " Crystals.", Color3.fromRGB(255, 255, 0))
+
+                 local myPos = GetRoot().Position
+                 table.sort(crystals, function(a,b) 
+                     return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude 
+                 end)
+
+                 for _, node in ipairs(crystals) do
+                     if not States.AutoMiningV20 then break end
+                     
+                     local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+                     if prompt then
+                         local part = prompt.Parent
+                         local r = GetRoot()
+                         
+                         if r and part then
+                             r.Anchored = false
+                             local dist = (r.Position - part.Position).Magnitude
+                             local tweenTime = dist / 60 
+                             if tweenTime < 0.5 then tweenTime = 0.5 end
+                             
+                             local targetPos = part.CFrame * CFrame.new(0, 0, 3) 
+                             local tween = Services.TweenService:Create(r, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetPos})
+                             tween:Play()
+                             tween.Completed:Wait()
+
+                             r.Velocity = Vector3.zero
+                             r.Anchored = true 
+                             r.CFrame = CFrame.lookAt(r.Position, part.Position) 
+                             
+                             Notify("MINING", "Aligning 5s...", Color3.fromRGB(255, 200, 200))
+                             task.wait(2.5)
+                             
+                             if prompt.Parent then 
+                                 Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
+                                 fireproximityprompt(prompt)
+                             end
+                             
+                             Notify("MINING", "Delay 8.5s...", nil)
+                             task.wait(8.5)
+                         end
+                     end
+                 end
+                 task.wait(1)
+             end
+         end
+
+         local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
+         local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
+         
+         RunMiningZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5)
+
+         if States.AutoMiningV20 then
+             Notify("MINING", "Switching to Depths...", Color3.fromRGB(200, 0, 255))
+             RunMiningZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 8)
+         end
+
+         Notify("MINING", "Cycle Done. Return.", Color3.fromRGB(0, 255, 0))
+         States.IsMining = false
+         States.AutoMiningV20 = false 
+         
+         -- Update visual tombol jika dimatikan script
+         if SwitchElements["Auto Mine Lava/Crystal"] then
+             SwitchElements["Auto Mine Lava/Crystal"](false)
+         end
+         
+         local finalRoot = GetRoot()
+         if finalRoot and SavedMinePosition then
+             finalRoot.Anchored = false
+             finalRoot.Velocity = Vector3.zero
+             finalRoot.CFrame = SavedMinePosition
+         end
+         
+         for _, part in pairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = true end
+         end
+
+         task.wait(1)
+         Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
+         Notify("GEAR", "Rod Equipped - Fish", nil)
+         task.wait(1)
+         StartAutoFishRoutine()
+    end)
+end
+
+local function StopMiningLogic()
+    States.IsMining = false
+    States.AutoMiningV20 = false
+    States.AutoFishActive = false 
+    
+    local hrp = GetRoot()
+    if hrp then 
+        hrp.Anchored = false 
+        for _, part in pairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = true end
+        end
+    end
+    Notify("MINING", "Stopped Manual.", Color3.fromRGB(255, 50, 50))
+end
+
+-- [SWITCHES MINING]
+MakeSwitch(PageEvent, "Auto Schedule (Time)", States.AutoSchedule, function(val)
+    States.AutoSchedule = val
+    Notify("SCHEDULE", "Auto Time: " .. (val and "ON" or "OFF"), val and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0))
+end)
+
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
     States.AutoMiningV20 = val
-    
     if val then
-        States.IsMining = true
-        States.AutoFishActive = false 
-        
-        task.spawn(function()
-             local hrp = GetRoot()
-             if not hrp then return end
-
-             -- [A] SAVE POSITION
-             SavedMinePosition = hrp.CFrame
-             Notify("MINING", "Position Saved. Starting...", Color3.fromRGB(255, 200, 0))
-             
-             -- [LOGIKA BARU] EQUIP ROD DULU SEBELUM KE LAVA
-             local char = Player.Character
-             if char then
-                local tool = char:FindFirstChildWhichIsA("Tool")
-                if tool then tool.Parent = Player.Backpack end
-             end
-             task.wait(0.5)
-             
-             -- 1. Equip Rod (Slot 1) Sesuai Request
-             Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-             Notify("MINING", "Reset: Equip Rod...", nil)
-             task.wait(1.5)
-             
-             -- 2. Equip Pickaxe (Slot 2) Agar bisa Mining
-             Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(2)
-             Notify("MINING", "Ready: Equip Pickaxe.", nil)
-             task.wait(1)
-
-             -- FUNGSI LOGIKA MINING PER AREA
-             local function RunMiningZone(zoneName, warpCFrame, folderIslands, startDelay)
-                 if not States.AutoMiningV20 then return end
-                 
-                 -- 1. Instan Teleport ke Area
-                 local root = GetRoot()
-                 if root then 
-                    root.Velocity = Vector3.zero
-                    root.Anchored = false
-                    root.CFrame = warpCFrame 
-                 end
-                 Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
-                 
-                 -- [LOGIKA BARU] CUSTOM DELAY SETELAH TELEPORT (Lava: 5s, Deeps: 8s)
-                 Notify("MINING", "Waiting " .. startDelay .. "s...", nil)
-                 task.wait(startDelay)
-
-                 -- 3. Scanning & Mining Loop
-                 while States.AutoMiningV20 do
-                     local targetFolder = folderIslands
-                     if not targetFolder then break end
-                     
-                     local crystals = {}
-                     for _, v in pairs(targetFolder:GetChildren()) do
-                         if v:FindFirstChildWhichIsA("ProximityPrompt", true) then 
-                             table.insert(crystals, v) 
-                         end
-                     end
-
-                     if #crystals == 0 then 
-                         Notify("MINING", zoneName .. " Cleared. Moving...", Color3.fromRGB(0, 255, 100))
-                         break 
-                     end
-
-                     Notify("MINING", "Found " .. #crystals .. " Crystals.", Color3.fromRGB(255, 255, 0))
-
-                     local myPos = GetRoot().Position
-                     table.sort(crystals, function(a,b) 
-                         return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude 
-                     end)
-
-                     for _, node in ipairs(crystals) do
-                         if not States.AutoMiningV20 then break end
-                         
-                         local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-                         if prompt then
-                             local part = prompt.Parent
-                             local r = GetRoot()
-                             
-                             if r and part then
-                                 r.Anchored = false
-                                 local dist = (r.Position - part.Position).Magnitude
-                                 local tweenTime = dist / 60 
-                                 if tweenTime < 0.5 then tweenTime = 0.5 end
-                                 
-                                 local targetPos = part.CFrame * CFrame.new(0, 0, 3) 
-                                 local tween = Services.TweenService:Create(r, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetPos})
-                                 tween:Play()
-                                 tween.Completed:Wait()
-
-                                 -- 4. Diam 5 Detik DI DEPAN Crystal
-                                 r.Velocity = Vector3.zero
-                                 r.Anchored = true 
-                                 r.CFrame = CFrame.lookAt(r.Position, part.Position) 
-                                 
-                                 Notify("MINING", "Aligning 5s...", Color3.fromRGB(255, 200, 200))
-                                 task.wait(3.5)
-                                 
-                                 -- 5. Extract
-                                 if prompt.Parent then 
-                                     Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
-                                     fireproximityprompt(prompt)
-                                 end
-                                 
-                                 -- 6. Delay 8.5 Detik Antar Crystal
-                                 Notify("MINING", "Delay 8.5s...", nil)
-                                 task.wait(8.5)
-                             end
-                         end
-                     end
-                     task.wait(1)
-                 end
-             end
-
-             -- [B] URUTAN EKSEKUSI ZONA
-             local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
-             local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
-             
-             -- Zona 1: Lava Basin (Delay standar 5 detik)
-             RunMiningZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5)
-
-             if States.AutoMiningV20 then
-                 -- Zona 2: Crystal Depths ([LOGIKA BARU] Delay 8 Detik)
-                 Notify("MINING", "Switching to Depths...", Color3.fromRGB(200, 0, 255))
-                 RunMiningZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 8)
-             end
-
-             -- [C] SELESAI -> KEMBALI -> AUTO FISH
-             Notify("MINING", "All Done. Returning...", Color3.fromRGB(0, 255, 0))
-             States.IsMining = false
-             States.AutoMiningV20 = false 
-             
-             local finalRoot = GetRoot()
-             if finalRoot and SavedMinePosition then
-                 finalRoot.Anchored = false
-                 finalRoot.Velocity = Vector3.zero
-                 finalRoot.CFrame = SavedMinePosition
-             end
-             
-             for _, part in pairs(Player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = true end
-             end
-
-             task.wait(1)
-             Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-             Notify("GEAR", "Rod Equipped - Starting Fish", nil)
-             task.wait(1)
-             StartAutoFishRoutine()
-        end)
+        StartMiningLogic()
     else
-        States.IsMining = false
-        States.AutoMiningV20 = false
-        States.AutoFishActive = false 
-        
-        local hrp = GetRoot()
-        if hrp then 
-            hrp.Anchored = false 
-            for _, part in pairs(Player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = true end
-            end
-        end
-        Notify("MINING", "Stopped Manual.", Color3.fromRGB(255, 50, 50))
+        StopMiningLogic()
     end
 end)
 
@@ -2147,6 +2165,38 @@ task.spawn(function()
     end
 end)
 
+-- [NEW] SCHEDULER LOOP (WIB DETECTOR)
+task.spawn(function()
+    while true do
+        if States.AutoSchedule then
+            -- Get Time in UTC
+            local date = os.date("!*t")
+            -- Convert to WIB (UTC+7)
+            local wib_hour = (date.hour + 7) % 24
+            local wib_min  = date.min
+            
+            -- Logic: Jam Genap (2,4,6...) & Menit 0-40
+            local isSpawnTime = (wib_hour % 2 == 0) and (wib_min >= 0 and wib_min < 40)
+            
+            if isSpawnTime then
+                -- Jika Mining MATI saat jam spawn, nyalakan otomatis (Fitur Anti-Of)
+                if not States.AutoMiningV20 then
+                    Notify("SCHEDULE", "Waktu Spawn! Mining ON.", Color3.fromRGB(0, 255, 0))
+                    States.AutoMiningV20 = true
+                    
+                    -- Update visual tombol switch
+                    if SwitchElements["Auto Mine Lava/Crystal"] then
+                        SwitchElements["Auto Mine Lava/Crystal"](true)
+                    end
+                    
+                    StartMiningLogic()
+                end
+            end
+        end
+        task.wait(1) 
+    end
+end)
+
 -- [STATUS DETECTOR]
 task.spawn(function() 
     while true do 
@@ -2188,7 +2238,7 @@ end)
 -- [AUTO EXECUTE] MAX FPS UNLOCKER
 task.spawn(function()
     if setfpscap then 
-         setfpscap(9999) 
+         setfpscap(999) 
      end
 end)
 
