@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V27 + Charm Fix", nil, 4)
+Notify("SERAPHIN", "V29 Valentine Shop", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -383,7 +383,7 @@ end
 
 -- [TAB DEFINITION]
 local TabMainBtn   = CreateSideTab("TabMain", "MAIN", true)
-local TabCharmBtn  = CreateSideTab("TabCharm", "CHARMS", false) -- TAB BARU
+local TabCharmBtn  = CreateSideTab("TabCharm", "SHOP", false) -- RENAMED TO SHOP
 local TabEventBtn  = CreateSideTab("TabEvent", "EVENT", false)
 local TabPlayerBtn = CreateSideTab("TabPlayer", "PLAYER", false)
 local TabMiscBtn   = CreateSideTab("TabMisc", "MISC", false)
@@ -427,7 +427,7 @@ end
 
 -- PAGE INIT
 local PageMain   = CreatePage("PageMain", true, false)
-local PageCharm  = CreatePage("PageCharm", false, true) -- PAGE BARU
+local PageCharm  = CreatePage("PageCharm", false, true)
 local PageEvent  = CreatePage("PageEvent", false, true)
 local PagePlayer = CreatePage("PagePlayer", false, true)
 local PageMisc   = CreatePage("PageMisc", false, true)
@@ -1314,6 +1314,139 @@ BuyBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
+-- ====================================================
+-- [3] VALENTINE SHOP (LIMITED)
+-- ====================================================
+local LimitedRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RE/LimitedPurchaseRequest")
+local ValContainer = Instance.new("Frame", PageCharm)
+ValContainer.Name = "ValSystem"
+ValContainer.Size = UDim2.new(0.95, 0, 0, 85)
+ValContainer.BackgroundTransparency = 1
+ValContainer.ClipsDescendants = true
+
+local ValDropdown = Instance.new("Frame", ValContainer)
+ValDropdown.Name = "Dropdown"
+ValDropdown.Size = UDim2.new(1, 0, 0, 26)
+ValDropdown.BackgroundTransparency = 1
+ValDropdown.ZIndex = 5
+
+local ValBtn = Instance.new("TextButton", ValDropdown)
+ValBtn.Size = UDim2.new(1, 0, 1, 0)
+ValBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+ValBtn.BackgroundTransparency = 0.3
+ValBtn.Text = "Valentine Shop >"
+ValBtn.TextColor3 = UI_THEME.TextMain
+ValBtn.Font = UI_THEME.FontBtn
+ValBtn.TextSize = 10
+ValBtn.AutoButtonColor = true
+Instance.new("UICorner", ValBtn).CornerRadius = UDim.new(0, 6)
+
+local ValListFrame = Instance.new("Frame", ValDropdown)
+ValListFrame.Size = UDim2.new(1, 0, 0, 60)
+ValListFrame.Position = UDim2.new(0, 0, 0, 30)
+ValListFrame.BackgroundTransparency = 0.2
+ValListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+ValListFrame.Visible = false
+ValListFrame.ZIndex = 10
+Instance.new("UICorner", ValListFrame).CornerRadius = UDim.new(0, 6)
+
+local ValListLayout = Instance.new("UIListLayout", ValListFrame)
+ValListLayout.Padding = UDim.new(0, 2)
+ValListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+ValListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local SelectedValItem = nil
+local ValData = {
+    ["Love Potion (1)"] = 1,
+    ["Love Totem (2)"] = 2
+}
+
+local function UpdateValSelect(name)
+    SelectedValItem = name
+    ValBtn.Text = "Selected: " .. name
+    ValListFrame.Visible = false
+    Services.TweenService:Create(ValContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+end
+
+for name, id in pairs(ValData) do
+    local btn = Instance.new("TextButton", ValListFrame)
+    btn.Size = UDim2.new(0.95, 0, 0, 24)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.BackgroundTransparency = 0.5
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = UI_THEME.FontUI
+    btn.TextSize = 9
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    btn.MouseButton1Click:Connect(function() UpdateValSelect(name) end)
+end
+
+local ValActionFrame = Instance.new("Frame", ValContainer)
+ValActionFrame.Name = "Action"
+ValActionFrame.Size = UDim2.new(1, 0, 0, 26)
+ValActionFrame.Position = UDim2.new(0, 0, 1, -26)
+ValActionFrame.BackgroundTransparency = 1
+
+local ValQtyInput = Instance.new("TextBox", ValActionFrame)
+ValQtyInput.Size = UDim2.new(0.3, 0, 1, 0)
+ValQtyInput.Position = UDim2.new(0, 0, 0, 0)
+ValQtyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+ValQtyInput.BackgroundTransparency = 0.3
+ValQtyInput.Text = "1"
+ValQtyInput.PlaceholderText = "Qty"
+ValQtyInput.TextColor3 = UI_THEME.Accent
+ValQtyInput.Font = UI_THEME.FontUI
+ValQtyInput.TextSize = 10
+Instance.new("UICorner", ValQtyInput).CornerRadius = UDim.new(0, 6)
+
+local ValBuyBtn = Instance.new("TextButton", ValActionFrame)
+ValBuyBtn.Size = UDim2.new(0.65, 0, 1, 0)
+ValBuyBtn.Position = UDim2.new(0.35, 0, 0, 0)
+ValBuyBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 150)
+ValBuyBtn.BackgroundTransparency = 0.2
+ValBuyBtn.Text = "PURCHASE"
+ValBuyBtn.TextColor3 = Color3.new(1,1,1)
+ValBuyBtn.Font = UI_THEME.FontBtn
+ValBuyBtn.TextSize = 10
+Instance.new("UICorner", ValBuyBtn).CornerRadius = UDim.new(0, 6)
+
+local IsValOpen = false
+ValBtn.MouseButton1Click:Connect(function()
+    IsValOpen = not IsValOpen
+    if IsValOpen then
+        ValListFrame.Visible = true
+        Services.TweenService:Create(ValContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 130)}):Play()
+    else
+        ValListFrame.Visible = false
+        Services.TweenService:Create(ValContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+    end
+end)
+
+ValBuyBtn.MouseButton1Click:Connect(function()
+    if not SelectedValItem then
+        Notify("SHOP", "Select Item!", Color3.fromRGB(255, 50, 50))
+        return
+    end
+    
+    local amount = tonumber(ValQtyInput.Text) or 1
+    if amount < 1 then amount = 1 end
+    local targetID = ValData[SelectedValItem]
+    
+    Notify("SHOP", "Buying " .. amount .. " " .. SelectedValItem .. "...", Color3.fromRGB(255, 100, 200))
+    
+    task.spawn(function()
+        for i = 1, amount do
+            local success, err = pcall(function()
+                LimitedRemote:FireServer(targetID)
+            end)
+            if not success then break end
+            task.wait(0.1)
+        end
+        Notify("SHOP", "Done!", Color3.fromRGB(0, 255, 100))
+    end)
+end)
+
+
 -- [TAB EVENT]
 
 MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
@@ -1341,9 +1474,9 @@ local function IsMiningTime()
     local utcNow = os.date("!*t")
     local wibHour = (utcNow.hour + 7) % 24
     local wibMin = utcNow.min
-    -- Jadwal: Jam Genap (02, 04, dst) Menit 00-40
+    -- Jadwal: Jam Genap (00, 02, 04, ...) Menit 00-45
     local isEven = (wibHour % 2 == 0)
-    local inWindow = (wibMin >= 0 and wibMin <= 40)
+    local inWindow = (wibMin >= 0 and wibMin <= 45)
     return isEven and inWindow
 end
 
@@ -2235,7 +2368,7 @@ end)
 -- [AUTO EXECUTE] MAX FPS UNLOCKER
 task.spawn(function()
     if setfpscap then
-          setfpscap(999)
+          setfpscap(9999)
       end
 end)
 
