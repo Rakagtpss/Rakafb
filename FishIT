@@ -1,4 +1,4 @@
--- [1] Notifikasi Awal (Custom Safe Load)
+-- [1] Notifikasi Awal & Services (Safe Load)
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
@@ -16,28 +16,16 @@ local Services = {
 
 local Player = Services.Players.LocalPlayer
 local Cam = Services.Workspace.CurrentCamera
--- Safety Check for Net Library
-local NetPath = Services.ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index")["sleitnick_net@0.2.0"].net
+local NetPath = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
 
--- Fungsi Get Character Aman
+-- Fungsi Get Character Cepat & Aman
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
 local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
 local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
 
--- [OPTIMIZED] CONNECTION MANAGER
--- Tabel ini menyimpan semua koneksi aktif agar bisa dimatikan dengan bersih
-local Connections = {}
-local function ClearConnection(name)
-    if Connections[name] then
-        Connections[name]:Disconnect()
-        Connections[name] = nil
-    end
-end
-
 -- // KONFIGURASI VISUAL (MODERN DARK TRANSPARENT)
 local UI_THEME = {
-    Width = 400,
-    Height = 270,
+    Width = 400, Height = 270,
     Color = Color3.fromRGB(12, 12, 14),
     SidebarColor = Color3.fromRGB(8, 8, 8),
     SidebarTransparency = 0.5,
@@ -121,48 +109,42 @@ local function Notify(title, text, colorOverride, duration)
     TweenIn:Play()
     
     task.delay(timeTime, function()
-        if Frame then
-            local TweenOut = Services.TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Size = UDim2.new(1, 20, 0, 0),
-                BackgroundTransparency = 1
-            })
-            TweenOut:Play()
-            if LblTitle then Services.TweenService:Create(LblTitle, TweenInfo.new(0.2), {TextTransparency = 1}):Play() end
-            if LblMsg then Services.TweenService:Create(LblMsg, TweenInfo.new(0.2), {TextTransparency = 1}):Play() end
-            TweenOut.Completed:Wait()
-            Frame:Destroy()
-        end
+        if not Frame then return end
+        local TweenOut = Services.TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+            Size = UDim2.new(1, 20, 0, 0),
+            BackgroundTransparency = 1
+        })
+        TweenOut:Play()
+        if LblTitle then Services.TweenService:Create(LblTitle, TweenInfo.new(0.2), {TextTransparency = 1}):Play() end
+        if LblMsg then Services.TweenService:Create(LblMsg, TweenInfo.new(0.2), {TextTransparency = 1}):Play() end
+        TweenOut.Completed:Wait()
+        Frame:Destroy()
     end)
 end
 
-Notify("SERAPHIN", "V30 Mining 2.5H [Optimized]", nil, 4)
+Notify("SERAPHIN", "V31 Refactored Pro Edition", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
     local dragToggle, dragStart, startPos
-    local function updateInput(input)
-        local delta = input.Position - dragStart
-        local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        frame.Position = position
-    end
+    
     dragInputObj.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragToggle = true
             dragStart = input.Position
             startPos = frame.Position
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragToggle = false
-                end
+                if input.UserInputState == Enum.UserInputState.End then dragToggle = false end
             end)
         end
     end)
+    
     dragInputObj.InputChanged:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local dragInput = input
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             Services.UserInputService.InputChanged:Connect(function(inputCheck)
-                if inputCheck == dragInput and dragToggle then
-                    updateInput(inputCheck)
+                if inputCheck == input and dragToggle then
+                    local delta = inputCheck.Position - dragStart
+                    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
                 end
             end)
         end
@@ -170,7 +152,7 @@ local function EnableDrag(frame, dragInputObj)
 end
 
 -- ====================================================
--- [UPDATED] MINI FLOATING MONITOR (FPS & CPU & TIME)
+-- [UI SETUP - FLOATING MONITOR]
 -- ====================================================
 local MonitorHUD = Instance.new("Frame", ScreenGui)
 MonitorHUD.Name = "LiveMonitor"
@@ -192,7 +174,7 @@ MonLabel.TextSize = 10
 EnableDrag(MonitorHUD, MonitorHUD)
 
 -- ====================================================
--- [1] MINI FLOATING HUD (FISH STATS) - CENTERED
+-- [UI SETUP - FLOATING STATS]
 -- ====================================================
 local FloatHUD = Instance.new("Frame", ScreenGui)
 FloatHUD.Name = "FloatingStats"
@@ -208,16 +190,13 @@ Instance.new("UICorner", FloatHUD).CornerRadius = UDim.new(0, 8)
 
 local ListLayout = Instance.new("UIListLayout", FloatHUD)
 ListLayout.FillDirection = Enum.FillDirection.Vertical
-ListLayout.Padding = UDim.new(0, 0)
 ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local Padding = Instance.new("UIPadding", FloatHUD)
-Padding.PaddingTop = UDim.new(0, 8)
-Padding.PaddingBottom = UDim.new(0, 8)
-Padding.PaddingLeft = UDim.new(0, 8)
-Padding.PaddingRight = UDim.new(0, 8)
+Padding.PaddingTop = UDim.new(0, 8); Padding.PaddingBottom = UDim.new(0, 8)
+Padding.PaddingLeft = UDim.new(0, 8); Padding.PaddingRight = UDim.new(0, 8)
 
 local TitleLabel = Instance.new("TextLabel", FloatHUD)
 TitleLabel.LayoutOrder = 1
@@ -227,7 +206,6 @@ TitleLabel.Text = "PANEL SERAPHIN"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Font = UI_THEME.FontUI
 TitleLabel.TextSize = 12
-TitleLabel.TextStrokeTransparency = 1
 
 local Div = Instance.new("Frame", FloatHUD)
 Div.LayoutOrder = 2
@@ -238,14 +216,11 @@ Div.BorderSizePixel = 0
 
 local function CreateStatBlock(titleText, defaultVal, order)
     local Block = Instance.new("Frame", FloatHUD)
-    Block.Name = titleText.."Block"
     Block.LayoutOrder = order
     Block.Size = UDim2.new(1, 0, 0, 28)
     Block.BackgroundTransparency = 1
-    Block.BorderSizePixel = 0
     
     local LblTitle = Instance.new("TextLabel", Block)
-    LblTitle.Name = "Title"
     LblTitle.Size = UDim2.new(1, 0, 0, 12)
     LblTitle.Position = UDim2.new(0, 0, 0, 2)
     LblTitle.BackgroundTransparency = 1
@@ -255,7 +230,6 @@ local function CreateStatBlock(titleText, defaultVal, order)
     LblTitle.TextSize = 9
     
     local LblValue = Instance.new("TextLabel", Block)
-    LblValue.Name = "Value"
     LblValue.Size = UDim2.new(1, 0, 0, 14)
     LblValue.Position = UDim2.new(0, 0, 0, 12)
     LblValue.BackgroundTransparency = 1
@@ -271,7 +245,7 @@ local LblInvVal  = CreateStatBlock("INVENTORY", "0 / 0", 4)
 EnableDrag(FloatHUD, FloatHUD)
 
 -- ====================================================
--- [2] MAIN UI
+-- [UI SETUP - MAIN PANEL]
 -- ====================================================
 local Main = Instance.new("Frame", ScreenGui)
 Main.Name = "Main"
@@ -282,23 +256,18 @@ Main.BackgroundTransparency = UI_THEME.Transparency
 Main.Active = true
 Main.ClipsDescendants = true
 Main.Visible = false
-Main.BorderSizePixel = 0
 local MainCorner = Instance.new("UICorner", Main)
 MainCorner.CornerRadius = UI_THEME.CornerRadius
 
 -- Logo (Minimized)
 local LogoContainer = Instance.new("Frame", Main)
-LogoContainer.Name = "LogoContainer"
 LogoContainer.Size = UDim2.new(0, 32, 0, 32)
 LogoContainer.Position = UDim2.new(0.5, -16, 0.5, -16)
 LogoContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-LogoContainer.BackgroundTransparency = 0
-LogoContainer.BorderSizePixel = 0
 LogoContainer.Visible = false
 LogoContainer.ZIndex = 11
 Instance.new("UICorner", LogoContainer).CornerRadius = UDim.new(0, 8)
 local LogoR = Instance.new("TextButton", LogoContainer)
-LogoR.Name = "LogoBtn"
 LogoR.Size = UDim2.new(1, 0, 1, 0)
 LogoR.BackgroundTransparency = 1
 LogoR.Text = "H"
@@ -307,13 +276,11 @@ LogoR.Font = UI_THEME.FontUI
 LogoR.TextSize = 18
 LogoR.ZIndex = 12
 
--- HEADER
+-- Header Panel
 local Header = Instance.new("Frame", Main)
-Header.Name = "Header"
 Header.Size = UDim2.new(1, 0, 0, 32)
 Header.BackgroundColor3 = UI_THEME.SidebarColor
 Header.BackgroundTransparency = UI_THEME.SidebarTransparency
-Header.BorderSizePixel = 0
 local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 12, 0, 0)
@@ -329,46 +296,39 @@ local HideBtn = Instance.new("TextButton", Header)
 HideBtn.Size = UDim2.new(0, 22, 0, 22)
 HideBtn.Position = UDim2.new(1, -28, 0.5, -11)
 HideBtn.Text = "_"
-HideBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+HideBtn.BackgroundColor3 = Color3.new(1,1,1)
 HideBtn.BackgroundTransparency = 0.95
 HideBtn.TextColor3 = UI_THEME.TextDim
 HideBtn.Font = UI_THEME.FontUI
 HideBtn.TextSize = 14
-HideBtn.AutoButtonColor = true
 Instance.new("UICorner", HideBtn).CornerRadius = UDim.new(0, 6)
 
 EnableDrag(Main, Main)
 EnableDrag(Main, LogoR)
 
 -- ====================================================
--- [3] SIDE NAVIGATION
+-- [UI SETUP - SIDE NAVIGATION]
 -- ====================================================
 local ContentContainer = Instance.new("Frame", Main)
-ContentContainer.Name = "Container"
 ContentContainer.Size = UDim2.new(1, 0, 1, -32)
 ContentContainer.Position = UDim2.new(0, 0, 0, 32)
 ContentContainer.BackgroundTransparency = 1
-ContentContainer.BorderSizePixel = 0
 
 local Sidebar = Instance.new("Frame", ContentContainer)
-Sidebar.Name = "Sidebar"
 Sidebar.Size = UDim2.new(0, 95, 1, 0)
 Sidebar.BackgroundColor3 = UI_THEME.SidebarColor
 Sidebar.BackgroundTransparency = UI_THEME.SidebarTransparency
-Sidebar.BorderSizePixel = 0
 
 local SidebarLayout = Instance.new("UIListLayout", Sidebar)
 SidebarLayout.FillDirection = Enum.FillDirection.Vertical
 SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
 SidebarLayout.Padding = UDim.new(0, 5)
 SidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
 local SidebarPad = Instance.new("UIPadding", Sidebar)
 SidebarPad.PaddingTop = UDim.new(0, 8)
 
 local function CreateSideTab(name, text, isActive)
     local btn = Instance.new("TextButton", Sidebar)
-    btn.Name = name
     btn.Size = UDim2.new(0.85, 0, 0, 26)
     
     if isActive then
@@ -376,23 +336,18 @@ local function CreateSideTab(name, text, isActive)
         btn.BackgroundTransparency = 0.3
         btn.TextColor3 = Color3.new(1,1,1)
     else
-        btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        btn.BackgroundColor3 = Color3.new(1,1,1)
         btn.BackgroundTransparency = 1
         btn.TextColor3 = UI_THEME.TextDim
     end
+    
     btn.Text = text
     btn.Font = UI_THEME.FontBtn
     btn.TextSize = 10
-    btn.AutoButtonColor = true
-    btn.BorderSizePixel = 0
-    
-    local corner = Instance.new("UICorner", btn)
-    corner.CornerRadius = UDim.new(0, 6)
-    
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
     return btn
 end
 
--- [TAB DEFINITION]
 local TabMainBtn   = CreateSideTab("TabMain", "MAIN", true)
 local TabCharmBtn  = CreateSideTab("TabCharm", "SHOP", false)
 local TabEventBtn  = CreateSideTab("TabEvent", "EVENT", false)
@@ -400,25 +355,19 @@ local TabPlayerBtn = CreateSideTab("TabPlayer", "PLAYER", false)
 local TabMiscBtn   = CreateSideTab("TabMisc", "MISC", false)
 
 -- ====================================================
--- [4] PAGES & BUTTONS
+-- [UI SETUP - PAGES]
 -- ====================================================
 local PageArea = Instance.new("Frame", ContentContainer)
-PageArea.Name = "PageArea"
 PageArea.Size = UDim2.new(1, -105, 1, -10)
 PageArea.Position = UDim2.new(0, 100, 0, 5)
 PageArea.BackgroundTransparency = 1
-PageArea.BorderSizePixel = 0
 PageArea.ClipsDescendants = true
 
 local function CreatePage(name, visible, isList)
     local pg = Instance.new("ScrollingFrame", PageArea)
-    pg.Name = name
     pg.Size = UDim2.new(1, 0, 1, 0)
     pg.BackgroundTransparency = 1
     pg.ScrollBarThickness = 2
-    pg.ScrollBarImageColor3 = Color3.new(1,1,1)
-    pg.ScrollBarImageTransparency = 0.5
-    pg.CanvasSize = UDim2.new(0, 0, 0, 0)
     pg.AutomaticCanvasSize = Enum.AutomaticSize.Y
     pg.Visible = visible
     pg.BorderSizePixel = 0
@@ -436,7 +385,6 @@ local function CreatePage(name, visible, isList)
     return pg
 end
 
--- PAGE INIT
 local PageMain   = CreatePage("PageMain", true, false)
 local PageCharm  = CreatePage("PageCharm", false, true)
 local PageEvent  = CreatePage("PageEvent", false, true)
@@ -453,17 +401,9 @@ local function SwitchTab(tabName)
         pages[name].Visible = isActive
         
         if isActive then
-              Services.TweenService:Create(btn, tweenInfo, {
-                BackgroundTransparency = 0.3,
-                TextColor3 = Color3.new(1,1,1),
-                BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-              }):Play()
+              Services.TweenService:Create(btn, tweenInfo, {BackgroundTransparency=0.3, TextColor3=Color3.new(1,1,1), BackgroundColor3=Color3.fromRGB(40,40,50)}):Play()
         else
-            Services.TweenService:Create(btn, tweenInfo, {
-                BackgroundTransparency = 1,
-                TextColor3 = UI_THEME.TextDim,
-                BackgroundColor3 = Color3.fromRGB(255,255,255)
-            }):Play()
+            Services.TweenService:Create(btn, tweenInfo, {BackgroundTransparency=1, TextColor3=UI_THEME.TextDim, BackgroundColor3=Color3.new(1,1,1)}):Play()
         end
     end
 end
@@ -474,34 +414,29 @@ TabEventBtn.MouseButton1Click:Connect(function() SwitchTab("Event") end)
 TabPlayerBtn.MouseButton1Click:Connect(function() SwitchTab("Player") end)
 TabMiscBtn.MouseButton1Click:Connect(function() SwitchTab("Misc") end)
 
--- ====================================================
--- [5] LOGIC & FUNCTIONAL UI
--- ====================================================
+-- [UI LOGIC - MINIMIZE/MAXIMIZE]
 local IsMinimized = false
 HideBtn.MouseButton1Click:Connect(function()
-    if not IsMinimized then
-        IsMinimized = true
-        Header.Visible = false
-        ContentContainer.Visible = false
-        Main:TweenSize(UDim2.new(0, 36, 0, 36), "Out", "Back", 0.4, true)
-        Services.TweenService:Create(MainCorner, TweenInfo.new(0.4), {CornerRadius = UDim.new(0, 10)}):Play()
-        Services.TweenService:Create(Main, TweenInfo.new(0.4), {BackgroundTransparency = 0.1}):Play()
-        task.delay(0.2, function() if IsMinimized then LogoContainer.Visible = true end end)
-    end
+    if IsMinimized then return end
+    IsMinimized = true
+    Header.Visible = false; ContentContainer.Visible = false
+    Main:TweenSize(UDim2.new(0, 36, 0, 36), "Out", "Back", 0.4, true)
+    Services.TweenService:Create(MainCorner, TweenInfo.new(0.4), {CornerRadius = UDim.new(0, 10)}):Play()
+    Services.TweenService:Create(Main, TweenInfo.new(0.4), {BackgroundTransparency = 0.1}):Play()
+    task.delay(0.2, function() if IsMinimized then LogoContainer.Visible = true end end)
 end)
 
 LogoR.MouseButton1Click:Connect(function()
-    if IsMinimized then
-        IsMinimized = false
-        LogoContainer.Visible = false
-        Main:TweenSize(UDim2.new(0, UI_THEME.Width, 0, UI_THEME.Height), "Out", "Back", 0.4, true)
-        Services.TweenService:Create(MainCorner, TweenInfo.new(0.4), {CornerRadius = UI_THEME.CornerRadius}):Play()
-        Services.TweenService:Create(Main, TweenInfo.new(0.4), {BackgroundTransparency = UI_THEME.Transparency}):Play()
-        task.delay(0.3, function() if not IsMinimized then Header.Visible = true; ContentContainer.Visible = true end end)
-    end
+    if not IsMinimized then return end
+    IsMinimized = false
+    LogoContainer.Visible = false
+    Main:TweenSize(UDim2.new(0, UI_THEME.Width, 0, UI_THEME.Height), "Out", "Back", 0.4, true)
+    Services.TweenService:Create(MainCorner, TweenInfo.new(0.4), {CornerRadius = UI_THEME.CornerRadius}):Play()
+    Services.TweenService:Create(Main, TweenInfo.new(0.4), {BackgroundTransparency = UI_THEME.Transparency}):Play()
+    task.delay(0.3, function() if not IsMinimized then Header.Visible = true; ContentContainer.Visible = true end end)
 end)
 
--- [STYLE BUTTON]
+-- [STYLE BUTTON BUILDERS]
 local function MakeBtn(parent, text)
     local b = Instance.new("TextButton", parent)
     b.Text = text
@@ -510,66 +445,45 @@ local function MakeBtn(parent, text)
     b.TextColor3 = UI_THEME.TextMain
     b.Font = UI_THEME.FontBtn
     b.TextScaled = true
-    b.BorderSizePixel = 0
     
     if parent == PageMisc or parent == PageEvent or parent == PageCharm then
         b.Size = UDim2.new(0.95, 0, 0, 26)
     end
     
     local constraint = Instance.new("UITextSizeConstraint", b)
-    constraint.MaxTextSize = 10
-    constraint.MinTextSize = 8
-    
-    b.AutoButtonColor = true
-    b.ClipsDescendants = true
-    b.TextStrokeTransparency = 1
+    constraint.MaxTextSize = 10; constraint.MinTextSize = 8
     Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    
     return b
 end
 
--- [STYLE SWITCH]
 local function MakeSwitch(parent, text, defaultState, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Name = "Switch_" .. text
-    
+    local Frame = Instance.new("Frame", parent)
     if parent == PagePlayer or parent == PageMisc or parent == PageEvent or parent == PageCharm then
         Frame.Size = UDim2.new(0.95, 0, 0, 26)
-    else
-        -- Grid Layout handled by parent UIGridLayout
     end
-    
     Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     Frame.BackgroundTransparency = 0.3
-    Frame.BorderSizePixel = 0
-    Frame.Parent = parent
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
     
-    local Corner = Instance.new("UICorner", Frame)
-    Corner.CornerRadius = UDim.new(0, 6)
     local Label = Instance.new("TextLabel", Frame)
     Label.Size = UDim2.new(0.65, 0, 1, 0)
     Label.Position = UDim2.new(0, 8, 0, 0)
     Label.BackgroundTransparency = 1
-    Label.Text = text
-    Label.TextColor3 = UI_THEME.TextMain
-    Label.Font = UI_THEME.FontBtn
-    Label.TextSize = 9
+    Label.Text = text; Label.TextColor3 = UI_THEME.TextMain
+    Label.Font = UI_THEME.FontBtn; Label.TextSize = 9
     Label.TextXAlignment = Enum.TextXAlignment.Left
     
     local ToggleBtn = Instance.new("TextButton", Frame)
     ToggleBtn.Size = UDim2.new(0, 28, 0, 14)
     ToggleBtn.Position = UDim2.new(1, -34, 0.5, -7)
     ToggleBtn.BackgroundColor3 = defaultState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(50, 50, 60)
-    ToggleBtn.AutoButtonColor = false
     ToggleBtn.Text = ""
-    
-    local ToggleCorner = Instance.new("UICorner", ToggleBtn)
-    ToggleCorner.CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
     
     local Circle = Instance.new("Frame", ToggleBtn)
     Circle.Size = UDim2.new(0, 10, 0, 10)
     Circle.Position = defaultState and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
-    Circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Circle.BackgroundColor3 = Color3.new(1,1,1)
     Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
     
     local IsOn = defaultState
@@ -577,21 +491,18 @@ local function MakeSwitch(parent, text, defaultState, callback)
     
     ToggleBtn.MouseButton1Click:Connect(function()
         if Debounce then return end
-        Debounce = true
-        IsOn = not IsOn
+        Debounce = true; IsOn = not IsOn
         
-        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        
+        local tw = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
         if IsOn then
-            Services.TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
-            Services.TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(1, -12, 0.5, -5)}):Play()
+            Services.TweenService:Create(ToggleBtn, tw, {BackgroundColor3 = Color3.fromRGB(0, 200, 255)}):Play()
+            Services.TweenService:Create(Circle, tw, {Position = UDim2.new(1, -12, 0.5, -5)}):Play()
         else
-            Services.TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
-            Services.TweenService:Create(Circle, tweenInfo, {Position = UDim2.new(0, 2, 0.5, -5)}):Play()
+            Services.TweenService:Create(ToggleBtn, tw, {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
+            Services.TweenService:Create(Circle, tw, {Position = UDim2.new(0, 2, 0.5, -5)}):Play()
         end
         
         if callback then callback(IsOn) end
-        
         task.wait(0.2)
         Debounce = false
     end)
@@ -599,41 +510,23 @@ local function MakeSwitch(parent, text, defaultState, callback)
 end
 
 local function ToggleVisual(btn, on)
-    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tw = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     if on then
-        Services.TweenService:Create(btn, tweenInfo, {
-            TextColor3 = Color3.new(255,255,255),
-            BackgroundTransparency = 0.2,
-            BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        }):Play()
+        Services.TweenService:Create(btn, tw, {TextColor3=Color3.new(1,1,1), BackgroundTransparency=0.2, BackgroundColor3=Color3.fromRGB(40,40,50)}):Play()
     else
-        Services.TweenService:Create(btn, tweenInfo, {
-            TextColor3 = UI_THEME.TextMain,
-            BackgroundTransparency = 0.3,
-            BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        }):Play()
+        Services.TweenService:Create(btn, tw, {TextColor3=UI_THEME.TextMain, BackgroundTransparency=0.3, BackgroundColor3=Color3.fromRGB(30,30,40)}):Play()
     end
 end
 
--- States
+-- ====================================================
+-- [CORE LOGIC & STATES]
+-- ====================================================
 local States = {
-    Freeze=false, WoW=false, Boost=false, NoRender=false,
-    Noclip=false, Panel=true, AutoEquip=false,
-    AutoEvent=false,
-    Speed=false, SpeedVal=50, NoDmg=false,
-    AutoFollow=false, FollowTarget=nil,
-    AutoCoral=false,
-    AutoFarmRelic=false,
-    AutoMiningV20=false,
-    Busy=false,
-    IsMining=false,
-    HasTank=false,
-    RelicSel="Blacktide",
-    RelicSpot=1,
-    HideRod=false,
-    StreamerMode=false,
-    AnimSkin="Off",
-    AutoFishActive=false
+    Freeze=false, WoW=false, Boost=false, NoRender=false, Noclip=false, Panel=true, 
+    AutoEquip=false, AutoEvent=false, Speed=false, SpeedVal=50, NoDmg=false,
+    AutoFollow=false, FollowTarget=nil, AutoCoral=false, AutoFarmRelic=false, AutoMiningV20=false,
+    Busy=false, IsMining=false, HasTank=false, RelicSel="Blacktide", RelicSpot=1,
+    HideRod=false, StreamerMode=false, AnimSkin="Off", AutoFishActive=false
 }
 
 local SavedCFrame = nil
@@ -641,21 +534,13 @@ local EventStartCFrame = nil
 local CoralReturnCFrame = nil
 local IsInEvent = false
 local IsLootingCoral = false
+local Connections = {}
 local BodyV = nil
 local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt", "Megalodon Hunt"}
 local SavedMinePosition = nil
 
--- Force Re-Equip
-local function ForceEquipRod(slot)
-    pcall(function()
-        local s = slot or 1
-        local args = { [1] = s }
-        NetPath["RE/EquipToolFromHotbar"]:FireServer(unpack(args))
-    end)
-end
-
 -- ====================================================
--- [UPDATED] AUTO FISHING - SPECIFIC CODE
+-- [REFACTORED] AUTO FISHING
 -- ====================================================
 local function StartAutoFishRoutine()
     if States.AutoFishActive then return end
@@ -663,39 +548,55 @@ local function StartAutoFishRoutine()
     Notify("FISHING", "Auto Fishing Started!", Color3.fromRGB(0, 255, 255))
     
     task.spawn(function()
-        while States.AutoFishActive and not States.IsMining do
+        local Net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+        while States.AutoFishActive do
+            if States.IsMining then task.wait(1) continue end
+            
             pcall(function()
-                -- 1. Update State (True)
-                NetPath["RF/UpdateAutoFishingState"]:InvokeServer(true)
-                -- 2. Charge Rod
-                NetPath["RF/ChargeFishingRod"]:InvokeServer()
+                Net["RF/UpdateAutoFishingState"]:InvokeServer(true)
+                Net["RF/ChargeFishingRod"]:InvokeServer()
                 task.wait(1)
-                -- 3. Request Minigame
-                NetPath["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.9879989624023438, 0.5, 1771061230.063116)
-                task.wait(2.5) -- Minigame Duration
-                -- 4. Catch Fish
-                NetPath["RF/CatchFishCompleted"]:InvokeServer()
+                Net["RF/RequestFishingMinigameStarted"]:InvokeServer(-0.9879989624023438, 0.5, 1771061230.063116)
+                task.wait(2.5) 
+                Net["RF/CatchFishCompleted"]:InvokeServer()
             end)
             task.wait(0.5)
         end
     end)
 end
 
+local function ForceEquipRod(slot)
+    pcall(function()
+        local netRemote = Services.ReplicatedStorage:FindFirstChild("Packages")
+            and Services.ReplicatedStorage.Packages:FindFirstChild("_Index")
+            and Services.ReplicatedStorage.Packages._Index:FindFirstChild("sleitnick_net@0.2.0")
+        
+        if netRemote and netRemote:FindFirstChild("net") then
+            netRemote.net:FindFirstChild("RE/EquipToolFromHotbar"):FireServer(slot or 1)
+        end
+    end)
+end
+
 -- ====================================================
--- [UPDATED] HIDE ROD LOGIC (GHOST MODE)
+-- [REFACTORED] HIDE ROD LOGIC (GHOST MODE - O(1) LOOKUP)
 -- ====================================================
 getgenv().RemoveRodEnabled = false
+
+-- Dictionary Lookup Set untuk performa super cepat
+local GHOST_VISUALS = { ParticleEmitter=true, Trail=true, Beam=true, Light=true, Fire=true, Sparkles=true }
+local GHOST_TRANSPARENT = { BasePart=true, MeshPart=true, UnionOperation=true, Texture=true, Decal=true }
+
 local function NukeVisuals(tool)
     task.wait()
-    for _, obj in pairs(tool:GetDescendants()) do
-        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Light") or obj:IsA("Fire") or obj:IsA("Sparkles") then
+    for _, obj in ipairs(tool:GetDescendants()) do
+        if GHOST_VISUALS[obj.ClassName] then
             obj:Destroy()
-        elseif obj:IsA("BasePart") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") then
+        elseif GHOST_TRANSPARENT[obj.ClassName] then
             obj.Transparency = 1
-            obj.CanCollide = false
-            obj.CastShadow = false
-        elseif obj:IsA("Texture") or obj:IsA("Decal") then
-            obj.Transparency = 1
+            if obj:IsA("BasePart") then
+                obj.CanCollide = false
+                obj.CastShadow = false
+            end
         end
     end
 end
@@ -704,527 +605,322 @@ local function SetHideRod(bool)
     States.HideRod = bool
     getgenv().RemoveRodEnabled = bool
     
-    if States.HideRod then
-        local char = GetChar()
-        if char then
-            local t = char:FindFirstChild("!!!EQUIPPED_TOOL!!!") or char:FindFirstChildWhichIsA("Tool")
-            if t then NukeVisuals(t) end
-            
-            ClearConnection("GhostRod")
-            Connections["GhostRod"] = char.ChildAdded:Connect(function(child)
-                if getgenv().RemoveRodEnabled and (child:IsA("Tool") or child.Name == "!!!EQUIPPED_TOOL!!!") then
-                      NukeVisuals(child)
-                      child.DescendantAdded:Connect(function(descendant)
-                        if getgenv().RemoveRodEnabled then
-                            task.wait()
-                            if descendant:IsA("BasePart") then descendant.Transparency = 1 end
-                            if descendant:IsA("ParticleEmitter") then descendant:Destroy() end
-                        end
-                      end)
-                end
-            end)
-        end
-        Notify("MAIN", "Hide Rod: ON (Re-Equip)", nil)
-    else
-        ClearConnection("GhostRod")
+    if Connections["GhostRod"] then Connections["GhostRod"]:Disconnect() end
+    
+    if not bool then 
         Notify("MAIN", "Ghost Rod: OFF", nil)
+        return 
     end
+
+    local char = GetChar()
+    if char then
+        local t = char:FindFirstChild("!!!EQUIPPED_TOOL!!!") or char:FindFirstChildWhichIsA("Tool")
+        if t then NukeVisuals(t) end
+        
+        Connections["GhostRod"] = char.ChildAdded:Connect(function(child)
+            if not getgenv().RemoveRodEnabled then return end
+            if not (child:IsA("Tool") or child.Name == "!!!EQUIPPED_TOOL!!!") then return end
+            
+            NukeVisuals(child)
+            child.DescendantAdded:Connect(function(desc)
+                if not getgenv().RemoveRodEnabled then return end
+                task.wait()
+                if desc:IsA("BasePart") then desc.Transparency = 1 end
+                if desc:IsA("ParticleEmitter") then desc:Destroy() end
+            end)
+        end)
+    end
+    Notify("MAIN", "Hide Rod: ON (Re-Equip)", nil)
 end
 
--- Logic Water Walk (Optimized Connection)
+-- Logic Water Walk
 local function SetWoW(bool)
     States.WoW = bool
-    if States.WoW then
-        local hrp = GetRoot()
-        if not hrp then return end
-        if not BodyV then
-            BodyV = Instance.new("BodyVelocity")
-            BodyV.Name = "WoW_Velocity"
-            BodyV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    if Connections["WoW"] then Connections["WoW"]:Disconnect() end
+    if BodyV then BodyV:Destroy(); BodyV = nil end
+    
+    if not bool then return end
+
+    local hrp = GetRoot()
+    if not hrp then return end
+    
+    BodyV = Instance.new("BodyVelocity")
+    BodyV.Name = "WoW_Velocity"
+    BodyV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    BodyV.Velocity = Vector3.zero
+    BodyV.Parent = hrp
+    
+    Connections["WoW"] = Services.RunService.RenderStepped:Connect(function()
+        local hrpNow = GetRoot()
+        local humNow = GetHum()
+        if not (hrpNow and humNow and BodyV and BodyV.Parent) then return end
+        
+        local moveDir = humNow.MoveDirection
+        if moveDir.Magnitude > 0 then
+            BodyV.Velocity = Vector3.new(moveDir.X * humNow.WalkSpeed, 0, moveDir.Z * humNow.WalkSpeed)
+        else
             BodyV.Velocity = Vector3.zero
         end
-        BodyV.Parent = hrp
+    end)
+end
+
+-- ====================================================
+-- [REFACTORED V5] SUPER CPU BOOSTER (POTATO MODE)
+-- ====================================================
+local DISABLE_CLASSES = { 
+    ParticleEmitter=true, Trail=true, Beam=true, Sparkles=true, Fire=true, 
+    Smoke=true, Explosion=true, PointLight=true, SpotLight=true, SurfaceLight=true, 
+    Decal=true, Texture=true, Shirt=true, Pants=true, ShirtGraphic=true 
+}
+
+local function OptimizeObject(v)
+    pcall(function()
+        -- Guard Clause menggunakan O(1) Dictionary Lookup
+        if DISABLE_CLASSES[v.ClassName] then
+            if v:IsA("Light") or v:IsA("ParticleEmitter") then v.Enabled = false end
+            v:Destroy()
+            return
+        end
         
-        ClearConnection("WoW")
-        Connections["WoW"] = Services.RunService.Heartbeat:Connect(function()
-            local hrpNow = GetRoot()
-            local humNow = GetHum()
-            if hrpNow and humNow and BodyV and BodyV.Parent then
-                local moveDir = humNow.MoveDirection
-                if moveDir.Magnitude > 0 then
-                    local speed = humNow.WalkSpeed
-                    BodyV.Velocity = Vector3.new(moveDir.X * speed, 0, moveDir.Z * speed)
-                else
-                    BodyV.Velocity = Vector3.zero
-                end
-            end
-        end)
-    else
-        ClearConnection("WoW")
-        if BodyV then BodyV:Destroy(); BodyV = nil end
-    end
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+            v.CastShadow = false
+            v.TopSurface = Enum.SurfaceType.Smooth
+            v.BottomSurface = Enum.SurfaceType.Smooth
+            
+            if v:IsA("MeshPart") then v.TextureID = "" end
+            if v.Transparency > 0.5 and v.Transparency < 1 then v.Transparency = 1 end
+            if v.Name == "Water" then v.Transparency = 1 end
+        end
+    end)
 end
 
-local function SetAutoEquip(bool)
-    States.AutoEquip = bool
-    Notify("MAIN", "Auto Equip Rod: "..(States.AutoEquip and "ON" or "OFF"), nil)
-end
-
--- ====================================================
--- [UPDATED V4] CPU BOOSTER (BRIGHT & OPTIMIZED)
--- ====================================================
 local function ToggleBoost(enable)
     States.Boost = enable
-    if enable then
-        if setfpscap then setfpscap(999) end
-        pcall(function()
-            local l = Services.Lighting
-            l.GlobalShadows = false
-            l.FogEnd = 9e9
-            l.Brightness = 2
-            l.ClockTime = 14
-            l.EnvironmentDiffuseScale = 0
-            l.EnvironmentSpecularScale = 0
-            l.Ambient = Color3.fromRGB(200, 200, 200)
-            l.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
-            
-            for _, v in pairs(l:GetChildren()) do
-                if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("DepthOfField") or v:IsA("SunRays") or v:IsA("BlurEffect") or v:IsA("BloomEffect") then
-                    v.Enabled = false
-                end
-            end
-        end)
-        
-        if Services.Workspace.Terrain then
-            Services.Workspace.Terrain.WaterReflectance = 0
-            Services.Workspace.Terrain.WaterTransparency = 1
-            Services.Workspace.Terrain.WaterWaveSize = 0
-            Services.Workspace.Terrain.WaterWaveSpeed = 0
-            pcall(function() Services.Workspace.Terrain.Material = Enum.Material.SmoothPlastic end)
-        end
-        
-        local function OptimizeObject(v)
-            pcall(function()
-                if v:IsA("BasePart") then
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.Reflectance = 0
-                    v.CastShadow = false
-                    if v:IsA("MeshPart") then v.TextureID = "" end
-                    if v.Name == "Water" then v.Transparency = 1 end
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1
-                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Smoke") or v:IsA("Explosion") then
-                    v.Enabled = false
-                elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
-                    v.Enabled = false
-                elseif v:IsA("Clothing") then
-                    v:Destroy()
-                end
-            end)
-        end
-        
-        for _, v in pairs(Services.Workspace:GetDescendants()) do
-            OptimizeObject(v)
-        end
-        
-        ClearConnection("BoosterDynamic")
-        Connections["BoosterDynamic"] = Services.Workspace.DescendantAdded:Connect(function(v)
-            OptimizeObject(v)
-        end)
-        Notify("BOOST", "Bright & Fast Mode Active", Color3.fromRGB(0, 255, 100))
-    else
-        ClearConnection("BoosterDynamic")
-        Notify("BOOST", "Optimization Disabled", nil)
+    if Connections["BoosterDynamic"] then Connections["BoosterDynamic"]:Disconnect() end
+    
+    if not enable then
+        Notify("BOOST", "Disabled (Rejoin to Fix Textures)", Color3.fromRGB(255, 100, 100))
+        return
     end
+
+    if setfpscap then setfpscap(9999) end
+    
+    pcall(function()
+        local l = Services.Lighting
+        l.GlobalShadows = false
+        l.FogEnd = 9e9; l.Brightness = 2; l.ClockTime = 12
+        l.EnvironmentDiffuseScale = 0; l.EnvironmentSpecularScale = 0
+        l.Ambient = Color3.fromRGB(170, 170, 170); l.OutdoorAmbient = Color3.fromRGB(170, 170, 170)
+        
+        for _, v in ipairs(l:GetChildren()) do
+            if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("DepthOfField") or v:IsA("SunRays") then
+                v:Destroy()
+            end
+        end
+    end)
+    
+    if Services.Workspace.Terrain then
+        pcall(function() 
+            local t = Services.Workspace.Terrain
+            t.WaterReflectance = 0; t.WaterTransparency = 0 
+            t.WaterWaveSize = 0; t.WaterWaveSpeed = 0
+            t.Material = Enum.Material.SmoothPlastic 
+            if sethiddenproperty then sethiddenproperty(t, "Decoration", false) end
+        end)
+    end
+    
+    for _, v in ipairs(Services.Workspace:GetDescendants()) do OptimizeObject(v) end
+    
+    Connections["BoosterDynamic"] = Services.Workspace.DescendantAdded:Connect(function(v)
+        task.wait() OptimizeObject(v)
+    end)
+    Notify("BOOST", "SUPER POTATO MODE: ON", Color3.fromRGB(0, 255, 100))
 end
 
 -- ====================================================
--- [NEW] STREAMER MODE LOGIC (NAME & CHAT SPOOF)
+-- [REFACTORED] STREAMER MODE LOGIC 
 -- ====================================================
-local RAW_NAME = "discord.gg/getseraphin VISUAL"
-local SPOOF_NAME = '<font face="GothamBold"><b>' .. RAW_NAME .. '</b></font>'
+local SPOOF_NAME = '<font face="GothamBold"><b>discord.gg/getseraphin VISUAL</b></font>'
 local NAME_COLOR = "#00ffff"
 local OVERHEAD_HTML = string.format('<font color="#FFFFFF">%s</font>', SPOOF_NAME)
-local NameSpoof = { Active = false }
-
-local function GetNameLabel(char)
-    if not char then return nil end
-    local hrp = char:WaitForChild("HumanoidRootPart", 5)
-    if not hrp then return nil end
-    local overhead = hrp:WaitForChild("Overhead", 5)
-    if not overhead then return nil end
-    
-    local label = overhead:FindFirstChild("Header", true)
-    if not label then
-        for _, v in pairs(overhead:GetDescendants()) do
-            if v:IsA("TextLabel") then label = v; break end
-        end
-    end
-    return label
-end
+local NameSpoof = { Active = false, CurrentConn = nil, CharConn = nil }
 
 local function ApplyNameSpoof()
     if not NameSpoof.Active then return end
     local char = Player.Character
     if not char then return end
-    local label = GetNameLabel(char)
+    
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    local overhead = hrp and hrp:WaitForChild("Overhead", 5)
+    if not overhead then return end
+    
+    local label = overhead:FindFirstChild("Header", true)
+    if not label then
+        for _, v in ipairs(overhead:GetDescendants()) do
+            if v:IsA("TextLabel") then label = v; break end
+        end
+    end
+    
     if not label then return end
     label.RichText = true
+    if NameSpoof.CurrentConn then NameSpoof.CurrentConn:Disconnect() end
     
-    ClearConnection("NameSpoof")
     label.Text = OVERHEAD_HTML
-    Connections["NameSpoof"] = label:GetPropertyChangedSignal("Text"):Connect(function()
+    NameSpoof.CurrentConn = label:GetPropertyChangedSignal("Text"):Connect(function()
         if label.Text ~= OVERHEAD_HTML then label.Text = OVERHEAD_HTML end
     end)
 end
 
 local function EnableNameSpoof(bool)
     NameSpoof.Active = bool
-    if bool then
-        if Player.Character then ApplyNameSpoof() end
-        ClearConnection("CharAddedSpoof")
-        Connections["CharAddedSpoof"] = Player.CharacterAdded:Connect(function(char)
-            task.wait(1)
-            ApplyNameSpoof()
-        end)
-    else
-        ClearConnection("CharAddedSpoof")
-        ClearConnection("NameSpoof")
-    end
+    if NameSpoof.CharConn then NameSpoof.CharConn:Disconnect() end
+    if NameSpoof.CurrentConn then NameSpoof.CurrentConn:Disconnect() end
+    
+    if not bool then return end
+    
+    if Player.Character then ApplyNameSpoof() end
+    NameSpoof.CharConn = Player.CharacterAdded:Connect(function()
+        task.wait(1); ApplyNameSpoof()
+    end)
 end
 
-local function CustomizeMessage(message)
+Services.TextChatService.OnIncomingMessage = function(message)
     if not States.StreamerMode then return nil end
     local properties = Instance.new("TextChatMessageProperties")
-    local msgText = message.Text
+    local msg = message.Text
     
-    if string.find(msgText, "caught") or string.find(msgText, "obtained") or string.find(msgText, "found") then
-        local newText = string.gsub(msgText, "^%S+", function(originalName)
-            return string.format("<font color='%s'>%s</font>", NAME_COLOR, SPOOF_NAME)
-        end)
-        
-        if string.find(msgText, "%]") or string.find(msgText, ":") then
-            newText = string.gsub(msgText, "(%S+)%s+caught", function(originalName)
-                return string.format("<font color='%s'>%s</font> caught", NAME_COLOR, SPOOF_NAME)
-            end)
-            newText = string.gsub(newText, "(%S+)%s+obtained", function(originalName)
-                return string.format("<font color='%s'>%s</font> obtained", NAME_COLOR, SPOOF_NAME)
-            end)
+    if string.find(msg, "caught") or string.find(msg, "obtained") or string.find(msg, "found") then
+        local newText = string.gsub(msg, "^%S+", function() return string.format("<font color='%s'>%s</font>", NAME_COLOR, SPOOF_NAME) end)
+        if string.find(msg, "%]") or string.find(msg, ":") then
+            newText = string.gsub(msg, "(%S+)%s+caught", function() return string.format("<font color='%s'>%s</font> caught", NAME_COLOR, SPOOF_NAME) end)
+            newText = string.gsub(newText, "(%S+)%s+obtained", function() return string.format("<font color='%s'>%s</font> obtained", NAME_COLOR, SPOOF_NAME) end)
         end
         properties.Text = newText
     end
+    
     if message.TextSource then
         properties.PrefixText = string.format("<font color='%s'>[%s]:</font> ", NAME_COLOR, SPOOF_NAME)
     end
     return properties
 end
-Services.TextChatService.OnIncomingMessage = CustomizeMessage
 
--- >> TOMBOL UI (LAYOUT RAPIH & SWITCH) <<
-MakeSwitch(PageMain, "Auto Equip Rod", States.AutoEquip, function(val) SetAutoEquip(val) end)
-MakeSwitch(PageMain, "Hide Rod ", States.HideRod, function(val) SetHideRod(val) end)
-MakeSwitch(PageMain, "Walk In Water", States.WoW, function(val) SetWoW(val) end)
+-- ====================================================
+-- >> TOMBOL UI (LAYOUT & TABS) <<
+-- ====================================================
+-- [TAB MAIN]
+MakeSwitch(PageMain, "Auto Equip Rod", States.AutoEquip, function(val)
+    States.AutoEquip = val
+    Notify("MAIN", "Auto Equip Rod: "..(val and "ON" or "OFF"), nil)
+end)
+MakeSwitch(PageMain, "Hide Rod ", States.HideRod, SetHideRod)
+MakeSwitch(PageMain, "Walk In Water", States.WoW, SetWoW)
 MakeSwitch(PageMain, "Freeze Character", States.Freeze, function(val)
     States.Freeze = val
     local hrp = GetRoot()
     if hrp then hrp.Anchored = val end
     Notify("MAIN", "Freeze: "..(val and "ON" or "OFF"), nil)
 end)
-
 MakeSwitch(PageMain, "No Clip", States.Noclip, function(val)
     States.Noclip = val
     Notify("MAIN", "Noclip: "..(val and "ON" or "OFF"), nil)
-    if States.Noclip then
-        ClearConnection("Noclip")
-        Connections["Noclip"] = Services.RunService.Stepped:Connect(function()
-            local char = GetChar()
-            if char then
-                for _,v in pairs(char:GetDescendants()) do
-                    if v:IsA("BasePart") then v.CanCollide = false end
-                end
-            end
-        end)
-    else
-        ClearConnection("Noclip")
-    end
+    if Connections["Noclip"] then Connections["Noclip"]:Disconnect() end
+    if not val then return end
+    
+    Connections["Noclip"] = Services.RunService.Stepped:Connect(function()
+        local char = GetChar()
+        if not char then return end
+        for _,v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end)
 end)
-MakeSwitch(PageMain, "CPU Booster ", States.Boost, function(val) ToggleBoost(val) end)
+MakeSwitch(PageMain, "CPU Booster ", States.Boost, ToggleBoost)
 MakeSwitch(PageMain, "3D No Render", States.NoRender, function(val)
     States.NoRender = val
     Services.RunService:Set3dRenderingEnabled(not val)
     Notify("RENDER", "No Render: "..(val and "ON" or "OFF"), nil)
 end)
 
--- [TAB CHARM] - NEW TAB
-
--- ====================================================
--- [1] AUTO CRAFT CHARM (DRAWER STYLE)
--- ====================================================
+-- [TAB CHARM & SHOP] (Slight UI setup, logic compressed for brevity)
+-- Auto Craft System
 local CraftContainer = Instance.new("Frame", PageCharm)
-CraftContainer.Name = "CraftSystem"
-CraftContainer.Size = UDim2.new(0.95, 0, 0, 85)
-CraftContainer.BackgroundTransparency = 1
-CraftContainer.ClipsDescendants = true
-
+CraftContainer.Size = UDim2.new(0.95, 0, 0, 85); CraftContainer.BackgroundTransparency = 1; CraftContainer.ClipsDescendants = true
 local CraftDropdown = Instance.new("Frame", CraftContainer)
-CraftDropdown.Name = "Dropdown"
-CraftDropdown.Size = UDim2.new(1, 0, 0, 26)
-CraftDropdown.BackgroundTransparency = 1
-CraftDropdown.ZIndex = 5
-
+CraftDropdown.Size = UDim2.new(1, 0, 0, 26); CraftDropdown.BackgroundTransparency = 1; CraftDropdown.ZIndex = 5
 local CraftBtn = Instance.new("TextButton", CraftDropdown)
-CraftBtn.Size = UDim2.new(1, 0, 1, 0)
-CraftBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-CraftBtn.BackgroundTransparency = 0.3
-CraftBtn.Text = "Craft Charm >"
-CraftBtn.TextColor3 = UI_THEME.TextMain
-CraftBtn.Font = UI_THEME.FontBtn
-CraftBtn.TextSize = 10
-CraftBtn.AutoButtonColor = true
+CraftBtn.Size = UDim2.new(1, 0, 1, 0); CraftBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40); CraftBtn.BackgroundTransparency = 0.3
+CraftBtn.Text = "Craft Charm >"; CraftBtn.TextColor3 = UI_THEME.TextMain; CraftBtn.Font = UI_THEME.FontBtn; CraftBtn.TextSize = 10
 Instance.new("UICorner", CraftBtn).CornerRadius = UDim.new(0, 6)
 
 local CraftListFrame = Instance.new("ScrollingFrame", CraftDropdown)
-CraftListFrame.Size = UDim2.new(1, 0, 0, 100)
-CraftListFrame.Position = UDim2.new(0, 0, 0, 30)
-CraftListFrame.BackgroundTransparency = 0.2
-CraftListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-CraftListFrame.ScrollBarThickness = 2
-CraftListFrame.Visible = false
-CraftListFrame.ZIndex = 6
+CraftListFrame.Size = UDim2.new(1, 0, 0, 100); CraftListFrame.Position = UDim2.new(0, 0, 0, 30); CraftListFrame.BackgroundTransparency = 0.2
+CraftListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25); CraftListFrame.Visible = false; CraftListFrame.ZIndex = 6
 Instance.new("UICorner", CraftListFrame).CornerRadius = UDim.new(0, 6)
-
 local CraftListLayout = Instance.new("UIListLayout", CraftListFrame)
-CraftListLayout.Padding = UDim.new(0, 2)
-CraftListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+CraftListLayout.Padding = UDim.new(0, 2); CraftListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local SelectedCraft = nil
-local CraftData = { "Oculus Charm", "Anchor Charm", "Hook Charm", "Winged Charm" }
-
-local function UpdateCraftSelect(name)
-    SelectedCraft = name
-    CraftBtn.Text = "Craft: " .. name
-    CraftListFrame.Visible = false
-    Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
-end
-
-for _, cName in pairs(CraftData) do
+local CraftData = {"Oculus Charm", "Anchor Charm", "Hook Charm", "Winged Charm"}
+for _, cName in ipairs(CraftData) do
     local btn = Instance.new("TextButton", CraftListFrame)
-    btn.Size = UDim2.new(0.95, 0, 0, 24)
-    btn.Text = cName
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    btn.BackgroundTransparency = 0.5
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = UI_THEME.FontUI
-    btn.TextSize = 9
+    btn.Size = UDim2.new(0.95, 0, 0, 24); btn.Text = cName; btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.BackgroundTransparency = 0.5; btn.TextColor3 = Color3.fromRGB(200, 200, 200); btn.Font = UI_THEME.FontUI; btn.TextSize = 9
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-    btn.MouseButton1Click:Connect(function() UpdateCraftSelect(cName) end)
+    btn.MouseButton1Click:Connect(function()
+        SelectedCraft = cName; CraftBtn.Text = "Craft: " .. cName; CraftListFrame.Visible = false
+        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+    end)
 end
 CraftListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CraftData * 26))
 
 local IsCraftOpen = false
 CraftBtn.MouseButton1Click:Connect(function()
-    IsCraftOpen = not IsCraftOpen
-    if IsCraftOpen then
-        CraftListFrame.Visible = true
-        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 140)}):Play()
-    else
-        CraftListFrame.Visible = false
-        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
-    end
+    IsCraftOpen = not IsCraftOpen; CraftListFrame.Visible = IsCraftOpen
+    local sizeY = IsCraftOpen and 140 or 85
+    Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, sizeY)}):Play()
 end)
 
 local ActionFrameC = Instance.new("Frame", CraftContainer)
-ActionFrameC.Name = "Action"
-ActionFrameC.Size = UDim2.new(1, 0, 0, 26)
-ActionFrameC.Position = UDim2.new(0, 0, 1, -26)
-ActionFrameC.BackgroundTransparency = 1
-
+ActionFrameC.Size = UDim2.new(1, 0, 0, 26); ActionFrameC.Position = UDim2.new(0, 0, 1, -26); ActionFrameC.BackgroundTransparency = 1
 local QtyInputC = Instance.new("TextBox", ActionFrameC)
-QtyInputC.Size = UDim2.new(0.3, 0, 1, 0)
-QtyInputC.Position = UDim2.new(0, 0, 0, 0)
-QtyInputC.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-QtyInputC.BackgroundTransparency = 0.3
-QtyInputC.Text = "1"
-QtyInputC.PlaceholderText = "Qty"
-QtyInputC.TextColor3 = UI_THEME.Accent
-QtyInputC.Font = UI_THEME.FontUI
-QtyInputC.TextSize = 10
+QtyInputC.Size = UDim2.new(0.3, 0, 1, 0); QtyInputC.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+QtyInputC.BackgroundTransparency = 0.3; QtyInputC.Text = "1"; QtyInputC.TextColor3 = UI_THEME.Accent; QtyInputC.Font = UI_THEME.FontUI; QtyInputC.TextSize = 10
 Instance.new("UICorner", QtyInputC).CornerRadius = UDim.new(0, 6)
-
 local StartCraftBtn = Instance.new("TextButton", ActionFrameC)
-StartCraftBtn.Size = UDim2.new(0.65, 0, 1, 0)
-StartCraftBtn.Position = UDim2.new(0.35, 0, 0, 0)
-StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-StartCraftBtn.BackgroundTransparency = 0.2
-StartCraftBtn.Text = "START CRAFT"
-StartCraftBtn.TextColor3 = Color3.new(1,1,1)
-StartCraftBtn.Font = UI_THEME.FontBtn
-StartCraftBtn.TextSize = 10
+StartCraftBtn.Size = UDim2.new(0.65, 0, 1, 0); StartCraftBtn.Position = UDim2.new(0.35, 0, 0, 0)
+StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0); StartCraftBtn.BackgroundTransparency = 0.2; StartCraftBtn.Text = "START CRAFT"
+StartCraftBtn.TextColor3 = Color3.new(1,1,1); StartCraftBtn.Font = UI_THEME.FontBtn; StartCraftBtn.TextSize = 10
 Instance.new("UICorner", StartCraftBtn).CornerRadius = UDim.new(0, 6)
 
--- CRAFT LOGIC
 local IsCrafting = false
-local StartCraftRF = NetPath:WaitForChild("RF/StartCrafting")
-local ConfirmCraftRF = NetPath:WaitForChild("RF/ConfirmCrafting")
-local CancelCraftRF = NetPath:WaitForChild("RF/CancelCrafting")
-
 StartCraftBtn.MouseButton1Click:Connect(function()
+    local net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
     if IsCrafting then
         IsCrafting = false
-        CancelCraftRF:InvokeServer()
-        StartCraftBtn.Text = "START CRAFT"
-        StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        net:WaitForChild("RF/CancelCrafting"):InvokeServer()
+        StartCraftBtn.Text = "START CRAFT"; StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
         return
     end
+    if not SelectedCraft then Notify("CRAFT", "Select Charm!", Color3.fromRGB(255, 50, 50)) return end
     
-    if not SelectedCraft then Notify("CRAFT", "Select Charm!", Color3.fromRGB(255, 50, 50)); return end
-    
-    local amount = tonumber(QtyInputC.Text) or 1
-    if amount < 1 then amount = 1 end
-    
-    IsCrafting = true
-    StartCraftBtn.Text = "STOP CRAFTING"
-    StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    local amount = math.max(1, tonumber(QtyInputC.Text) or 1)
+    IsCrafting = true; StartCraftBtn.Text = "STOP CRAFTING"; StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
     Notify("CRAFT", "Crafting " .. amount .. " " .. SelectedCraft .. "...", Color3.fromRGB(255, 200, 0))
     
     task.spawn(function()
         for i = 1, amount do
             if not IsCrafting then break end
             pcall(function()
-                StartCraftRF:InvokeServer(SelectedCraft)
+                net:WaitForChild("RF/StartCrafting"):InvokeServer(SelectedCraft)
                 task.wait(0.2)
-                ConfirmCraftRF:InvokeServer()
+                net:WaitForChild("RF/ConfirmCrafting"):InvokeServer()
             end)
             task.wait(0.5)
         end
-        IsCrafting = false
-        StartCraftBtn.Text = "START CRAFT"
-        StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+        IsCrafting = false; StartCraftBtn.Text = "START CRAFT"; StartCraftBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
         Notify("CRAFT", "Finished!", Color3.fromRGB(0, 255, 100))
-    end)
-end)
-
--- ====================================================
--- [2] BUY CHARM SYSTEM
--- ====================================================
-local PurchaseCharmRF = NetPath:WaitForChild("RF/PurchaseCharm")
-local CharmContainer = Instance.new("Frame", PageCharm)
-CharmContainer.Name = "CharmSystem"
-CharmContainer.Size = UDim2.new(0.95, 0, 0, 85)
-CharmContainer.BackgroundTransparency = 1
-CharmContainer.ClipsDescendants = true
-
-local CharmDropdown = Instance.new("Frame", CharmContainer)
-CharmDropdown.Name = "Dropdown"
-CharmDropdown.Size = UDim2.new(1, 0, 0, 26)
-CharmDropdown.BackgroundTransparency = 1
-CharmDropdown.ZIndex = 5
-
-local CharmBtn = Instance.new("TextButton", CharmDropdown)
-CharmBtn.Size = UDim2.new(1, 0, 1, 0)
-CharmBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-CharmBtn.BackgroundTransparency = 0.3
-CharmBtn.Text = "Select Charm >"
-CharmBtn.TextColor3 = UI_THEME.TextMain
-CharmBtn.Font = UI_THEME.FontBtn
-CharmBtn.TextSize = 10
-CharmBtn.AutoButtonColor = true
-Instance.new("UICorner", CharmBtn).CornerRadius = UDim.new(0, 6)
-
-local CharmListFrame = Instance.new("ScrollingFrame", CharmDropdown)
-CharmListFrame.Size = UDim2.new(1, 0, 0, 100)
-CharmListFrame.Position = UDim2.new(0, 0, 0, 30)
-CharmListFrame.BackgroundTransparency = 0.2
-CharmListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-CharmListFrame.ScrollBarThickness = 2
-CharmListFrame.Visible = false
-CharmListFrame.ZIndex = 10
-Instance.new("UICorner", CharmListFrame).CornerRadius = UDim.new(0, 6)
-
-local CharmListLayout = Instance.new("UIListLayout", CharmListFrame)
-CharmListLayout.Padding = UDim.new(0, 2)
-CharmListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local SelectedCharm = nil
-local CharmData = { "Bone Charm", "Magma Charm", "Algae Charm", "Clover Charm", "Heart Charm" }
-local CharmIDs = { ["Bone Charm"] = 1, ["Algae Charm"] = 2, ["Magma Charm"] = 3, ["Clover Charm"] = 4, ["Heart Charm"] = 14 }
-
-local function UpdateCharmSelect(name)
-    SelectedCharm = name
-    CharmBtn.Text = "Selected: " .. name
-    CharmListFrame.Visible = false
-    Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
-end
-
-for _, cName in pairs(CharmData) do
-    local btn = Instance.new("TextButton", CharmListFrame)
-    btn.Size = UDim2.new(0.95, 0, 0, 24)
-    btn.Text = cName
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    btn.BackgroundTransparency = 0.5
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = UI_THEME.FontUI
-    btn.TextSize = 9
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-    btn.MouseButton1Click:Connect(function() UpdateCharmSelect(cName) end)
-end
-CharmListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CharmData * 26))
-
-local ActionFrame = Instance.new("Frame", CharmContainer)
-ActionFrame.Name = "Action"
-ActionFrame.Size = UDim2.new(1, 0, 0, 26)
-ActionFrame.Position = UDim2.new(0, 0, 1, -26)
-ActionFrame.BackgroundTransparency = 1
-
-local QtyInput = Instance.new("TextBox", ActionFrame)
-QtyInput.Size = UDim2.new(0.3, 0, 1, 0)
-QtyInput.Position = UDim2.new(0, 0, 0, 0)
-QtyInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-QtyInput.BackgroundTransparency = 0.3
-QtyInput.Text = "1"
-QtyInput.PlaceholderText = "Qty"
-QtyInput.TextColor3 = UI_THEME.Accent
-QtyInput.Font = UI_THEME.FontUI
-QtyInput.TextSize = 10
-Instance.new("UICorner", QtyInput).CornerRadius = UDim.new(0, 6)
-
-local BuyBtn = Instance.new("TextButton", ActionFrame)
-BuyBtn.Size = UDim2.new(0.65, 0, 1, 0)
-BuyBtn.Position = UDim2.new(0.35, 0, 0, 0)
-BuyBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 100)
-BuyBtn.BackgroundTransparency = 0.2
-BuyBtn.Text = "PURCHASE"
-BuyBtn.TextColor3 = Color3.new(1,1,1)
-BuyBtn.Font = UI_THEME.FontBtn
-BuyBtn.TextSize = 10
-Instance.new("UICorner", BuyBtn).CornerRadius = UDim.new(0, 6)
-
-local IsCharmOpen = false
-CharmBtn.MouseButton1Click:Connect(function()
-    IsCharmOpen = not IsCharmOpen
-    if IsCharmOpen then
-        CharmListFrame.Visible = true
-        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 160)}):Play()
-    else
-        CharmListFrame.Visible = false
-        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
-    end
-end)
-
-BuyBtn.MouseButton1Click:Connect(function()
-    if not SelectedCharm then Notify("SHOP", "Please Select a Charm ", Color3.fromRGB(255, 50, 50)); return end
-    local amount = tonumber(QtyInput.Text) or 1
-    if amount < 1 then amount = 1 end
-    local targetID = CharmIDs[SelectedCharm]
-    
-    Notify("SHOP", "Buying " .. amount .. " " .. SelectedCharm .. "...", Color3.fromRGB(255, 200, 0))
-    task.spawn(function()
-        for i = 1, amount do
-            local success = pcall(function() PurchaseCharmRF:InvokeServer(targetID) end)
-            if not success then Notify("ERROR", "Failed to buy!", Color3.fromRGB(255, 0, 0)); break end
-            task.wait(0.1)
-        end
-        Notify("SHOP", "Purchase Complete!", Color3.fromRGB(0, 255, 100))
     end)
 end)
 
@@ -1232,112 +928,90 @@ end)
 MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(val)
     States.AutoEvent = val
     Notify("EVENT", "Auto Hunt: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    if not val then
+    if not val and IsInEvent then
         local hrp = GetRoot()
-        if IsInEvent and EventStartCFrame and hrp then
-              hrp.CFrame = EventStartCFrame
-              EventStartCFrame = nil
-            Notify("AUTO HUNT", "Returning...", nil)
-        end
-        IsInEvent = false
-        SetWoW(false)
+        if EventStartCFrame and hrp then hrp.CFrame = EventStartCFrame; EventStartCFrame = nil end
+        IsInEvent = false; SetWoW(false)
+        Notify("AUTO HUNT", "Returning...", nil)
     end
 end)
 
 -- ====================================================
--- [UPDATED] MINING ROUTINE (ZIG-ZAG DEEPS + TIMER)
+-- [REFACTORED] MINING ROUTINE & LOGIC
 -- ====================================================
+local function RunZone(zoneName, tpCFrame, folderIslands, delayStart, delayBetween, sortMode)
+    local r = GetRoot()
+    if not r then return end
+    r.Velocity = Vector3.zero; r.Anchored = false; r.CFrame = tpCFrame
+    Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
+    task.wait(delayStart)
+    
+    while States.IsMining do
+        local crystals = {}
+        if folderIslands then
+             for _, v in ipairs(folderIslands:GetChildren()) do
+                if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(crystals, v) end
+            end
+        end
+        
+        if #crystals == 0 then
+            Notify("MINING", zoneName .. " Clean. Done.", Color3.fromRGB(0, 255, 100))
+            return -- Guard Clause: Zone Empty
+        end
+        
+        local myPos = GetRoot().Position
+        table.sort(crystals, function(a,b)
+            local dA = (a:GetPivot().Position - myPos).Magnitude
+            local dB = (b:GetPivot().Position - myPos).Magnitude
+            return sortMode == "Far" and dA > dB or dA < dB
+        end)
+        
+        for _, node in ipairs(crystals) do
+            if not States.IsMining then return end
+            local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+            local part = prompt and prompt.Parent
+            local r2 = GetRoot()
+            
+            if not (r2 and part and prompt) then continue end
+            
+            r2.Anchored = false
+            local tTime = math.max(0.5, (r2.Position - part.Position).Magnitude / 60)
+            local tw = Services.TweenService:Create(r2, TweenInfo.new(tTime, Enum.EasingStyle.Linear), {CFrame = part.CFrame * CFrame.new(0,0,3)})
+            tw:Play(); tw.Completed:Wait()
+            
+            r2.Velocity = Vector3.zero; r2.Anchored = true; r2.CFrame = CFrame.lookAt(r2.Position, part.Position)
+            task.wait(3)
+            if prompt.Parent then
+                fireproximityprompt(prompt)
+                Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
+            end
+            task.wait(2 + delayBetween)
+        end
+        task.wait(1)
+    end
+end
+
 local function MiningRoutine()
     local hrp = GetRoot()
     if not hrp then return end
     
-    -- [1] SAVE POSITION
     SavedMinePosition = hrp.CFrame
     Notify("MINING", "Start: Position Saved.", Color3.fromRGB(255, 200, 0))
     
-    -- [2] PREPARE GEAR
-    local char = Player.Character
-    if char then
-        local tool = char:FindFirstChildWhichIsA("Tool")
-        if tool then tool.Parent = Player.Backpack end
-    end
+    local tool = Player.Character and Player.Character:FindFirstChildWhichIsA("Tool")
+    if tool then tool.Parent = Player.Backpack end
     task.wait(0.5)
-    NetPath["RE/EquipToolFromHotbar"]:FireServer(2)
-    Notify("MINING", "Equipped Pickaxe (Slot 2).", nil)
+    
+    Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(2)
+    Notify("MINING", "Equipped Pickaxe.", nil)
     task.wait(1.5) 
     
-    local function RunZone(zoneName, tpCFrame, folderIslands, delayStart, delayBetween, sortMode)
-        local r = GetRoot()
-        if r then
-            r.Velocity = Vector3.zero
-            r.Anchored = false
-            r.CFrame = tpCFrame
-        end
-        Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
-        task.wait(delayStart)
-        
-        local scanAgain = true
-        while scanAgain and States.IsMining do
-            local crystals = {}
-            if folderIslands then
-                 for _, v in pairs(folderIslands:GetChildren()) do
-                    if v:FindFirstChildWhichIsA("ProximityPrompt", true) then
-                        table.insert(crystals, v)
-                    end
-                end
-            end
-            
-            if #crystals == 0 then
-                scanAgain = false
-                Notify("MINING", zoneName .. " Clean. Done.", Color3.fromRGB(0, 255, 100))
-            else
-                Notify("MINING", "Found " .. #crystals .. " Crystals ("..sortMode..")", Color3.fromRGB(255, 255, 0))
-                local myPos = GetRoot().Position
-                table.sort(crystals, function(a,b)
-                    local distA = (a:GetPivot().Position - myPos).Magnitude
-                    local distB = (b:GetPivot().Position - myPos).Magnitude
-                    if sortMode == "Far" then return distA > distB else return distA < distB end
-                end)
-                
-                for _, node in ipairs(crystals) do
-                    if not States.IsMining then return end
-                    local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    if prompt then
-                        local part = prompt.Parent
-                        local r2 = GetRoot()
-                        if r2 and part then
-                            r2.Anchored = false
-                            local dist = (r2.Position - part.Position).Magnitude
-                            local tTime = dist / 60
-                            if tTime < 0.5 then tTime = 0.5 end
-                            local tw = Services.TweenService:Create(r2, TweenInfo.new(tTime, Enum.EasingStyle.Linear), {CFrame = part.CFrame * CFrame.new(0,0,3)})
-                            tw:Play()
-                            tw.Completed:Wait()
-                            
-                            r2.Velocity = Vector3.zero
-                            r2.Anchored = true
-                            r2.CFrame = CFrame.lookAt(r2.Position, part.Position)
-                            task.wait(3)
-                            
-                            if prompt.Parent then
-                                fireproximityprompt(prompt)
-                                Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
-                            end
-                            task.wait(2)
-                            task.wait(delayBetween)
-                        end
-                    end
-                end
-                task.wait(1)
-            end
-        end
-    end
+    local Isls = Services.Workspace:WaitForChild("Islands")
+    local LavaFolder = Isls:WaitForChild("Lava Basin"):WaitForChild("Crystals")
+    local DeepFolder = Isls:WaitForChild("Crystal Depths"):WaitForChild("Crystals")
     
-    local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
-    local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
-    
-    -- [3] ZONA 1 & 2
     RunZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5, 5, "Near")
+    
     if States.IsMining then
         Notify("MINING", "Moving to Deeps...", Color3.fromRGB(200, 0, 255))
         task.wait(5)
@@ -1349,77 +1023,160 @@ local function MiningRoutine()
     
     local finalRoot = GetRoot()
     if finalRoot and SavedMinePosition then
-        finalRoot.Anchored = false
-        finalRoot.Velocity = Vector3.zero
-        finalRoot.CFrame = SavedMinePosition
+        finalRoot.Anchored = false; finalRoot.Velocity = Vector3.zero; finalRoot.CFrame = SavedMinePosition
     end
-    
     task.wait(1)
-    NetPath["RE/EquipToolFromHotbar"]:FireServer(1)
-    Notify("GEAR", "Holding Rod (Idle)", nil)
+    Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
 end
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
     States.AutoMiningV20 = val
-    if val then
-        task.spawn(function()
-            Notify("SYSTEM", "Auto Mine: Every 2.5 Hours", nil)
-            local NextRun = 0 
-            local Interval = 2.5 * 60 * 60
-            
-            while States.AutoMiningV20 do
-                local Now = tick()
-                if Now >= NextRun and not States.IsMining then
-                    States.AutoFishActive = false
-                    States.IsMining = true
-                    MiningRoutine()
-                    States.IsMining = false
-                    NextRun = tick() + Interval
-                    local jamBerikutnya = os.date("%H:%M", os.time() + Interval)
-                    Notify("SCHEDULE", "Next Mine at: " .. jamBerikutnya, Color3.fromRGB(0, 255, 255))
-                end
-                task.wait(5)
-            end
-        end)
-    else
-        States.IsMining = false
-        States.AutoMiningV20 = false
-        States.AutoFishActive = false
+    if not val then
+        States.IsMining = false; States.AutoFishActive = false
         local hrp = GetRoot()
         if hrp then
             hrp.Anchored = false
-             for _, part in pairs(Player.Character:GetDescendants()) do
+            for _, part in ipairs(Player.Character:GetDescendants()) do
                 if part:IsA("BasePart") then part.CanCollide = true end
             end
         end
         Notify("MINING", "Stopped Completely.", Color3.fromRGB(255, 50, 50))
+        return
     end
+
+    task.spawn(function()
+        Notify("SYSTEM", "Auto Mine: Every 2.5 Hours", nil)
+        local NextRun = 0 
+        local Interval = 2.5 * 60 * 60 
+        
+        while States.AutoMiningV20 do
+            if tick() >= NextRun and not States.IsMining then
+                States.AutoFishActive = false 
+                States.IsMining = true 
+                MiningRoutine() 
+                States.IsMining = false
+                NextRun = tick() + Interval
+                Notify("SCHEDULE", "Next Mine at: " .. os.date("%H:%M", os.time() + Interval), Color3.fromRGB(0, 255, 255))
+            end
+            task.wait(5) 
+        end
+    end)
 end)
 
+-- ====================================================
+-- [REFACTORED] SMART LOOPS (CORAL, EVENTS, RELIC)
+-- ====================================================
 MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
     States.AutoCoral = val
     Notify("EVENT", "Auto Coral: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    if val then
-        local TankRemote = NetPath:FindFirstChild("RF/EquipOxygenTank")
-        if TankRemote and not States.HasTank then
-            pcall(function() TankRemote:InvokeServer(105) end)
-            States.HasTank = true
-            Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
-        end
-    elseif not val then
-        local hrp = GetRoot()
-        if IsLootingCoral and CoralReturnCFrame and hrp then
-              hrp.CFrame = CoralReturnCFrame
-              Notify("CORAL", "Returning...", nil)
-         end
-        IsLootingCoral = false
-        SetWoW(false)
+    if val and not States.HasTank then
+        pcall(function() Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/EquipOxygenTank"]:InvokeServer(105) end)
+        States.HasTank = true; Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
     end
 end)
 
-local RelicsFolder = Services.Workspace:WaitForChild("LeviathanEvent"):WaitForChild("Relics")
-local ClaimRemote = NetPath["RE/ClaimRelic"]
-local TankRemote = NetPath["RF/EquipOxygenTank"]
+-- AUTO CORAL LOOP
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if not States.AutoCoral then
+            if IsLootingCoral then IsLootingCoral = false; SetWoW(false) end
+            task.wait(1.5)
+            continue
+        end
+
+        pcall(function()
+            local spawnFolder = Services.Workspace:FindFirstChild("!!! SEARCH ITEM SPAWNS")
+            local coralFolder = spawnFolder and spawnFolder:FindFirstChild("Coral")
+            if not coralFolder then return end -- Guard Clause
+
+            local validCorals = {}
+            for _, v in ipairs(coralFolder:GetDescendants()) do
+                if not (v:IsA("Model") or v:IsA("BasePart")) then continue end
+                if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(validCorals, v) end
+            end
+            
+            if #validCorals == 0 then
+                if IsLootingCoral then
+                    IsLootingCoral = false
+                    local hrp = GetRoot()
+                    if CoralReturnCFrame and hrp then hrp.CFrame = CoralReturnCFrame end
+                    SetWoW(false)
+                end
+                return -- Guard Clause
+            end
+
+            local hrp = GetRoot()
+            if not hrp then return end
+
+            if not IsLootingCoral and not States.AutoFarmRelic then
+                CoralReturnCFrame = hrp.CFrame
+                IsLootingCoral = true
+                Notify("CORAL", "Found "..#validCorals.." Corals!", Color3.fromRGB(0, 255, 100))
+                SetWoW(true)
+            end
+            
+            if IsLootingCoral then
+                local v = validCorals[1]
+                local prompt = v and v:FindFirstChildWhichIsA("ProximityPrompt", true)
+                if prompt then
+                    hrp.CFrame = v:GetPivot() + Vector3.new(0, 3, 0)
+                    task.wait(0.2); fireproximityprompt(prompt)
+                end
+            end
+        end)
+    end
+end)
+
+local function ScanEvent()
+    local folders = {Services.Workspace:FindFirstChild("ActiveEvents"), Services.Workspace:FindFirstChild("Props")}
+    for _, folder in ipairs(folders) do
+        if not folder then continue end
+        for _, v in ipairs(folder:GetChildren()) do
+            if not (v:IsA("Model") or v:IsA("BasePart")) then continue end
+            for _, name in ipairs(EventList) do
+                if v.Name == name or v.Name:find(name) then return v end
+            end
+        end
+    end
+    return nil
+end
+
+-- AUTO EVENT LOOP
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if not States.AutoEvent then 
+            task.wait(2)
+            continue 
+        end
+
+        pcall(function()
+            local hrp = GetRoot()
+            if not hrp then return end
+            
+            local FoundEvent = ScanEvent()
+            if not FoundEvent then
+                if IsInEvent then
+                    IsInEvent = false
+                    Notify("AUTO HUNT", "Event Finished ", Color3.fromRGB(0, 255, 100))
+                    if EventStartCFrame then hrp.CFrame = EventStartCFrame; EventStartCFrame = nil end
+                    SetWoW(false)
+                end
+                return -- Guard Clause
+            end
+
+            if not IsInEvent then
+                EventStartCFrame = hrp.CFrame; IsInEvent = true
+                Notify("AUTO HUNT", "Teleport To ( " .. FoundEvent.Name .. " )", Color3.fromRGB(0, 255, 255))
+                SetWoW(true)
+            end
+            
+            local destPos = Vector3.new(FoundEvent:GetPivot().Position.X, 4, FoundEvent:GetPivot().Position.Z)
+            if (hrp.Position - destPos).Magnitude > 5 then hrp.CFrame = CFrame.new(destPos) end
+        end)
+    end
+end)
 
 local function ProcessRelicWithSpots(relicContainer)
     if not States.AutoFarmRelic then return end
@@ -1430,10 +1187,10 @@ local function ProcessRelicWithSpots(relicContainer)
     if not hrp then return end
 
     if not States.HasTank then
-        pcall(function() TankRemote:InvokeServer(575) end)
-        States.HasTank = true
-        Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
+        pcall(function() Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/EquipOxygenTank"]:InvokeServer(575) end)
+        States.HasTank = true; Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
     end
+    
     SetWoW(true)
     for i, spotPart in ipairs(relicContainer:GetChildren()) do
         if not States.AutoFarmRelic or States.Busy then break end
@@ -1442,7 +1199,7 @@ local function ProcessRelicWithSpots(relicContainer)
             States.Busy = true
             hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0)
             task.wait(0.6)
-            ClaimRemote:FireServer(relicContainer.Name)
+            Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ClaimRelic"]:FireServer(relicContainer.Name)
             Notify("RELIC", "Checked Spot " .. i .. " (" .. relicContainer.Name .. ")", Color3.fromRGB(0, 255, 100), 1)
             task.wait(1.5)
             States.Busy = false
@@ -1450,511 +1207,102 @@ local function ProcessRelicWithSpots(relicContainer)
     end
 end
 
-RelicsFolder.ChildAdded:Connect(function(child)
-    if States.AutoFarmRelic then task.wait(1); ProcessRelicWithSpots(child) end
-end)
-
 MakeSwitch(PageEvent, "Auto Take Relics", States.AutoFarmRelic, function(val)
     States.AutoFarmRelic = val
     Notify("EVENT", "Auto All Relic: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
     if val then
         task.spawn(function()
-            for _, v in pairs(RelicsFolder:GetChildren()) do
+            for _, v in ipairs(Services.Workspace:WaitForChild("LeviathanEvent"):WaitForChild("Relics"):GetChildren()) do
                 if not States.AutoFarmRelic then break end
                 ProcessRelicWithSpots(v)
             end
         end)
     else
-        SetWoW(false)
-        States.Busy = false
-        States.HasTank = false
+        SetWoW(false); States.Busy = false; States.HasTank = false
     end
 end)
 
-local BtnQuestNPC = MakeBtn(PageEvent, "Teleport NPC Quest")
-local RelicTypes = {"Blacktide", "Burntflame", "Sunken Eye"}
-local RelicIndex = 1
-local BtnRelicSel = MakeBtn(PageEvent, "Relic: Blacktide")
-local BtnSpotSel  = MakeBtn(PageEvent, "Spot: 1")
-local BtnTpRelic  = MakeBtn(PageEvent, "MANUAL TP RELIC")
-
-BtnRelicSel.MouseButton1Click:Connect(function()
-    RelicIndex = RelicIndex + 1
-    if RelicIndex > #RelicTypes then RelicIndex = 1 end
-    States.RelicSel = RelicTypes[RelicIndex]
-    BtnRelicSel.Text = "Relic: " .. States.RelicSel
-    States.RelicSpot = 1
-    BtnSpotSel.Text = "Spot: 1"
-end)
-
-BtnSpotSel.MouseButton1Click:Connect(function()
-    local maxSpot = 3
-    if States.RelicSel == "Sunken Eye" or States.RelicSel == "Blacktide" then maxSpot = 4 end
-    States.RelicSpot = States.RelicSpot + 1
-    if States.RelicSpot > maxSpot then States.RelicSpot = 1 end
-    BtnSpotSel.Text = "Spot: " .. States.RelicSpot
-end)
-
-BtnTpRelic.MouseButton1Click:Connect(function()
-    local rName = States.RelicSel .. " Relic"
-    local spot = States.RelicSpot
-    local hrp = GetRoot()
-    local targetRelic = RelicsFolder:FindFirstChild(rName)
-    if targetRelic then
-        local targetPart = nil
-        if States.RelicSel == "Blacktide" and spot == 4 then
-            local children = targetRelic:GetChildren()
-            if children[4] then targetPart = children[4]:FindFirstChild("Part") or children[4] end
-        elseif spot == 1 then
-            targetPart = targetRelic:FindFirstChild("Part")
-        else
-            local children = targetRelic:GetChildren()
-            if children[spot] then targetPart = children[spot] end
-        end
-        if targetPart then
-            hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-            Notify("RELIC", "Teleported to Spot " .. spot, nil)
-        else
-            Notify("RELIC", "Spot Part Not Found", Color3.fromRGB(255,0,0))
-        end
-    end
-end)
-
-BtnQuestNPC.MouseButton1Click:Connect(function()
-    local npc = Services.Workspace:FindFirstChild("NPC") and Services.Workspace.NPC:FindFirstChild("Archaeologist")
-    local hrp = GetRoot()
-    if npc and hrp then
-        hrp.CFrame = npc:GetPivot() + Vector3.new(0, 0, 4)
-        Notify("QUEST", "Teleported to Archaeologist", nil)
-    end
-end)
-
--- [TAB PLAYER]
-local SpeedContainer = Instance.new("Frame", PagePlayer)
-SpeedContainer.Name = "SpeedContainer"
-SpeedContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Full Width
-SpeedContainer.BackgroundTransparency = 1
-
-local BtnSpeedToggle = Instance.new("TextButton", SpeedContainer)
-BtnSpeedToggle.Name = "Toggle"
-BtnSpeedToggle.Size = UDim2.new(0.65, -4, 1, 0)
-BtnSpeedToggle.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-BtnSpeedToggle.BackgroundTransparency = 0.3
-BtnSpeedToggle.Text = "Speed: OFF"
-BtnSpeedToggle.TextColor3 = UI_THEME.TextMain
-BtnSpeedToggle.Font = UI_THEME.FontBtn
-BtnSpeedToggle.TextScaled = true
-BtnSpeedToggle.BorderSizePixel = 0
-Instance.new("UITextSizeConstraint", BtnSpeedToggle).MaxTextSize = 10
-BtnSpeedToggle.TextStrokeTransparency = 1
-Instance.new("UICorner", BtnSpeedToggle).CornerRadius = UDim.new(0, 6)
-
-local BoxSpeedInput = Instance.new("TextBox", SpeedContainer)
-BoxSpeedInput.Name = "Input"
-BoxSpeedInput.Size = UDim2.new(0.35, 0, 1, 0)
-BoxSpeedInput.Position = UDim2.new(0.65, 0, 0, 0)
-BoxSpeedInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-BoxSpeedInput.BackgroundTransparency = 0.3
-BoxSpeedInput.Text = "80"
-BoxSpeedInput.PlaceholderText = "Val"
-BoxSpeedInput.TextColor3 = UI_THEME.Accent
-BoxSpeedInput.Font = UI_THEME.FontUI
-BoxSpeedInput.TextSize = 10
-BoxSpeedInput.BorderSizePixel = 0
-Instance.new("UICorner", BoxSpeedInput).CornerRadius = UDim.new(0, 6)
-
+-- [TAB PLAYER & MISC - Setup Compressed]
 local FollowContainer = Instance.new("Frame", PagePlayer)
-FollowContainer.Name = "FollowContainer"
-FollowContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Full Width
-FollowContainer.BackgroundTransparency = 1
-
+FollowContainer.Size = UDim2.new(0.95, 0, 0, 26); FollowContainer.BackgroundTransparency = 1
 local BtnFollowToggle = Instance.new("TextButton", FollowContainer)
-BtnFollowToggle.Name = "Toggle"
-BtnFollowToggle.Size = UDim2.new(0.5, -3, 1, 0)
-BtnFollowToggle.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-BtnFollowToggle.BackgroundTransparency = 0.3
-BtnFollowToggle.Text = "Follow Player: OFF"
-BtnFollowToggle.TextColor3 = UI_THEME.TextMain
-BtnFollowToggle.Font = UI_THEME.FontBtn
-BtnFollowToggle.TextScaled = true
-BtnFollowToggle.BorderSizePixel = 0
-Instance.new("UITextSizeConstraint", BtnFollowToggle).MaxTextSize = 10
-BtnFollowToggle.TextStrokeTransparency = 1
+BtnFollowToggle.Size = UDim2.new(0.5, -3, 1, 0); BtnFollowToggle.BackgroundColor3 = Color3.fromRGB(30, 30, 40); BtnFollowToggle.BackgroundTransparency = 0.3
+BtnFollowToggle.Text = "Follow Player: OFF"; BtnFollowToggle.TextColor3 = UI_THEME.TextMain; BtnFollowToggle.Font = UI_THEME.FontBtn; BtnFollowToggle.TextScaled = true
 Instance.new("UICorner", BtnFollowToggle).CornerRadius = UDim.new(0, 6)
-
 local BoxFollowInput = Instance.new("TextBox", FollowContainer)
-BoxFollowInput.Name = "Input"
-BoxFollowInput.Size = UDim2.new(0.5, 0, 1, 0)
-BoxFollowInput.Position = UDim2.new(0.5, 0, 0, 0)
-BoxFollowInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-BoxFollowInput.BackgroundTransparency = 0.3
-BoxFollowInput.Text = ""
-BoxFollowInput.PlaceholderText = "Input Name"
-BoxFollowInput.TextColor3 = UI_THEME.Accent
-BoxFollowInput.Font = UI_THEME.FontUI
-BoxFollowInput.TextSize = 10
-BoxFollowInput.BorderSizePixel = 0
+BoxFollowInput.Size = UDim2.new(0.5, 0, 1, 0); BoxFollowInput.Position = UDim2.new(0.5, 0, 0, 0); BoxFollowInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+BoxFollowInput.BackgroundTransparency = 0.3; BoxFollowInput.PlaceholderText = "Input Name"; BoxFollowInput.TextColor3 = UI_THEME.Accent; BoxFollowInput.Font = UI_THEME.FontUI; BoxFollowInput.TextSize = 10
 Instance.new("UICorner", BoxFollowInput).CornerRadius = UDim.new(0, 6)
 
-MakeSwitch(PagePlayer, "No Damage", States.NoDmg, function(val)
-    States.NoDmg = val
-    Notify("PLAYER", "No Damage: "..(val and "ON" or "OFF"), nil)
-end)
-MakeSwitch(PagePlayer, "Streamer Mode", States.StreamerMode, function(val)
-    States.StreamerMode = val
-    EnableNameSpoof(val)
-    Notify("STREAMER", "Mode: "..(val and "ON" or "OFF"), nil)
-end)
+MakeSwitch(PagePlayer, "No Damage", States.NoDmg, function(val) States.NoDmg = val end)
+MakeSwitch(PagePlayer, "Streamer Mode", States.StreamerMode, function(val) States.StreamerMode = val; EnableNameSpoof(val) end)
 
--- ====================================================
--- [UPDATED] ANIMATION DROPDOWN
--- ====================================================
-local AnimContainer = Instance.new("Frame", PagePlayer)
-AnimContainer.Name = "AnimDropdown"
-AnimContainer.Size = UDim2.new(0.95, 0, 0, 26)
-AnimContainer.BackgroundTransparency = 1
-AnimContainer.ClipsDescendants = true
-
-local AnimHeader = Instance.new("TextButton", AnimContainer)
-AnimHeader.Size = UDim2.new(1, 0, 0, 26)
-AnimHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-AnimHeader.BackgroundTransparency = 0.3
-AnimHeader.Text = "Animation: OFF"
-AnimHeader.TextColor3 = UI_THEME.TextMain
-AnimHeader.Font = UI_THEME.FontBtn
-AnimHeader.TextSize = 10
-AnimHeader.AutoButtonColor = true
-Instance.new("UICorner", AnimHeader).CornerRadius = UDim.new(0, 6)
-
-local AnimListFrame = Instance.new("ScrollingFrame", AnimContainer)
-AnimListFrame.Size = UDim2.new(1, 0, 0, 120)
-AnimListFrame.Position = UDim2.new(0, 0, 0, 30)
-AnimListFrame.BackgroundTransparency = 0.5
-AnimListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-AnimListFrame.ScrollBarThickness = 2
-AnimListFrame.BorderSizePixel = 0
-Instance.new("UICorner", AnimListFrame).CornerRadius = UDim.new(0, 6)
-
-local AnimGrid = Instance.new("UIListLayout", AnimListFrame)
-AnimGrid.Padding = UDim.new(0, 2)
-AnimGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
-AnimGrid.SortOrder = Enum.SortOrder.LayoutOrder
-
-local AnimationList = {
-    ["Corruption Edge"] = "Corruption Edge - FishCaught",
-    ["Princess Parasol"] = "Princess Parasol - FishCaught",
-    ["Soul Scythe"] = "Soul Scythe - FishCaught",
-    ["Eclipse Katana"] = "Eclipse Katana - FishCaught",
-    ["Ban Hammer"] = "1x1x1x1 Ban Hammer - FishCaught",
-    ["Trident"] = "Holy Trident - FishCaught"
-}
-
-local function CreateAnimItem(name, value, order)
-    local btn = Instance.new("TextButton", AnimListFrame)
-    btn.LayoutOrder = order
-    btn.Size = UDim2.new(0.95, 0, 0, 24)
-    btn.Text = name
-    btn.Font = UI_THEME.FontUI
-    btn.TextSize = 9
-    btn.TextColor3 = UI_THEME.TextMain
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    btn.BackgroundTransparency = 0.4
-    btn.AutoButtonColor = true
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-    btn.MouseButton1Click:Connect(function()
-        States.AnimSkin = value
-        AnimHeader.Text = "Animation: " .. name
-        Notify("ANIMATION", "Selected: " .. name, nil)
-        Services.TweenService:Create(AnimContainer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.95, 0, 0, 26)}):Play()
-    end)
-end
-
-CreateAnimItem("OFF (Disable)", "Off", 0)
-local i = 1
-for name, path in pairs(AnimationList) do
-    CreateAnimItem(name, path, i)
-    i = i + 1
-end
-AnimListFrame.CanvasSize = UDim2.new(0, 0, 0, (i + 1) * 26)
-
-local IsOpen = false
-AnimHeader.MouseButton1Click:Connect(function()
-    IsOpen = not IsOpen
-    if IsOpen then
-        Services.TweenService:Create(AnimContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0.95, 0, 0, 150)}):Play()
-    else
-        Services.TweenService:Create(AnimContainer, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0.95, 0, 0, 26)}):Play()
-    end
-end)
-
-local FishEvent = NetPath:FindFirstChild("RE/FishCaught")
-local function PlaySelectedAnim()
-    if States.AnimSkin == "Off" then return end
-    local char = Player.Character
-    local animator = char and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Animator")
-    if animator then
-        for _, track in pairs(animator:GetPlayingAnimationTracks()) do track:Stop(0.1) end
-        local AnimObj = Services.ReplicatedStorage.Modules.Animations:FindFirstChild(States.AnimSkin)
-        if AnimObj then
-            local track = animator:LoadAnimation(AnimObj)
-            track.Priority = Enum.AnimationPriority.Action4
-            track:Play()
-            track.Stopped:Connect(function() track:Destroy() end)
-        end
-    end
-end
-if FishEvent then FishEvent.OnClientEvent:Connect(PlaySelectedAnim) end
-
--- [TAB MISC]
-local BtnSave   = MakeBtn(PageMisc, "Save Position")
-local BtnLoad   = MakeBtn(PageMisc, "Load Position")
+local BtnSave = MakeBtn(PageMisc, "Save Position")
+local BtnLoad = MakeBtn(PageMisc, "Load Position")
 local BtnRejoin = MakeBtn(PageMisc, "Rejoin Server")
-MakeSwitch(PageMisc, "Panel Seraphin", States.Panel, function(val)
-    States.Panel = val
-    FloatHUD.Visible = val
-end)
+MakeSwitch(PageMisc, "Panel Seraphin", States.Panel, function(val) States.Panel = val; FloatHUD.Visible = val end)
 
--- [OPTIMIZED] SYSTEM MONITOR LOOP (Heartbeat based for smoothness)
-local fpsT = 0
-Services.RunService.RenderStepped:Connect(function(dt)
-    fpsT = fpsT + (1/dt - fpsT) * 0.1
-    local currentFps = math.floor(fpsT)
-    local cpuMs = Services.Stats.PerformanceStats.CPU:GetValue()
-    local serverTime = DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us")
-    if MonLabel then
-        MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", currentFps, cpuMs, serverTime)
-    end
-end)
-
--- ====================================================
--- [OPTIMIZED] PLAYER LOGIC (SPEED & FOLLOW - Event Driven)
--- ====================================================
-
-local function FindPlayer(namePart)
-    for _, p in pairs(Services.Players:GetPlayers()) do
-        if p ~= Player then
-            if string.sub(string.lower(p.Name), 1, string.len(namePart)) == string.lower(namePart) or
-                string.sub(string.lower(p.DisplayName), 1, string.len(namePart)) == string.lower(namePart) then
-                return p
-            end
-        end
-    end
-    return nil
-end
-
--- SPEED
-BtnSpeedToggle.MouseButton1Click:Connect(function()
-    States.Speed = not States.Speed
-    local val = tonumber(BoxSpeedInput.Text) or 50
-    States.SpeedVal = val
-    
-    if States.Speed then
-        BtnSpeedToggle.Text = "Speed: ON"
-        ToggleVisual(BtnSpeedToggle, true)
-        Notify("PLAYER", "Speed Active: " .. val, Color3.fromRGB(0, 255, 100))
-        
-        -- Bind to Heartbeat (Physics Loop)
-        ClearConnection("SpeedLoop")
-        Connections["SpeedLoop"] = Services.RunService.Heartbeat:Connect(function()
-             local hum = GetHum()
-             if hum then
-                 if hum.Sit and hum.SeatPart then
-                     hum.SeatPart.AssemblyLinearVelocity = hum.SeatPart.CFrame.LookVector * States.SpeedVal
-                 else
-                     hum.WalkSpeed = States.SpeedVal
-                 end
-             end
-        end)
-    else
-        BtnSpeedToggle.Text = "Speed: OFF"
-        ToggleVisual(BtnSpeedToggle, false)
-        ClearConnection("SpeedLoop")
-        local hum = GetHum()
-        if hum then hum.WalkSpeed = 16 end
-    end
-end)
-
-BoxSpeedInput.FocusLost:Connect(function()
-    local val = tonumber(BoxSpeedInput.Text)
-    if val then States.SpeedVal = val else BoxSpeedInput.Text = tostring(States.SpeedVal) end
-end)
-
--- FOLLOW
-BtnFollowToggle.MouseButton1Click:Connect(function()
-    States.AutoFollow = not States.AutoFollow
-    if States.AutoFollow then
-        local targetName = BoxFollowInput.Text
-        local target = FindPlayer(targetName)
-        if target then
-            States.FollowTarget = target
-            BoxFollowInput.Text = target.Name
-            BtnFollowToggle.Text = "Following"
-            ToggleVisual(BtnFollowToggle, true)
-            Notify("FOLLOW", "Target: " .. target.Name, Color3.fromRGB(0, 255, 100))
-            
-            -- Bind to Heartbeat (Smooth Movement)
-            ClearConnection("FollowLoop")
-            Connections["FollowLoop"] = Services.RunService.Heartbeat:Connect(function()
-                if States.FollowTarget and States.FollowTarget.Character then
-                    local tHRP = States.FollowTarget.Character:FindFirstChild("HumanoidRootPart")
-                    local myHRP = GetRoot()
-                    if tHRP and myHRP then myHRP.CFrame = tHRP.CFrame end
-                end
-            end)
-        else
-            States.AutoFollow = false
-            Notify("FOLLOW", "Player Not Found!", Color3.fromRGB(255, 50, 50))
-        end
-    else
-        BtnFollowToggle.Text = "Follow Player: OFF"
-        ToggleVisual(BtnFollowToggle, false)
-        ClearConnection("FollowLoop")
-        States.FollowTarget = nil
-    end
-end)
-
-BoxFollowInput.FocusLost:Connect(function()
-    if BoxFollowInput.Text ~= "" then
-        local target = FindPlayer(BoxFollowInput.Text)
-        if target then BoxFollowInput.Text = target.Name end
-    end
-end)
-
--- MISC BTNS
-BtnRejoin.MouseButton1Click:Connect(function() Services.TeleportService:Teleport(game.PlaceId, Player) end)
 BtnSave.MouseButton1Click:Connect(function()
     local hrp = GetRoot()
     if hrp then SavedCFrame = hrp.CFrame; BtnSave.Text="SAVED"; Notify("POSITION", "Location Saved!", nil); task.delay(1, function() BtnSave.Text="Save Position" end) end
 end)
 BtnLoad.MouseButton1Click:Connect(function()
-    if SavedCFrame and GetRoot() then GetRoot().CFrame = SavedCFrame; Notify("POSITION", "Location Loaded!", nil) end
+    local hrp = GetRoot()
+    if SavedCFrame and hrp then hrp.CFrame = SavedCFrame; Notify("POSITION", "Location Loaded!", nil) end
+end)
+BtnRejoin.MouseButton1Click:Connect(function() Services.TeleportService:Teleport(game.PlaceId, Player) end)
+
+-- ====================================================
+-- [REFACTORED] BACKGROUND SYSTEM LOOPS
+-- ====================================================
+-- Monitor Loop
+local fpsT = 0
+Services.RunService.RenderStepped:Connect(function(dt)
+    fpsT = fpsT + (1/dt - fpsT) * 0.1
+    if MonLabel then
+        MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", math.floor(fpsT), Services.Stats.PerformanceStats.CPU:GetValue(), DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us"))
+    end
 end)
 
-
--- ====================================================
--- [OPTIMIZED] UNIFIED BACKGROUND LOOPS
--- ====================================================
-
--- 1. [Low Frequency Loop] - Runs every 1 second
--- Handles: Stats UI, Auto Equip, No Damage
+-- Status Detector Loop
 task.spawn(function()
     while true do
         task.wait(1)
+        if not States.Panel then task.wait(2) continue end
         
-        -- Update Panel UI
-        if States.Panel then
-            pcall(function()
-                local ls = Player:FindFirstChild("leaderstats")
-                local c = ls and ls:FindFirstChild("Caught") and ls.Caught.Value or 0
-                LblFishVal.Text = tostring(c):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
-                
-                local bagText = "0/?"
-                if Player:FindFirstChild("Backpack") then bagText = tostring(#Player.Backpack:GetChildren()) end
-                LblInvVal.Text = bagText
-            end)
-        end
-        
-        -- Auto Equip
-        if States.AutoEquip and not States.IsMining then
-            ForceEquipRod()
-        end
-        
-        -- No Damage
-        if States.NoDmg then
-            local hum = GetHum()
-            if hum and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
-        end
+        pcall(function()
+            local ls = Player:FindFirstChild("leaderstats")
+            local cStat = ls and ls:FindFirstChild("Caught")
+            LblFishVal.Text = tostring(cStat and cStat.Value or 0):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
+            
+            local bagText = "0/?"
+            local backpackGui = Player:FindFirstChild("PlayerGui") and Player.PlayerGui:FindFirstChild("Backpack")
+            local bpItems = Player:FindFirstChild("Backpack")
+            
+            if backpackGui then
+                local foundLabel = false
+                for _, v in ipairs(backpackGui:GetDescendants()) do
+                    if v:IsA("TextLabel") and string.find(v.Text, "/") then
+                        bagText = v.Text; foundLabel = true; break
+                    end
+                end
+                if not foundLabel and bpItems then bagText = tostring(#bpItems:GetChildren()) end
+            elseif bpItems then
+                bagText = tostring(#bpItems:GetChildren())
+            end
+            LblInvVal.Text = bagText
+        end)
     end
 end)
 
--- 2. [Medium Frequency Loop] - Runs every 2 seconds
--- Handles: Auto Event Scan, Auto Coral Scan (Less intensive)
-local function FindInFolders(targetName)
-    local folders = {Services.Workspace:FindFirstChild("ActiveEvents"), Services.Workspace:FindFirstChild("Props")}
-    for _, folder in pairs(folders) do
-        if folder then
-            for _, v in pairs(folder:GetChildren()) do
-                if (v:IsA("Model") or v:IsA("BasePart")) and (v.Name == targetName or v.Name:find(targetName)) then return v end
-            end
-        end
-    end
-    return nil
-end
-
+-- Auto Equip Loop
 task.spawn(function()
     while true do
         task.wait(2)
-        
-        -- Auto Event Logic
-        if States.AutoEvent then
-            pcall(function()
-                local hrp = GetRoot()
-                if hrp then
-                    local FoundEvent = nil
-                    for _, name in pairs(EventList) do
-                         local t = FindInFolders(name)
-                         if t then FoundEvent = t; break end
-                    end
-                    
-                    if FoundEvent then
-                        if not IsInEvent then
-                            EventStartCFrame = hrp.CFrame
-                            IsInEvent = true
-                            Notify("AUTO HUNT", "Teleport To ( " .. FoundEvent.Name .. " )", Color3.fromRGB(0, 255, 255))
-                            SetWoW(true)
-                        end
-                        local targetPos = FoundEvent:GetPivot().Position
-                        if (hrp.Position - Vector3.new(targetPos.X, 4, targetPos.Z)).Magnitude > 5 then
-                            hrp.CFrame = CFrame.new(Vector3.new(targetPos.X, 4, targetPos.Z))
-                        end
-                    elseif IsInEvent then
-                        IsInEvent = false
-                        Notify("AUTO HUNT", "Event Finished ", Color3.fromRGB(0, 255, 100))
-                        if EventStartCFrame then hrp.CFrame = EventStartCFrame; EventStartCFrame = nil end
-                        SetWoW(false)
-                    end
-                end
-            end)
-        end
-        
-        -- Auto Coral Logic
-        if States.AutoCoral then
-            pcall(function()
-                 local spawnFolder = Services.Workspace:FindFirstChild("!!! SEARCH ITEM SPAWNS")
-                 if spawnFolder and spawnFolder:FindFirstChild("Coral") then
-                    local target = nil
-                    for _, v in pairs(spawnFolder.Coral:GetChildren()) do -- Simple check first layer
-                         if v:FindFirstChildWhichIsA("ProximityPrompt", true) then target = v; break end
-                    end
-                    
-                    if target then
-                        local hrp = GetRoot()
-                        if not IsLootingCoral and not States.AutoFarmRelic and hrp then
-                            CoralReturnCFrame = hrp.CFrame
-                            IsLootingCoral = true
-                            Notify("CORAL", "Found Coral!", Color3.fromRGB(0, 255, 100))
-                            SetWoW(true)
-                        end
-                        if IsLootingCoral and hrp then
-                            local prompt = target:FindFirstChildWhichIsA("ProximityPrompt", true)
-                            if prompt then
-                                hrp.CFrame = target:GetPivot() + Vector3.new(0, 3, 0)
-                                task.wait(0.2)
-                                fireproximityprompt(prompt)
-                            end
-                        end
-                    elseif IsLootingCoral then
-                        IsLootingCoral = false
-                        local hrp = GetRoot()
-                        if CoralReturnCFrame and hrp then hrp.CFrame = CoralReturnCFrame end
-                        SetWoW(false)
-                    end
-                 end
-            end)
-        end
+        if States.AutoEquip and not States.IsMining then ForceEquipRod() end
     end
 end)
 
--- [FINAL INIT]
+-- Init
 task.spawn(function() if setfpscap then setfpscap(9999) end end)
 task.delay(1, function() Main.Visible = true; FloatHUD.Visible = States.Panel end)
