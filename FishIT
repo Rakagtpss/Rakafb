@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V30 Mining 2.5H", nil, 4)
+Notify("SERAPHIN", "Add New Fitur + Improve CPU", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -163,7 +163,7 @@ end
 -- ====================================================
 local MonitorHUD = Instance.new("Frame", ScreenGui)
 MonitorHUD.Name = "LiveMonitor"
-MonitorHUD.Size = UDim2.new(0, 180, 0, 24)
+MonitorHUD.Size = UDim2.new(0, 200, 0, 24)
 MonitorHUD.Position = UDim2.new(0.5, -90, 0, 10)
 MonitorHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 MonitorHUD.BackgroundTransparency = 0.2
@@ -432,6 +432,10 @@ local PageEvent  = CreatePage("PageEvent", false, true)
 local PagePlayer = CreatePage("PagePlayer", false, true)
 local PageMisc   = CreatePage("PageMisc", false, true)
 
+-- MENGURANGI JARAK SPESIFIK DI TAB SHOP AGAR LEBIH RAPAT
+local llCharm = PageCharm:FindFirstChildOfClass("UIListLayout")
+if llCharm then llCharm.Padding = UDim.new(0, 3) end
+
 local function SwitchTab(tabName)
     local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
     local tabs = {Main = TabMainBtn, Charm = TabCharmBtn, Event = TabEventBtn, Player = TabPlayerBtn, Misc = TabMiscBtn}
@@ -621,8 +625,7 @@ local States = {
     RelicSpot=1,
     HideRod=false,
     StreamerMode=false,
-    AnimSkin="Off",
-    AutoFishActive=false
+    AnimSkin="Off"
 }
 
 local SavedCFrame = nil
@@ -636,45 +639,6 @@ local LastFishCaughtTime = tick()
 local LastFishCount = 0
 local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt", "Megalodon Hunt"}
 local SavedMinePosition = nil
-
--- ====================================================
--- [UPDATED] AUTO FISHING - SPECIFIC CODE
--- ====================================================
-local function StartAutoFishRoutine()
-    if States.AutoFishActive then return end
-    States.AutoFishActive = true
-    Notify("FISHING", "Auto Fishing Started!", Color3.fromRGB(0, 255, 255))
-    
-    task.spawn(function()
-        local Net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
-        
-        while States.AutoFishActive and not States.IsMining do
-            pcall(function()
-                -- 1. Update State (True)
-                local argsState = { true }
-                Net["RF/UpdateAutoFishingState"]:InvokeServer(unpack(argsState))
-                
-                -- 2. Charge Rod
-                Net["RF/ChargeFishingRod"]:InvokeServer()
-                task.wait(1)
-                
-                -- 3. Request Minigame (Specific Args)
-                local argsGame = {
-                    -0.9879989624023438,
-                    0.5,
-                    1771061230.063116
-                }
-                Net["RF/RequestFishingMinigameStarted"]:InvokeServer(unpack(argsGame))
-                
-                task.wait(2.5) -- Minigame Duration
-                
-                -- 4. Catch Fish
-                Net["RF/CatchFishCompleted"]:InvokeServer()
-            end)
-            task.wait(0.5)
-        end
-    end)
-end
 
 -- Force Re-Equip
 local function ForceEquipRod(slot)
@@ -843,7 +807,7 @@ local function ToggleBoost(enable)
     States.Boost = enable
     
     if enable then
-        if setfpscap then setfpscap(9999) end -- Unlock FPS
+        if setfpscap then setfpscap(999) end -- Unlock FPS
         
         -- 1. SETTING LIGHTING (MODE GELAP & DATAR)
         pcall(function()
@@ -891,7 +855,7 @@ local function ToggleBoost(enable)
             OptimizeObject(v)
         end)
         
-        Notify("BOOST", "SUPER POTATO MODE: ON", Color3.fromRGB(0, 255, 100))
+        Notify("BOOST", "Cpu Booster On ", Color3.fromRGB(0, 255, 100))
     else
         -- MEMATIKAN BOOSTER (BUTUH REJOIN UNTUK MENGEMBALIKAN TEKSTUR)
         if BoostConnection then BoostConnection:Disconnect() end
@@ -902,7 +866,7 @@ end
 -- ====================================================
 -- [NEW] STREAMER MODE LOGIC (NAME & CHAT SPOOF)
 -- ====================================================
-local RAW_NAME = "discord.gg/getseraphin VISUAL"
+local RAW_NAME = "discord.gg/getseraphin "
 local SPOOF_NAME = '<font face="GothamBold"><b>' .. RAW_NAME .. '</b></font>'
 local NAME_COLOR = "#00ffff"
 local OVERHEAD_HTML = string.format('<font color="#FFFFFF">%s</font>', SPOOF_NAME)
@@ -1047,7 +1011,7 @@ end)
 -- ====================================================
 local CraftContainer = Instance.new("Frame", PageCharm)
 CraftContainer.Name = "CraftSystem"
-CraftContainer.Size = UDim2.new(0.95, 0, 0, 85)
+CraftContainer.Size = UDim2.new(0.95, 0, 0, 54) -- FIXED: Ukuran saat tertutup disesuaikan agar rapat
 CraftContainer.BackgroundTransparency = 1
 CraftContainer.ClipsDescendants = true
 
@@ -1071,8 +1035,8 @@ Instance.new("UICorner", CraftBtn).CornerRadius = UDim.new(0, 6)
 
 -- List Item
 local CraftListFrame = Instance.new("ScrollingFrame", CraftDropdown)
-CraftListFrame.Size = UDim2.new(1, 0, 0, 100)
-CraftListFrame.Position = UDim2.new(0, 0, 0, 30)
+CraftListFrame.Size = UDim2.new(1, 0, 0, 104) -- Tinggi di-adjust tepat 4 item
+CraftListFrame.Position = UDim2.new(0, 0, 0, 28) -- Rapat di bawah tombol
 CraftListFrame.BackgroundTransparency = 0.2
 CraftListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 CraftListFrame.ScrollBarThickness = 2
@@ -1096,7 +1060,7 @@ local function UpdateCraftSelect(name)
     SelectedCraft = name
     CraftBtn.Text = "Craft: " .. name
     CraftListFrame.Visible = false
-    Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+    Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 54)}):Play()
 end
 
 for _, cName in pairs(CraftData) do
@@ -1118,10 +1082,10 @@ CraftBtn.MouseButton1Click:Connect(function()
     IsCraftOpen = not IsCraftOpen
     if IsCraftOpen then
         CraftListFrame.Visible = true
-        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 140)}):Play()
+        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 160)}):Play()
     else
         CraftListFrame.Visible = false
-        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+        Services.TweenService:Create(CraftContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 54)}):Play()
     end
 end)
 
@@ -1209,7 +1173,7 @@ end)
 local PurchaseCharmRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/PurchaseCharm")
 local CharmContainer = Instance.new("Frame", PageCharm)
 CharmContainer.Name = "CharmSystem"
-CharmContainer.Size = UDim2.new(0.95, 0, 0, 85)
+CharmContainer.Size = UDim2.new(0.95, 0, 0, 54) -- FIXED: Ukuran rapat
 CharmContainer.BackgroundTransparency = 1
 CharmContainer.ClipsDescendants = true
 
@@ -1233,8 +1197,8 @@ Instance.new("UICorner", CharmBtn).CornerRadius = UDim.new(0, 6)
 
 -- List Item (Isi Laci)
 local CharmListFrame = Instance.new("ScrollingFrame", CharmDropdown)
-CharmListFrame.Size = UDim2.new(1, 0, 0, 100)
-CharmListFrame.Position = UDim2.new(0, 0, 0, 30)
+CharmListFrame.Size = UDim2.new(1, 0, 0, 130) -- Tinggi di-adjust untuk 5 item
+CharmListFrame.Position = UDim2.new(0, 0, 0, 28)
 CharmListFrame.BackgroundTransparency = 0.2
 CharmListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 CharmListFrame.ScrollBarThickness = 2
@@ -1266,7 +1230,7 @@ local function UpdateCharmSelect(name)
     SelectedCharm = name
     CharmBtn.Text = "Selected: " .. name
     CharmListFrame.Visible = false
-    Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+    Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 54)}):Play()
 end
 
 for _, cName in pairs(CharmData) do
@@ -1319,10 +1283,10 @@ CharmBtn.MouseButton1Click:Connect(function()
     IsCharmOpen = not IsCharmOpen
     if IsCharmOpen then
         CharmListFrame.Visible = true
-        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 160)}):Play()
+        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 186)}):Play()
     else
         CharmListFrame.Visible = false
-        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+        Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 54)}):Play()
     end
 end)
 
@@ -1364,7 +1328,7 @@ end)
 local LimitedRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RE/LimitedPurchaseRequest")
 local ValContainer = Instance.new("Frame", PageCharm)
 ValContainer.Name = "ValSystem"
-ValContainer.Size = UDim2.new(0.95, 0, 0, 85)
+ValContainer.Size = UDim2.new(0.95, 0, 0, 54) -- FIXED: Ukuran rapat
 ValContainer.BackgroundTransparency = 1
 ValContainer.ClipsDescendants = true
 
@@ -1386,8 +1350,8 @@ ValBtn.AutoButtonColor = true
 Instance.new("UICorner", ValBtn).CornerRadius = UDim.new(0, 6)
 
 local ValListFrame = Instance.new("Frame", ValDropdown)
-ValListFrame.Size = UDim2.new(1, 0, 0, 60)
-ValListFrame.Position = UDim2.new(0, 0, 0, 30)
+ValListFrame.Size = UDim2.new(1, 0, 0, 52) -- Tinggi adjust 2 item
+ValListFrame.Position = UDim2.new(0, 0, 0, 28)
 ValListFrame.BackgroundTransparency = 0.2
 ValListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 ValListFrame.Visible = false
@@ -1409,7 +1373,7 @@ local function UpdateValSelect(name)
     SelectedValItem = name
     ValBtn.Text = "Selected: " .. name
     ValListFrame.Visible = false
-    Services.TweenService:Create(ValContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+    Services.TweenService:Create(ValContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 54)}):Play()
 end
 
 for name, id in pairs(ValData) do
@@ -1459,10 +1423,10 @@ ValBtn.MouseButton1Click:Connect(function()
     IsValOpen = not IsValOpen
     if IsValOpen then
         ValListFrame.Visible = true
-        Services.TweenService:Create(ValContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 130)}):Play()
+        Services.TweenService:Create(ValContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 108)}):Play()
     else
         ValListFrame.Visible = false
-        Services.TweenService:Create(ValContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
+        Services.TweenService:Create(ValContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 54)}):Play()
     end
 end)
 
@@ -1617,7 +1581,7 @@ local function MiningRoutine()
         RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 9, "Far")
     end
     
-    -- [6] FINISH -> RETURN -> EQUIP ROD ONLY (NO AUTO FISH)
+    -- [6] FINISH -> RETURN -> EQUIP ROD ONLY
     Notify("MINING", "Mining Done. Returning...", Color3.fromRGB(0, 255, 0))
     States.IsMining = false 
     
@@ -1639,16 +1603,15 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
     
     if val then
         task.spawn(function()
-            Notify("SYSTEM", "Auto Mine: Every 2.5 Hours", nil)
+            Notify("SYSTEM", "Auto Mine ", nil)
             
             local NextRun = 0 
-            local Interval = 2.5 * 60 * 60 -- 2.5 Jam
+            local Interval = 2.25 * 60 * 60 -- 2.5 Jam
             
             while States.AutoMiningV20 do
                 local Now = tick()
                 
                 if Now >= NextRun and not States.IsMining then
-                    States.AutoFishActive = false
                     States.IsMining = true
                     
                     MiningRoutine()
@@ -1666,7 +1629,6 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
     else
         States.IsMining = false
         States.AutoMiningV20 = false
-        States.AutoFishActive = false
         
         local hrp = GetRoot()
         if hrp then
@@ -2390,7 +2352,7 @@ end)
 -- [AUTO EXECUTE] MAX FPS UNLOCKER
 task.spawn(function()
     if setfpscap then
-          setfpscap(9999)
+          setfpscap(999)
       end
 end)
 
