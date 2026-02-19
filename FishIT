@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V30 Mining 2.5H + Potato Mode", nil, 4)
+Notify("SERAPHIN", "V30 Mining 2.5H", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -786,6 +786,8 @@ end
 -- ====================================================
 -- [UPDATED V5] SUPER CPU BOOSTER (POTATO MODE)
 -- ====================================================
+local BoostConnection = nil
+
 local function OptimizeObject(v)
     pcall(function()
         if v:IsA("BasePart") then
@@ -873,9 +875,7 @@ local function ToggleBoost(enable)
                 Services.Workspace.Terrain.Material = Enum.Material.SmoothPlastic 
                 
                 -- Opsional: Hapus dekorasi rumput jika ada
-                if sethiddenproperty then
-                    sethiddenproperty(Services.Workspace.Terrain, "Decoration", false)
-                end
+                sethiddenproperty(Services.Workspace.Terrain, "Decoration", false)
             end)
         end
         
@@ -885,8 +885,8 @@ local function ToggleBoost(enable)
         end
         
         -- 4. LISTENER UNTUK OBJEK BARU (AGAR TETAP RINGAN SAAT LOAD MAP BARU)
-        if Connections["BoosterDynamic"] then Connections["BoosterDynamic"]:Disconnect() end
-        Connections["BoosterDynamic"] = Services.Workspace.DescendantAdded:Connect(function(v)
+        if BoostConnection then BoostConnection:Disconnect() end
+        BoostConnection = Services.Workspace.DescendantAdded:Connect(function(v)
             task.wait() -- Tunggu sebentar agar property terload
             OptimizeObject(v)
         end)
@@ -894,7 +894,7 @@ local function ToggleBoost(enable)
         Notify("BOOST", "SUPER POTATO MODE: ON", Color3.fromRGB(0, 255, 100))
     else
         -- MEMATIKAN BOOSTER (BUTUH REJOIN UNTUK MENGEMBALIKAN TEKSTUR)
-        if Connections["BoosterDynamic"] then Connections["BoosterDynamic"]:Disconnect() end
+        if BoostConnection then BoostConnection:Disconnect() end
         Notify("BOOST", "Disabled (Rejoin to Fix Textures)", Color3.fromRGB(255, 100, 100))
     end
 end
@@ -1045,7 +1045,7 @@ end)
 -- ====================================================
 -- [1] AUTO CRAFT CHARM (DRAWER STYLE)
 -- ====================================================
-local CraftContainer = Instance.new("Frame", PageCharm) -- PINDAH KE PAGE CHARM
+local CraftContainer = Instance.new("Frame", PageCharm)
 CraftContainer.Name = "CraftSystem"
 CraftContainer.Size = UDim2.new(0.95, 0, 0, 85)
 CraftContainer.BackgroundTransparency = 1
@@ -1207,7 +1207,7 @@ end)
 -- [2] BUY CHARM SYSTEM (FIXED DRAWER)
 -- ====================================================
 local PurchaseCharmRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/PurchaseCharm")
-local CharmContainer = Instance.new("Frame", PageCharm) -- PINDAH KE PAGE CHARM
+local CharmContainer = Instance.new("Frame", PageCharm)
 CharmContainer.Name = "CharmSystem"
 CharmContainer.Size = UDim2.new(0.95, 0, 0, 85)
 CharmContainer.BackgroundTransparency = 1
@@ -1239,7 +1239,7 @@ CharmListFrame.BackgroundTransparency = 0.2
 CharmListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 CharmListFrame.ScrollBarThickness = 2
 CharmListFrame.Visible = false
-CharmListFrame.ZIndex = 10 -- Layer lebih tinggi agar muncul
+CharmListFrame.ZIndex = 10
 Instance.new("UICorner", CharmListFrame).CornerRadius = UDim.new(0, 6)
 
 local CharmListLayout = Instance.new("UIListLayout", CharmListFrame)
@@ -1266,7 +1266,6 @@ local function UpdateCharmSelect(name)
     SelectedCharm = name
     CharmBtn.Text = "Selected: " .. name
     CharmListFrame.Visible = false
-    -- Tutup laci setelah pilih
     Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
 end
 
@@ -1288,7 +1287,7 @@ CharmListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CharmData * 26))
 local ActionFrame = Instance.new("Frame", CharmContainer)
 ActionFrame.Name = "Action"
 ActionFrame.Size = UDim2.new(1, 0, 0, 26)
-ActionFrame.Position = UDim2.new(0, 0, 1, -26) -- Selalu di paling bawah container
+ActionFrame.Position = UDim2.new(0, 0, 1, -26)
 ActionFrame.BackgroundTransparency = 1
 
 local QtyInput = Instance.new("TextBox", ActionFrame)
@@ -1320,11 +1319,9 @@ CharmBtn.MouseButton1Click:Connect(function()
     IsCharmOpen = not IsCharmOpen
     if IsCharmOpen then
         CharmListFrame.Visible = true
-        -- Expand container biar list kelihatan
         Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3, Enum.EasingStyle.Back), {Size = UDim2.new(0.95, 0, 0, 160)}):Play()
     else
         CharmListFrame.Visible = false
-        -- Shrink container ke ukuran normal
         Services.TweenService:Create(CharmContainer, TweenInfo.new(0.3), {Size = UDim2.new(0.95, 0, 0, 85)}):Play()
     end
 end)
@@ -1635,8 +1632,6 @@ local function MiningRoutine()
     -- Equip Rod (Slot 1)
     Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
     Notify("GEAR", "Holding Rod (Idle)", nil)
-    
-    -- StartAutoFishRoutine()  <-- REMOVED PER REQUEST
 end
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
@@ -1646,33 +1641,29 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
         task.spawn(function()
             Notify("SYSTEM", "Auto Mine: Every 2.5 Hours", nil)
             
-            -- Set agar langsung jalan saat pertama kali diaktifkan
             local NextRun = 0 
-            local Interval = 2.5 * 60 * 60 -- 2.5 Jam (9000 Detik)
+            local Interval = 2.5 * 60 * 60 -- 2.5 Jam
             
             while States.AutoMiningV20 do
                 local Now = tick()
                 
-                -- Cek jika sudah waktunya mining DAN tidak sedang mining
                 if Now >= NextRun and not States.IsMining then
-                    States.AutoFishActive = false -- Matikan auto fish saat mau mining
-                    States.IsMining = true -- Tandai sedang mining
+                    States.AutoFishActive = false
+                    States.IsMining = true
                     
-                    MiningRoutine() -- Jalankan mining
+                    MiningRoutine()
                     
-                    -- Setelah mining selesai:
                     States.IsMining = false
-                    NextRun = tick() + Interval -- Set jadwal berikutnya 2.5 jam lagi
+                    NextRun = tick() + Interval
                     
                     local jamBerikutnya = os.date("%H:%M", os.time() + Interval)
                     Notify("SCHEDULE", "Next Mine at: " .. jamBerikutnya, Color3.fromRGB(0, 255, 255))
                 end
                 
-                task.wait(5) -- Cek loop setiap 5 detik
+                task.wait(5)
             end
         end)
     else
-        -- Matikan Total
         States.IsMining = false
         States.AutoMiningV20 = false
         States.AutoFishActive = false
@@ -1693,7 +1684,6 @@ MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
     Notify("EVENT", "Auto Coral: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
     
     if val then
-        -- OXYGEN TANK AUTO EQUIP
         local TankRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:FindFirstChild("RF/EquipOxygenTank")
         if TankRemote and not States.HasTank then
             pcall(function() TankRemote:InvokeServer(105) end)
@@ -1713,7 +1703,6 @@ MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
     end
 end)
 
--- [NEW LOGIC] RELIC DEFINITIONS & SPOT CYCLING
 local RelicsFolder = Services.Workspace:WaitForChild("LeviathanEvent"):WaitForChild("Relics")
 local ClaimRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ClaimRelic"]
 local TankRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/EquipOxygenTank"]
@@ -1849,10 +1838,10 @@ BtnQuestNPC.MouseButton1Click:Connect(function()
     end
 end)
 
--- [TAB PLAYER] - UPDATED TO LIST LAYOUT FOR DROPDOWN
+-- [TAB PLAYER] 
 local SpeedContainer = Instance.new("Frame", PagePlayer)
 SpeedContainer.Name = "SpeedContainer"
-SpeedContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Full Width
+SpeedContainer.Size = UDim2.new(0.95, 0, 0, 26) 
 SpeedContainer.BackgroundTransparency = 1
 
 local BtnSpeedToggle = Instance.new("TextButton", SpeedContainer)
@@ -1885,7 +1874,7 @@ Instance.new("UICorner", BoxSpeedInput).CornerRadius = UDim.new(0, 6)
 
 local FollowContainer = Instance.new("Frame", PagePlayer)
 FollowContainer.Name = "FollowContainer"
-FollowContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Full Width
+FollowContainer.Size = UDim2.new(0.95, 0, 0, 26)
 FollowContainer.BackgroundTransparency = 1
 
 local BtnFollowToggle = Instance.new("TextButton", FollowContainer)
@@ -1929,14 +1918,12 @@ end)
 -- ====================================================
 -- [UPDATED] DROPDOWN MENU ANIMATION (DRAWER STYLE)
 -- ====================================================
--- 1. Container Utama (Header + List)
 local AnimContainer = Instance.new("Frame", PagePlayer)
 AnimContainer.Name = "AnimDropdown"
-AnimContainer.Size = UDim2.new(0.95, 0, 0, 26) -- Ukuran awal (Tertutup)
+AnimContainer.Size = UDim2.new(0.95, 0, 0, 26)
 AnimContainer.BackgroundTransparency = 1
 AnimContainer.ClipsDescendants = true
 
--- 2. Header (Tombol Pemicu)
 local AnimHeader = Instance.new("TextButton", AnimContainer)
 AnimHeader.Size = UDim2.new(1, 0, 0, 26)
 AnimHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
@@ -1948,10 +1935,9 @@ AnimHeader.TextSize = 10
 AnimHeader.AutoButtonColor = true
 Instance.new("UICorner", AnimHeader).CornerRadius = UDim.new(0, 6)
 
--- 3. List (Laci di dalam)
 local AnimListFrame = Instance.new("ScrollingFrame", AnimContainer)
-AnimListFrame.Size = UDim2.new(1, 0, 0, 120) -- Tinggi maksimal saat terbuka
-AnimListFrame.Position = UDim2.new(0, 0, 0, 30) -- Di bawah header
+AnimListFrame.Size = UDim2.new(1, 0, 0, 120) 
+AnimListFrame.Position = UDim2.new(0, 0, 0, 30) 
 AnimListFrame.BackgroundTransparency = 0.5
 AnimListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 AnimListFrame.ScrollBarThickness = 2
@@ -1972,7 +1958,6 @@ local AnimationList = {
     ["Trident"] = "Holy Trident - FishCaught"
 }
 
--- Buat Tombol dalam List
 local function CreateAnimItem(name, value, order)
     local btn = Instance.new("TextButton", AnimListFrame)
     btn.LayoutOrder = order
@@ -2002,7 +1987,6 @@ for name, path in pairs(AnimationList) do
 end
 AnimListFrame.CanvasSize = UDim2.new(0, 0, 0, (i + 1) * 26)
 
--- 4. Logika Buka Tutup Laci
 local IsOpen = false
 AnimHeader.MouseButton1Click:Connect(function()
     IsOpen = not IsOpen
@@ -2058,19 +2042,33 @@ MakeSwitch(PageMisc, "Panel Seraphin", States.Panel, function(val)
 end)
 
 -- ====================================================
--- [UPDATED] SYSTEM MONITOR (REALTIME MS + COLOR + TIME)
+-- [OPTIMIZED] SYSTEM MONITOR (LIGHT UI LOOP)
 -- ====================================================
 local StatsService = game:GetService("Stats")
-local fpsT = 0
-Services.RunService.RenderStepped:Connect(function(dt)
-    fpsT = fpsT + (1/dt - fpsT) * 0.1
-    local currentFps = math.floor(fpsT)
-    local cpuMs = StatsService.PerformanceStats.CPU:GetValue()
-    local serverTime = DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us")
-    
-    if MonLabel then
-        MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", currentFps, cpuMs, serverTime)
-        MonLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+local RunService = game:GetService("RunService")
+
+local sec = os.clock()
+local frames = 0
+
+-- FPS Calculation (sangat ringan)
+RunService.RenderStepped:Connect(function()
+    frames = frames + 1
+end)
+
+-- Menggunakan task.spawn & task.wait(0.5) agar UI thread tidak terlalu terbebani RenderStepped setiap ms
+task.spawn(function()
+    while task.wait(0.5) do
+        local currentFps = math.floor(frames / (os.clock() - sec))
+        sec = os.clock()
+        frames = 0
+        
+        local cpuMs = StatsService.PerformanceStats.CPU:GetValue()
+        local serverTime = DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us")
+        
+        if MonLabel then
+            MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", currentFps, cpuMs, serverTime)
+            MonLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        end
     end
 end)
 
