@@ -124,7 +124,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "Add New Fitur + Improve CPU", nil, 4)
+Notify("SERAPHIN", "V30 Mining 2.5H", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -163,7 +163,7 @@ end
 -- ====================================================
 local MonitorHUD = Instance.new("Frame", ScreenGui)
 MonitorHUD.Name = "LiveMonitor"
-MonitorHUD.Size = UDim2.new(0, 200, 0, 24)
+MonitorHUD.Size = UDim2.new(0, 180, 0, 24)
 MonitorHUD.Position = UDim2.new(0.5, -90, 0, 10)
 MonitorHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 MonitorHUD.BackgroundTransparency = 0.2
@@ -748,57 +748,45 @@ local function SetAutoEquip(bool)
 end
 
 -- ====================================================
--- [UPDATED V5] SUPER CPU BOOSTER (POTATO MODE)
+-- [UPDATED V6] EXTREME GREEN POTATO BOOSTER
 -- ====================================================
 local BoostConnection = nil
 
 local function OptimizeObject(v)
     pcall(function()
         if v:IsA("BasePart") then
-            -- Ubah material ke SmoothPlastic (paling ringan)
+            -- UBAH JADI PLASTIK HIJAU FLAT
             v.Material = Enum.Material.SmoothPlastic
             v.Reflectance = 0
             v.CastShadow = false
             v.TopSurface = Enum.SurfaceType.Smooth
             v.BottomSurface = Enum.SurfaceType.Smooth
+            v.Color = Color3.fromRGB(30, 100, 30) -- HIJAU RUMPUT FLAT
             
-            -- Hapus tekstur mesh jika ada
             if v:IsA("MeshPart") then 
                 v.TextureID = "" 
             end
             
-            -- Optimasi transparansi (cegah rendering alpha blending yang berat)
             if v.Transparency > 0.5 and v.Transparency < 1 then
                 v.Transparency = 1 
             end
             
-            -- Hilangkan air render jika part bernama Water
             if v.Name == "Water" then 
                 v.Transparency = 1 
             end
             
         elseif v:IsA("Decal") or v:IsA("Texture") then
-            -- Hapus Decal/Logo/Gambar tempelan
             v:Destroy()
             
         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or 
                v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") or 
                v:IsA("Explosion") then
-            -- Matikan efek visual
             v.Enabled = false
             v:Destroy()
             
-        elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
-            -- Matikan lampu
+        elseif v:IsA("Light") then
             v.Enabled = false
             v:Destroy()
-            
-        elseif v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") then
-            -- Hapus baju karakter (opsional, tapi menambah FPS)
-            v:Destroy()
-            
-        elseif v:IsA("Explosion") then
-            v.Visible = false
         end
     end)
 end
@@ -807,21 +795,20 @@ local function ToggleBoost(enable)
     States.Boost = enable
     
     if enable then
-        if setfpscap then setfpscap(999) end -- Unlock FPS
+        if setfpscap then setfpscap(9999) end
         
-        -- 1. SETTING LIGHTING (MODE GELAP & DATAR)
+        -- 1. SETTING LIGHTING
         pcall(function()
             local l = Services.Lighting
             l.GlobalShadows = false
             l.FogEnd = 9e9
-            l.Brightness = 2
+            l.Brightness = 0
             l.ClockTime = 12
             l.EnvironmentDiffuseScale = 0
             l.EnvironmentSpecularScale = 0
-            l.Ambient = Color3.fromRGB(170, 170, 170)
-            l.OutdoorAmbient = Color3.fromRGB(170, 170, 170)
+            l.Ambient = Color3.fromRGB(255, 255, 255)
+            l.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
             
-            -- Hapus efek post-processing (Blur, SunRays, Bloom, dll)
             for _, v in pairs(l:GetChildren()) do
                 if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("DepthOfField") or v:IsA("SunRays") then
                     v:Destroy()
@@ -829,44 +816,42 @@ local function ToggleBoost(enable)
             end
         end)
         
-        -- 2. SETTING TERRAIN (AIR MATI & BOTAK)
+        -- 2. SETTING TERRAIN (HIJAU FLAT)
         if Services.Workspace.Terrain then
             pcall(function() 
-                Services.Workspace.Terrain.WaterReflectance = 0
-                Services.Workspace.Terrain.WaterTransparency = 0 -- Air solid (lebih ringan daripada transparan)
-                Services.Workspace.Terrain.WaterWaveSize = 0
-                Services.Workspace.Terrain.WaterWaveSpeed = 0
-                Services.Workspace.Terrain.Material = Enum.Material.SmoothPlastic 
-                
-                -- Opsional: Hapus dekorasi rumput jika ada
-                sethiddenproperty(Services.Workspace.Terrain, "Decoration", false)
+                local t = Services.Workspace.Terrain
+                t.WaterReflectance = 0
+                t.WaterTransparency = 0
+                t.WaterWaveSize = 0
+                t.WaterWaveSpeed = 0
+                t.Material = Enum.Material.SmoothPlastic
+                t.Color = Color3.fromRGB(30, 100, 30) -- HIJAU
+                sethiddenproperty(t, "Decoration", false)
             end)
         end
         
-        -- 3. OPTIMASI OBJEK YANG SUDAH ADA
+        -- 3. OPTIMASI OBJEK
         for _, v in pairs(Services.Workspace:GetDescendants()) do
             OptimizeObject(v)
         end
         
-        -- 4. LISTENER UNTUK OBJEK BARU (AGAR TETAP RINGAN SAAT LOAD MAP BARU)
         if BoostConnection then BoostConnection:Disconnect() end
         BoostConnection = Services.Workspace.DescendantAdded:Connect(function(v)
-            task.wait() -- Tunggu sebentar agar property terload
+            task.wait()
             OptimizeObject(v)
         end)
         
-        Notify("BOOST", "Cpu Booster On ", Color3.fromRGB(0, 255, 100))
+        Notify("BOOST", "Super Boost: ON", Color3.fromRGB(0, 255, 100))
     else
-        -- MEMATIKAN BOOSTER (BUTUH REJOIN UNTUK MENGEMBALIKAN TEKSTUR)
         if BoostConnection then BoostConnection:Disconnect() end
-        Notify("BOOST", "Disabled (Rejoin to Fix Textures)", Color3.fromRGB(255, 100, 100))
+        Notify("BOOST", "Disabled (Rejoin to Fix)", Color3.fromRGB(255, 100, 100))
     end
 end
 
 -- ====================================================
 -- [NEW] STREAMER MODE LOGIC (NAME & CHAT SPOOF)
 -- ====================================================
-local RAW_NAME = "discord.gg/getseraphin "
+local RAW_NAME = "discord.gg/getseraphin 🚀"
 local SPOOF_NAME = '<font face="GothamBold"><b>' .. RAW_NAME .. '</b></font>'
 local NAME_COLOR = "#00ffff"
 local OVERHEAD_HTML = string.format('<font color="#FFFFFF">%s</font>', SPOOF_NAME)
@@ -995,7 +980,7 @@ MakeSwitch(PageMain, "No Clip", States.Noclip, function(val)
         if Connections["Noclip"] then Connections["Noclip"]:Disconnect() end
     end
 end)
-MakeSwitch(PageMain, "CPU Booster ", States.Boost, function(val)
+MakeSwitch(PageMain, "Super Boost ", States.Boost, function(val)
     ToggleBoost(val)
 end)
 MakeSwitch(PageMain, "3D No Render", States.NoRender, function(val)
@@ -1301,7 +1286,7 @@ BuyBtn.MouseButton1Click:Connect(function()
     local targetID = CharmIDs[SelectedCharm]
     
     if not targetID then
-        Notify("ERROR", "Invalid ID Mapping", Color3.fromRGB(255,0,0))
+        Notify("ERROR", "Invalid ID ", Color3.fromRGB(255,0,0))
         return
     end
     Notify("SHOP", "Buying " .. amount .. " " .. SelectedCharm .. "...", Color3.fromRGB(255, 200, 0))
@@ -1578,7 +1563,7 @@ local function MiningRoutine()
         task.wait(5)
         
         -- [5] ZONA 2: CRYSTAL DEPTHS
-        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 9, "Far")
+        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 8, "Far")
     end
     
     -- [6] FINISH -> RETURN -> EQUIP ROD ONLY
@@ -1595,7 +1580,7 @@ local function MiningRoutine()
     task.wait(1)
     -- Equip Rod (Slot 1)
     Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-    Notify("GEAR", "Holding Rod (Idle)", nil)
+    Notify("GEAR", "Holding Rod ", nil)
 end
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
@@ -1603,7 +1588,7 @@ MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(v
     
     if val then
         task.spawn(function()
-            Notify("SYSTEM", "Auto Mine ", nil)
+            Notify("SYSTEM", "Auto Mine: Every 2.5 Hours", nil)
             
             local NextRun = 0 
             local Interval = 2.25 * 60 * 60 -- 2.5 Jam
@@ -2111,8 +2096,27 @@ task.spawn(function()
                 local tChar = States.FollowTarget.Character
                 local tHRP = tChar and tChar:FindFirstChild("HumanoidRootPart")
                 local myHRP = GetRoot()
-                if tHRP and myHRP then
-                    myHRP.CFrame = tHRP.CFrame
+                
+                -- LOGIC UNTUK BAWA ITEM / KENDARAAN
+                local myChar = Player.Character
+                local myHum = GetHum()
+                
+                if tHRP and myHRP and myChar then
+                    -- Cek apakah kita duduk di kursi (Vehicle / Boat)
+                    if myHum and myHum.Sit and myHum.SeatPart then
+                         local seat = myHum.SeatPart
+                         local vehicle = seat.Parent
+                         -- Pindahkan seluruh vehicle ke target
+                         if vehicle and vehicle.PrimaryPart then
+                             vehicle:SetPrimaryPartCFrame(tHRP.CFrame)
+                         else
+                             -- Jika vehicle ga punya primary part, pindahkan seatnya
+                             seat.CFrame = tHRP.CFrame
+                         end
+                    else
+                        -- Jika jalan kaki biasa
+                        myHRP.CFrame = tHRP.CFrame
+                    end
                 end
             end)
             task.wait()
