@@ -1,5 +1,5 @@
 -- // ==============================================================================
--- // Seraphin Helper - Refactored & Optimized (With Pro Adaptive Boost v3)
+-- // Seraphin Helper - Refactored & Optimized
 -- // ==============================================================================
 
 -- [1] SERVICES CACHE
@@ -20,10 +20,6 @@ local Services = {
 
 local LocalPlayer = Services.Players.LocalPlayer
 local Camera = Services.Workspace.CurrentCamera
-
-local CachedEnums = {
-    SmoothPlastic = Enum.Material.SmoothPlastic
-}
 
 -- [2] NETWORK WRAPPER
 local Network = {
@@ -190,7 +186,7 @@ local function Notify(title, text, colorOverride, duration)
         Position = UDim2.new(0, 0, 0, 5),
         BackgroundColor3 = color,
         BorderSizePixel = 0
-    }):Clone().Parent = Frame
+    }):Clone().Parent = Frame -- Quick corner handling inside Create isn't possible, manually add
     Utils.Create("UICorner", {Parent = Frame:GetChildren()[2], CornerRadius = UDim.new(0, 4)})
 
     local LblTitle = Utils.Create("TextLabel", {
@@ -234,7 +230,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V30 Mining 2.5H (Adaptive v3)", nil, 4)
+Notify("SERAPHIN", "V30 Mining 2.5H (Optimized)", nil, 4)
 
 -- Monitor HUD
 local MonitorHUD = Utils.Create("Frame", {
@@ -631,155 +627,68 @@ local function SetWoW(bool)
     end
 end
 
--- // --- PRO ADAPTIVE BOOST SYSTEM V3 --- //
-local OPTIMIZE_TAG = "SeraBoost_Opt"
-local BATCH_SIZE = 300
-
-local LightingOptimizer = { Snapshot = {}, EffectsSnapshot = {} }
-function LightingOptimizer.Save()
-    local l = Services.Lighting
-    LightingOptimizer.Snapshot = {
-        GlobalShadows = l.GlobalShadows, FogEnd = l.FogEnd, Brightness = l.Brightness,
-        ClockTime = l.ClockTime, EnvironmentDiffuseScale = l.EnvironmentDiffuseScale,
-        EnvironmentSpecularScale = l.EnvironmentSpecularScale, Ambient = l.Ambient,
-        OutdoorAmbient = l.OutdoorAmbient
-    }
-    table.clear(LightingOptimizer.EffectsSnapshot)
-    for _, v in ipairs(l:GetChildren()) do
-        if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("DepthOfField") or v:IsA("SunRays") or v:IsA("BlurEffect") or v:IsA("BloomEffect") then
-            LightingOptimizer.EffectsSnapshot[v] = v.Enabled
-        end
-    end
-end
-function LightingOptimizer.Apply()
-    local l = Services.Lighting
-    l.GlobalShadows = false; l.FogEnd = 9e9; l.Brightness = 2; l.ClockTime = 14
-    l.EnvironmentDiffuseScale = 0; l.EnvironmentSpecularScale = 0
-    l.Ambient = Color3.fromRGB(200, 200, 200); l.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
-    for v, _ in pairs(LightingOptimizer.EffectsSnapshot) do
-        if v.Parent then v.Enabled = false end
-    end
-end
-function LightingOptimizer.Restore()
-    local l = Services.Lighting
-    for prop, val in pairs(LightingOptimizer.Snapshot) do pcall(function() l[prop] = val end) end
-    for v, originalState in pairs(LightingOptimizer.EffectsSnapshot) do
-        if v.Parent then v.Enabled = originalState end
-    end
-    table.clear(LightingOptimizer.Snapshot); table.clear(LightingOptimizer.EffectsSnapshot)
-end
-
-local TerrainOptimizer = { Snapshot = {} }
-function TerrainOptimizer.Save()
-    local terrain = Services.Workspace:FindFirstChildOfClass("Terrain")
-    if terrain then
-        TerrainOptimizer.Snapshot = {
-            WaterReflectance = terrain.WaterReflectance, WaterTransparency = terrain.WaterTransparency,
-            WaterWaveSize = terrain.WaterWaveSize, WaterWaveSpeed = terrain.WaterWaveSpeed, Material = terrain.Material
-        }
-    end
-end
-function TerrainOptimizer.Apply()
-    local terrain = Services.Workspace:FindFirstChildOfClass("Terrain")
-    if terrain then
-        terrain.WaterReflectance = 0; terrain.WaterTransparency = 1
-        terrain.WaterWaveSize = 0; terrain.WaterWaveSpeed = 0
-        pcall(function() terrain.Material = CachedEnums.SmoothPlastic end)
-    end
-end
-function TerrainOptimizer.Restore()
-    local terrain = Services.Workspace:FindFirstChildOfClass("Terrain")
-    if terrain and TerrainOptimizer.Snapshot.WaterReflectance then
-        terrain.WaterReflectance = TerrainOptimizer.Snapshot.WaterReflectance
-        terrain.WaterTransparency = TerrainOptimizer.Snapshot.WaterTransparency
-        terrain.WaterWaveSize = TerrainOptimizer.Snapshot.WaterWaveSize
-        terrain.WaterWaveSpeed = TerrainOptimizer.Snapshot.WaterWaveSpeed
-        pcall(function() terrain.Material = TerrainOptimizer.Snapshot.Material end)
-    end
-    table.clear(TerrainOptimizer.Snapshot)
-end
-
-local ObjectOptimizer = {}
-function ObjectOptimizer.Optimize(v)
-    if not v.Parent or v:GetAttribute(OPTIMIZE_TAG) then return end
-    v:SetAttribute(OPTIMIZE_TAG, true)
-
-    if v:IsA("BasePart") then
-        v.Material = CachedEnums.SmoothPlastic
-        v.Reflectance = 0; v.CastShadow = false
-        if v:IsA("MeshPart") then v.TextureID = "" end
-        if v.Name == "Water" then v.Transparency = 1 end
-    elseif v:IsA("Decal") or v:IsA("Texture") then
-        v.Transparency = 1
-    elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Explosion") then
-        v.Enabled = false
-    elseif v:IsA("Light") then
-        v.Enabled = false
-    elseif v:IsA("Clothing") then
-        v:Destroy()
-    end
-end
-
-local AdaptiveProcessor = { Queue = {}, Connection = nil }
-function AdaptiveProcessor.Enqueue(inst)
-    if not inst:GetAttribute(OPTIMIZE_TAG) then table.insert(AdaptiveProcessor.Queue, inst) end
-end
-function AdaptiveProcessor.Start()
-    if AdaptiveProcessor.Connection then return end
-    AdaptiveProcessor.Connection = Services.RunService.Heartbeat:Connect(function()
-        local count = #AdaptiveProcessor.Queue
-        if count == 0 then return end
-        
-        local limit = math.max(1, count - BATCH_SIZE + 1)
-        for i = count, limit, -1 do
-            local inst = AdaptiveProcessor.Queue[i]
-            AdaptiveProcessor.Queue[i] = nil
-            if inst then ObjectOptimizer.Optimize(inst) end
-        end
-    end)
-end
-function AdaptiveProcessor.Stop()
-    if AdaptiveProcessor.Connection then
-        AdaptiveProcessor.Connection:Disconnect(); AdaptiveProcessor.Connection = nil
-    end
-    table.clear(AdaptiveProcessor.Queue)
-end
-
-local ConnectionManager = { DescendantAdded = nil }
-function ConnectionManager.Start()
-    if not ConnectionManager.DescendantAdded then
-        ConnectionManager.DescendantAdded = Services.Workspace.DescendantAdded:Connect(AdaptiveProcessor.Enqueue)
-    end
-end
-function ConnectionManager.Stop()
-    if ConnectionManager.DescendantAdded then
-        ConnectionManager.DescendantAdded:Disconnect(); ConnectionManager.DescendantAdded = nil
-    end
-end
-
 local function ToggleBoost(enable)
-    if State.Boost == enable then return end
     State.Boost = enable
-    
     if enable then
-        if setfpscap then pcall(setfpscap, 999) end
-        LightingOptimizer.Save(); TerrainOptimizer.Save()
-        LightingOptimizer.Apply(); TerrainOptimizer.Apply()
+        if setfpscap then setfpscap(999) end
+        pcall(function()
+            local l = Services.Lighting
+            l.GlobalShadows = false
+            l.FogEnd = 9e9
+            l.Brightness = 2
+            l.ClockTime = 14
+            l.EnvironmentDiffuseScale = 0
+            l.EnvironmentSpecularScale = 0
+            l.Ambient = Color3.fromRGB(200, 200, 200)
+            l.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
+            
+            for _, v in ipairs(l:GetChildren()) do
+                if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("DepthOfField") or v:IsA("SunRays") or v:IsA("BlurEffect") or v:IsA("BloomEffect") then
+                    v.Enabled = false
+                end
+            end
+        end)
         
-        AdaptiveProcessor.Start(); ConnectionManager.Start()
+        local terrain = Services.Workspace:FindFirstChildOfClass("Terrain")
+        if terrain then
+            terrain.WaterReflectance = 0
+            terrain.WaterTransparency = 1
+            terrain.WaterWaveSize = 0
+            terrain.WaterWaveSpeed = 0
+            pcall(function() terrain.Material = Enum.Material.SmoothPlastic end)
+        end
         
-        local allObjects = Services.Workspace:GetDescendants()
-        for _, v in ipairs(allObjects) do AdaptiveProcessor.Enqueue(v) end
+        local function OptimizeObject(v)
+            pcall(function()
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.Reflectance = 0
+                    v.CastShadow = false
+                    if v:IsA("MeshPart") then v.TextureID = "" end
+                    if v.Name == "Water" then v.Transparency = 1 end
+                elseif v:IsA("Decal") or v:IsA("Texture") then
+                    v.Transparency = 1
+                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Explosion") then
+                    v.Enabled = false
+                elseif v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
+                    v.Enabled = false
+                elseif v:IsA("Clothing") then
+                    v:Destroy()
+                end
+            end)
+        end
         
-        Notify("BOOST", "Adaptive Queue: " .. #allObjects .. " objects", Color3.fromRGB(0, 255, 100))
+        for _, v in ipairs(Services.Workspace:GetDescendants()) do OptimizeObject(v) end
+        
+        if State.Connections.BoosterDynamic then State.Connections.BoosterDynamic:Disconnect() end
+        State.Connections.BoosterDynamic = Services.Workspace.DescendantAdded:Connect(OptimizeObject)
+        
+        Notify("BOOST", "Bright & Fast Mode Active", Color3.fromRGB(0, 255, 100))
     else
-        ConnectionManager.Stop(); AdaptiveProcessor.Stop()
-        LightingOptimizer.Restore(); TerrainOptimizer.Restore()
-        
-        Notify("BOOST", "Adaptive Disabled. Lighting Restored.", nil)
+        if State.Connections.BoosterDynamic then State.Connections.BoosterDynamic:Disconnect() end
+        Notify("BOOST", "Optimization Disabled", nil)
     end
 end
--- // ------------------------------------ //
 
 -- Streamer Mode
 local OVERHEAD_HTML = '<font color="#FFFFFF"><font face="GothamBold"><b>discord.gg/getseraphin VISUAL</b></font></font>'
@@ -1019,10 +928,12 @@ end)
 -- [9] BACKGROUND LOOPS (Consolidated Task Processing)
 task.spawn(function()
     while true do
+        -- Player State Management
         pcall(function()
             local hum = Utils.GetHum()
             local hrp = Utils.GetRoot()
             
+            -- Speed Control
             if State.Speed and hum then
                 if hum.Sit and hum.SeatPart then
                     if hum.SeatPart.AssemblyLinearVelocity.Magnitude > 0 then
@@ -1033,16 +944,19 @@ task.spawn(function()
                 end
             end
             
+            -- No Damage Control
             if State.NoDmg and hum and hum.Health < hum.MaxHealth then
                 hum.Health = hum.MaxHealth
             end
             
+            -- Follow Control
             if State.AutoFollow and State.FollowTarget and hrp then
                 local tChar = State.FollowTarget.Character
                 local tHRP = tChar and tChar:FindFirstChild("HumanoidRootPart")
                 if tHRP then hrp.CFrame = tHRP.CFrame end
             end
             
+            -- Auto Equip Background Check
             if State.AutoEquip and not State.IsMining then
                 ForceEquipRod()
             end
