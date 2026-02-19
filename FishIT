@@ -1,4 +1,4 @@
--- [1] Notifikasi Awal (Custom Safe Load)
+-- [1] Notifikasi Awal & Anti-AFK (Fix Error 277)
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
@@ -11,12 +11,19 @@ local Services = {
     Workspace = game:GetService("Workspace"),
     SoundService = game:GetService("SoundService"),
     Stats = game:GetService("Stats"),
-    TextChatService = game:GetService("TextChatService")
+    TextChatService = game:GetService("TextChatService"),
+    VirtualUser = game:GetService("VirtualUser")
 }
 
 local Player = Services.Players.LocalPlayer
 local Cam = Services.Workspace.CurrentCamera
 local NetPath = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+
+-- ANTI-AFK (Mencegah Error 277 karena idle timeout)
+Player.Idled:Connect(function()
+    Services.VirtualUser:CaptureController()
+    Services.VirtualUser:ClickButton2(Vector2.new())
+end)
 
 -- Fungsi Get Character Aman
 local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
@@ -124,7 +131,7 @@ local function Notify(title, text, colorOverride, duration)
     end)
 end
 
-Notify("SERAPHIN", "V30 Mining 2.5H", nil, 4)
+Notify("SERAPHIN", "Loading...", nil, 4)
 
 -- DRAG FUNCTION
 local function EnableDrag(frame, dragInputObj)
@@ -163,7 +170,7 @@ end
 -- ====================================================
 local MonitorHUD = Instance.new("Frame", ScreenGui)
 MonitorHUD.Name = "LiveMonitor"
-MonitorHUD.Size = UDim2.new(0, 180, 0, 24)
+MonitorHUD.Size = UDim2.new(0, 200, 0, 24)
 MonitorHUD.Position = UDim2.new(0.5, -90, 0, 10)
 MonitorHUD.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
 MonitorHUD.BackgroundTransparency = 0.2
@@ -306,7 +313,7 @@ Header.BorderSizePixel = 0
 local Title = Instance.new("TextLabel", Header)
 Title.Size = UDim2.new(1, -40, 1, 0)
 Title.Position = UDim2.new(0, 12, 0, 0)
-Title.Text = "SERA <font color=\"rgb(255, 255, 255)\">HELPER</font>"
+Title.Text = "SERA <font color=\"rgb(0, 255, 255)\">HELPER</font>"
 Title.RichText = true
 Title.TextColor3 = UI_THEME.TextMain
 Title.Font = UI_THEME.FontUI
@@ -748,45 +755,43 @@ local function SetAutoEquip(bool)
 end
 
 -- ====================================================
--- [UPDATED V6] EXTREME GREEN POTATO BOOSTER
+-- [UPDATED] SUPER CPU BOOSTER (PURE PERFORMANCE, NO COLOR CHANGES)
 -- ====================================================
 local BoostConnection = nil
 
 local function OptimizeObject(v)
     pcall(function()
         if v:IsA("BasePart") then
-            -- UBAH JADI PLASTIK HIJAU FLAT
+            -- Meringankan render material tanpa mengubah warna aslinya
             v.Material = Enum.Material.SmoothPlastic
             v.Reflectance = 0
             v.CastShadow = false
-            v.TopSurface = Enum.SurfaceType.Smooth
-            v.BottomSurface = Enum.SurfaceType.Smooth
-            v.Color = Color3.fromRGB(30, 100, 30) -- HIJAU RUMPUT FLAT
             
+            -- Buang tekstur mesh berat
             if v:IsA("MeshPart") then 
                 v.TextureID = "" 
             end
             
+            -- Mencegah render transparan yang berat
             if v.Transparency > 0.5 and v.Transparency < 1 then
                 v.Transparency = 1 
             end
             
+            -- Matikan air
             if v.Name == "Water" then 
                 v.Transparency = 1 
             end
             
         elseif v:IsA("Decal") or v:IsA("Texture") then
-            v:Destroy()
+            v.Transparency = 1 -- Sembunyikan decal
             
         elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or 
                v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") or 
                v:IsA("Explosion") then
             v.Enabled = false
-            v:Destroy()
             
         elseif v:IsA("Light") then
             v.Enabled = false
-            v:Destroy()
         end
     end)
 end
@@ -795,37 +800,33 @@ local function ToggleBoost(enable)
     States.Boost = enable
     
     if enable then
-        if setfpscap then setfpscap(9999) end
+        if setfpscap then setfpscap(999) end
         
-        -- 1. SETTING LIGHTING
+        -- Turunkan Kualitas Render Utama Roblox
+        pcall(function()
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            UserSettings():GetService("UserGameSettings").SavedQualityLevel = Enum.SavedQualityLevel.QualityLevel1
+        end)
+        
+        -- 1. SETTING LIGHTING (Matikan fitur berat, pertahankan warna game)
         pcall(function()
             local l = Services.Lighting
             l.GlobalShadows = false
-            l.FogEnd = 9e9
-            l.Brightness = 0
-            l.ClockTime = 12
-            l.EnvironmentDiffuseScale = 0
-            l.EnvironmentSpecularScale = 0
-            l.Ambient = Color3.fromRGB(255, 255, 255)
-            l.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
             
             for _, v in pairs(l:GetChildren()) do
                 if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") or v:IsA("DepthOfField") or v:IsA("SunRays") then
-                    v:Destroy()
+                    v.Enabled = false
                 end
             end
         end)
         
-        -- 2. SETTING TERRAIN (HIJAU FLAT)
+        -- 2. SETTING TERRAIN (Matikan air dan dekorasi tanpa ubah warna)
         if Services.Workspace.Terrain then
             pcall(function() 
                 local t = Services.Workspace.Terrain
                 t.WaterReflectance = 0
-                t.WaterTransparency = 0
                 t.WaterWaveSize = 0
                 t.WaterWaveSpeed = 0
-                t.Material = Enum.Material.SmoothPlastic
-                t.Color = Color3.fromRGB(30, 100, 30) -- HIJAU
                 sethiddenproperty(t, "Decoration", false)
             end)
         end
@@ -841,17 +842,17 @@ local function ToggleBoost(enable)
             OptimizeObject(v)
         end)
         
-        Notify("BOOST", "Super Boost: ON", Color3.fromRGB(0, 255, 100))
+        Notify("BOOST", "Cpu Booster : ON", Color3.fromRGB(0, 255, 100))
     else
         if BoostConnection then BoostConnection:Disconnect() end
-        Notify("BOOST", "Disabled (Rejoin to Fix)", Color3.fromRGB(255, 100, 100))
+        Notify("BOOST", "Disabled (Rejoin to fix visuals)", Color3.fromRGB(255, 100, 100))
     end
 end
 
 -- ====================================================
 -- [NEW] STREAMER MODE LOGIC (NAME & CHAT SPOOF)
 -- ====================================================
-local RAW_NAME = "discord.gg/getseraphin 🚀"
+local RAW_NAME = "discord.gg/getseraphin "
 local SPOOF_NAME = '<font face="GothamBold"><b>' .. RAW_NAME .. '</b></font>'
 local NAME_COLOR = "#00ffff"
 local OVERHEAD_HTML = string.format('<font color="#FFFFFF">%s</font>', SPOOF_NAME)
@@ -980,7 +981,7 @@ MakeSwitch(PageMain, "No Clip", States.Noclip, function(val)
         if Connections["Noclip"] then Connections["Noclip"]:Disconnect() end
     end
 end)
-MakeSwitch(PageMain, "Super Boost ", States.Boost, function(val)
+MakeSwitch(PageMain, "Pure CPU Booster", States.Boost, function(val)
     ToggleBoost(val)
 end)
 MakeSwitch(PageMain, "3D No Render", States.NoRender, function(val)
@@ -996,11 +997,10 @@ end)
 -- ====================================================
 local CraftContainer = Instance.new("Frame", PageCharm)
 CraftContainer.Name = "CraftSystem"
-CraftContainer.Size = UDim2.new(0.95, 0, 0, 54) -- FIXED: Ukuran saat tertutup disesuaikan agar rapat
+CraftContainer.Size = UDim2.new(0.95, 0, 0, 54)
 CraftContainer.BackgroundTransparency = 1
 CraftContainer.ClipsDescendants = true
 
--- Dropdown Header
 local CraftDropdown = Instance.new("Frame", CraftContainer)
 CraftDropdown.Name = "Dropdown"
 CraftDropdown.Size = UDim2.new(1, 0, 0, 26)
@@ -1018,10 +1018,9 @@ CraftBtn.TextSize = 10
 CraftBtn.AutoButtonColor = true
 Instance.new("UICorner", CraftBtn).CornerRadius = UDim.new(0, 6)
 
--- List Item
 local CraftListFrame = Instance.new("ScrollingFrame", CraftDropdown)
-CraftListFrame.Size = UDim2.new(1, 0, 0, 104) -- Tinggi di-adjust tepat 4 item
-CraftListFrame.Position = UDim2.new(0, 0, 0, 28) -- Rapat di bawah tombol
+CraftListFrame.Size = UDim2.new(1, 0, 0, 104) 
+CraftListFrame.Position = UDim2.new(0, 0, 0, 28) 
 CraftListFrame.BackgroundTransparency = 0.2
 CraftListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 CraftListFrame.ScrollBarThickness = 2
@@ -1074,7 +1073,6 @@ CraftBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Action Input
 local ActionFrameC = Instance.new("Frame", CraftContainer)
 ActionFrameC.Name = "Action"
 ActionFrameC.Size = UDim2.new(1, 0, 0, 26)
@@ -1104,7 +1102,6 @@ StartCraftBtn.Font = UI_THEME.FontBtn
 StartCraftBtn.TextSize = 10
 Instance.new("UICorner", StartCraftBtn).CornerRadius = UDim.new(0, 6)
 
--- CRAFT LOGIC
 local IsCrafting = false
 local StartCraftRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/StartCrafting")
 local ConfirmCraftRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/ConfirmCrafting")
@@ -1139,7 +1136,7 @@ StartCraftBtn.MouseButton1Click:Connect(function()
             
             pcall(function()
                 StartCraftRF:InvokeServer(SelectedCraft)
-                task.wait(0.2)
+                task.wait(0.5) -- Prevent error 277 (spam limit)
                 ConfirmCraftRF:InvokeServer()
             end)
             task.wait(0.5)
@@ -1151,18 +1148,16 @@ StartCraftBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
-
 -- ====================================================
--- [2] BUY CHARM SYSTEM (FIXED DRAWER)
+-- [2] BUY CHARM SYSTEM
 -- ====================================================
 local PurchaseCharmRF = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RF/PurchaseCharm")
 local CharmContainer = Instance.new("Frame", PageCharm)
 CharmContainer.Name = "CharmSystem"
-CharmContainer.Size = UDim2.new(0.95, 0, 0, 54) -- FIXED: Ukuran rapat
+CharmContainer.Size = UDim2.new(0.95, 0, 0, 54) 
 CharmContainer.BackgroundTransparency = 1
 CharmContainer.ClipsDescendants = true
 
--- 1. HEADER & DROPDOWN (LACI)
 local CharmDropdown = Instance.new("Frame", CharmContainer)
 CharmDropdown.Name = "Dropdown"
 CharmDropdown.Size = UDim2.new(1, 0, 0, 26)
@@ -1180,9 +1175,8 @@ CharmBtn.TextSize = 10
 CharmBtn.AutoButtonColor = true
 Instance.new("UICorner", CharmBtn).CornerRadius = UDim.new(0, 6)
 
--- List Item (Isi Laci)
 local CharmListFrame = Instance.new("ScrollingFrame", CharmDropdown)
-CharmListFrame.Size = UDim2.new(1, 0, 0, 130) -- Tinggi di-adjust untuk 5 item
+CharmListFrame.Size = UDim2.new(1, 0, 0, 130)
 CharmListFrame.Position = UDim2.new(0, 0, 0, 28)
 CharmListFrame.BackgroundTransparency = 0.2
 CharmListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -1196,20 +1190,8 @@ CharmListLayout.Padding = UDim.new(0, 2)
 CharmListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local SelectedCharm = nil
-local CharmData = {
-    "Bone Charm",
-    "Magma Charm",
-    "Algae Charm",
-    "Clover Charm",
-    "Heart Charm"
-}
-local CharmIDs = {
-    ["Bone Charm"] = 1,
-    ["Algae Charm"] = 2,
-    ["Magma Charm"] = 3,
-    ["Clover Charm"] = 4,
-    ["Heart Charm"] = 14
-}
+local CharmData = { "Bone Charm", "Magma Charm", "Algae Charm", "Clover Charm", "Heart Charm" }
+local CharmIDs = { ["Bone Charm"] = 1, ["Algae Charm"] = 2, ["Magma Charm"] = 3, ["Clover Charm"] = 4, ["Heart Charm"] = 14 }
 
 local function UpdateCharmSelect(name)
     SelectedCharm = name
@@ -1232,7 +1214,6 @@ for _, cName in pairs(CharmData) do
 end
 CharmListFrame.CanvasSize = UDim2.new(0, 0, 0, (#CharmData * 26))
 
--- 2. QUANTITY INPUT & BUY BUTTON
 local ActionFrame = Instance.new("Frame", CharmContainer)
 ActionFrame.Name = "Action"
 ActionFrame.Size = UDim2.new(1, 0, 0, 26)
@@ -1262,7 +1243,6 @@ BuyBtn.Font = UI_THEME.FontBtn
 BuyBtn.TextSize = 10
 Instance.new("UICorner", BuyBtn).CornerRadius = UDim.new(0, 6)
 
--- LOGIC BUKA TUTUP LACI
 local IsCharmOpen = false
 CharmBtn.MouseButton1Click:Connect(function()
     IsCharmOpen = not IsCharmOpen
@@ -1285,10 +1265,7 @@ BuyBtn.MouseButton1Click:Connect(function()
     if amount < 1 then amount = 1 end
     local targetID = CharmIDs[SelectedCharm]
     
-    if not targetID then
-        Notify("ERROR", "Invalid ID ", Color3.fromRGB(255,0,0))
-        return
-    end
+    if not targetID then return end
     Notify("SHOP", "Buying " .. amount .. " " .. SelectedCharm .. "...", Color3.fromRGB(255, 200, 0))
     
     task.spawn(function()
@@ -1296,12 +1273,8 @@ BuyBtn.MouseButton1Click:Connect(function()
             local success, err = pcall(function()
                 PurchaseCharmRF:InvokeServer(targetID)
             end)
-            
-            if not success then
-                Notify("ERROR", "Failed to buy!", Color3.fromRGB(255, 0, 0))
-                break
-            end
-            task.wait(0.1)
+            if not success then break end
+            task.wait(0.3) -- Jeda agar tidak terkena error 277
         end
         Notify("SHOP", "Purchase Complete!", Color3.fromRGB(0, 255, 100))
     end)
@@ -1313,7 +1286,7 @@ end)
 local LimitedRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RE/LimitedPurchaseRequest")
 local ValContainer = Instance.new("Frame", PageCharm)
 ValContainer.Name = "ValSystem"
-ValContainer.Size = UDim2.new(0.95, 0, 0, 54) -- FIXED: Ukuran rapat
+ValContainer.Size = UDim2.new(0.95, 0, 0, 54)
 ValContainer.BackgroundTransparency = 1
 ValContainer.ClipsDescendants = true
 
@@ -1335,7 +1308,7 @@ ValBtn.AutoButtonColor = true
 Instance.new("UICorner", ValBtn).CornerRadius = UDim.new(0, 6)
 
 local ValListFrame = Instance.new("Frame", ValDropdown)
-ValListFrame.Size = UDim2.new(1, 0, 0, 52) -- Tinggi adjust 2 item
+ValListFrame.Size = UDim2.new(1, 0, 0, 52) 
 ValListFrame.Position = UDim2.new(0, 0, 0, 28)
 ValListFrame.BackgroundTransparency = 0.2
 ValListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -1349,10 +1322,7 @@ ValListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 ValListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
 local SelectedValItem = nil
-local ValData = {
-    ["Love Potion "] = 1,
-    ["Love Totems "] = 2
-}
+local ValData = { ["Love Potion "] = 1, ["Love Totems "] = 2 }
 
 local function UpdateValSelect(name)
     SelectedValItem = name
@@ -1429,11 +1399,8 @@ ValBuyBtn.MouseButton1Click:Connect(function()
     
     task.spawn(function()
         for i = 1, amount do
-            local success, err = pcall(function()
-                LimitedRemote:FireServer(targetID)
-            end)
-            if not success then break end
-            task.wait(0.1)
+            pcall(function() LimitedRemote:FireServer(targetID) end)
+            task.wait(0.3) -- Jeda aman untuk cegah crash 277
         end
         Notify("SHOP", "Done!", Color3.fromRGB(0, 255, 100))
     end)
@@ -1469,7 +1436,7 @@ local function MiningRoutine()
     SavedMinePosition = hrp.CFrame
     Notify("MINING", "Start: Position Saved.", Color3.fromRGB(255, 200, 0))
     
-    -- [2] PREPARE GEAR (Unequip 1, Equip 2)
+    -- [2] PREPARE GEAR
     local char = Player.Character
     if char then
         local tool = char:FindFirstChildWhichIsA("Tool")
@@ -1481,7 +1448,6 @@ local function MiningRoutine()
     Notify("MINING", "Equipped Pickaxe (Slot 2).", nil)
     task.wait(1.5) 
     
-    -- Function to Run Specific Zone with SORT MODE
     local function RunZone(zoneName, tpCFrame, folderIslands, delayStart, delayBetween, sortMode)
         local r = GetRoot()
         if r then
@@ -1490,7 +1456,6 @@ local function MiningRoutine()
             r.CFrame = tpCFrame
         end
         Notify("MINING", "Arrived " .. zoneName, Color3.fromRGB(255, 150, 0))
-        
         task.wait(delayStart)
         
         local scanAgain = true
@@ -1525,23 +1490,20 @@ local function MiningRoutine()
                         local r2 = GetRoot()
                         if r2 and part then
                             r2.Anchored = false
-                            local dist = (r2.Position - part.Position).Magnitude
-                            local tTime = dist / 60
-                            if tTime < 0.5 then tTime = 0.5 end
-                            local tw = Services.TweenService:Create(r2, TweenInfo.new(tTime, Enum.EasingStyle.Linear), {CFrame = part.CFrame * CFrame.new(0,0,3)})
-                            tw:Play()
-                            tw.Completed:Wait()
-                            
+                            -- Smooth Tp to avoid physics crashes
+                            r2.CFrame = part.CFrame * CFrame.new(0,0,3)
                             r2.Velocity = Vector3.zero
+                            task.wait(1) -- wait for physics sync
+                            
                             r2.Anchored = true
                             r2.CFrame = CFrame.lookAt(r2.Position, part.Position)
-                            task.wait(3)
+                            task.wait(2)
                             
                             if prompt.Parent then
                                 fireproximityprompt(prompt)
                                 Notify("MINING", "Extracting...", Color3.fromRGB(255, 0, 0))
                             end
-                            task.wait(2)
+                            task.wait(1.5)
                             task.wait(delayBetween)
                         end
                     end
@@ -1554,19 +1516,13 @@ local function MiningRoutine()
     local LavaFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Lava Basin"):WaitForChild("Crystals")
     local DeepFolder = Services.Workspace:WaitForChild("Islands"):WaitForChild("Crystal Depths"):WaitForChild("Crystals")
     
-    -- [3] ZONA 1: LAVA BASIN
     RunZone("Lava Basin", CFrame.new(860.08, 85.86, -10094.87), LavaFolder, 5, 5, "Near")
-    
     if States.IsMining then
-        -- [4] TRANSITION
         Notify("MINING", "Moving to Deeps...", Color3.fromRGB(200, 0, 255))
         task.wait(5)
-        
-        -- [5] ZONA 2: CRYSTAL DEPTHS
-        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 8, "Far")
+        RunZone("Crystal Depths", CFrame.new(5820.14, -907.79, 15424.53), DeepFolder, 5, 9, "Far")
     end
     
-    -- [6] FINISH -> RETURN -> EQUIP ROD ONLY
     Notify("MINING", "Mining Done. Returning...", Color3.fromRGB(0, 255, 0))
     States.IsMining = false 
     
@@ -1578,50 +1534,34 @@ local function MiningRoutine()
     end
     
     task.wait(1)
-    -- Equip Rod (Slot 1)
     Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]:FireServer(1)
-    Notify("GEAR", "Holding Rod ", nil)
 end
 
 MakeSwitch(PageEvent, "Auto Mine Lava/Crystal", States.AutoMiningV20, function(val)
     States.AutoMiningV20 = val
-    
     if val then
         task.spawn(function()
-            Notify("SYSTEM", "Auto Mine: Every 2.5 Hours", nil)
-            
+            Notify("SYSTEM", "Auto Mine ON", nil)
             local NextRun = 0 
-            local Interval = 2.25 * 60 * 60 -- 2.5 Jam
-            
+            local Interval = 2.25 * 60 * 60 
             while States.AutoMiningV20 do
                 local Now = tick()
-                
                 if Now >= NextRun and not States.IsMining then
                     States.IsMining = true
-                    
                     MiningRoutine()
-                    
                     States.IsMining = false
                     NextRun = tick() + Interval
-                    
                     local jamBerikutnya = os.date("%H:%M", os.time() + Interval)
                     Notify("SCHEDULE", "Next Mine at: " .. jamBerikutnya, Color3.fromRGB(0, 255, 255))
                 end
-                
                 task.wait(5)
             end
         end)
     else
         States.IsMining = false
         States.AutoMiningV20 = false
-        
         local hrp = GetRoot()
-        if hrp then
-            hrp.Anchored = false
-             for _, part in pairs(Player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then part.CanCollide = true end
-            end
-        end
+        if hrp then hrp.Anchored = false end
         Notify("MINING", "Stopped Completely.", Color3.fromRGB(255, 50, 50))
     end
 end)
@@ -1629,7 +1569,6 @@ end)
 MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
     States.AutoCoral = val
     Notify("EVENT", "Auto Coral: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    
     if val then
         local TankRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:FindFirstChild("RF/EquipOxygenTank")
         if TankRemote and not States.HasTank then
@@ -1638,12 +1577,10 @@ MakeSwitch(PageEvent, "Auto Take Coral", States.AutoCoral, function(val)
             Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
         end
     end
-    
     if not val then
         local hrp = GetRoot()
         if IsLootingCoral and CoralReturnCFrame and hrp then
               hrp.CFrame = CoralReturnCFrame
-              Notify("CORAL", "Returning...", nil)
          end
         IsLootingCoral = false
         SetWoW(false)
@@ -1656,7 +1593,6 @@ local TankRemote = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2
 
 local function ProcessRelicWithSpots(relicContainer)
     if not States.AutoFarmRelic then return end
-    
     local validNames = {["Sunken Eye Relic"]=true, ["Burntflame Relic"]=true, ["Blacktide Relic"]=true}
     if not validNames[relicContainer.Name] then return end
 
@@ -1666,7 +1602,6 @@ local function ProcessRelicWithSpots(relicContainer)
     if not States.HasTank then
         pcall(function() TankRemote:InvokeServer(575) end)
         States.HasTank = true
-        Notify("GEAR", "Oxygen Tank Equipped", Color3.fromRGB(0, 255, 255))
     end
     
     SetWoW(true)
@@ -1698,7 +1633,6 @@ end)
 MakeSwitch(PageEvent, "Auto Take Relics", States.AutoFarmRelic, function(val)
     States.AutoFarmRelic = val
     Notify("EVENT", "Auto All Relic: "..(val and "ON" or "OFF"), val and nil or Color3.fromRGB(255,50,50))
-    
     if val then
         task.spawn(function()
             for _, v in pairs(RelicsFolder:GetChildren()) do
@@ -1744,12 +1678,12 @@ BtnTpRelic.MouseButton1Click:Connect(function()
     
     if not hrp then return end
     local eventFolder = Services.Workspace:FindFirstChild("LeviathanEvent")
-    if not eventFolder then Notify("RELIC", "Event Map Not Found!", Color3.fromRGB(255,0,0)); return end
+    if not eventFolder then return end
     
     local relics = eventFolder:FindFirstChild("Relics")
-    if not relics then Notify("RELIC", "Relics Folder Missing!", Color3.fromRGB(255,0,0)); return end
+    if not relics then return end
     local targetRelic = relics:FindFirstChild(rName)
-    if not targetRelic then Notify("RELIC", rName.." Not Found!", Color3.fromRGB(255,0,0)); return end
+    if not targetRelic then return end
     local targetPart = nil
     
     if States.RelicSel == "Blacktide" and spot == 4 then
@@ -1768,8 +1702,6 @@ BtnTpRelic.MouseButton1Click:Connect(function()
     if targetPart then
         hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
         Notify("RELIC", "Teleported to Spot " .. spot, nil)
-    else
-        Notify("RELIC", "Spot Part Not Found", Color3.fromRGB(255,0,0))
     end
 end)
 
@@ -1779,9 +1711,6 @@ BtnQuestNPC.MouseButton1Click:Connect(function()
     if npc and hrp then
         local pivot = npc:GetPivot()
         hrp.CFrame = pivot + Vector3.new(0, 0, 4)
-        Notify("QUEST", "Teleported to Archaeologist", nil)
-    else
-        Notify("QUEST", "Archaeologist Not Found!", Color3.fromRGB(255, 50, 50))
     end
 end)
 
@@ -1989,7 +1918,7 @@ MakeSwitch(PageMisc, "Panel Seraphin", States.Panel, function(val)
 end)
 
 -- ====================================================
--- [OPTIMIZED] SYSTEM MONITOR (LIGHT UI LOOP)
+-- [OPTIMIZED] SYSTEM MONITOR
 -- ====================================================
 local StatsService = game:GetService("Stats")
 local RunService = game:GetService("RunService")
@@ -1997,12 +1926,10 @@ local RunService = game:GetService("RunService")
 local sec = os.clock()
 local frames = 0
 
--- FPS Calculation (sangat ringan)
 RunService.RenderStepped:Connect(function()
     frames = frames + 1
 end)
 
--- Menggunakan task.spawn & task.wait(0.5) agar UI thread tidak terlalu terbebani RenderStepped setiap ms
 task.spawn(function()
     while task.wait(0.5) do
         local currentFps = math.floor(frames / (os.clock() - sec))
@@ -2010,7 +1937,7 @@ task.spawn(function()
         frames = 0
         
         local cpuMs = StatsService.PerformanceStats.CPU:GetValue()
-        local serverTime = DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us")
+        local serverTime = DateTime.now():FormatUniversalTime("HH:mm:ss", "id-ID")
         
         if MonLabel then
             MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", currentFps, cpuMs, serverTime)
@@ -2031,7 +1958,6 @@ BtnSpeedToggle.MouseButton1Click:Connect(function()
     if States.Speed then
         BtnSpeedToggle.Text = "Speed: ON"
         ToggleVisual(BtnSpeedToggle, true)
-        Notify("PLAYER", "Speed Aktif: " .. val, Color3.fromRGB(0, 255, 100))
         if hum and not hum.Sit then hum.WalkSpeed = 16 end
     else
         BtnSpeedToggle.Text = "Speed: OFF"
@@ -2067,7 +1993,6 @@ BtnFollowToggle.MouseButton1Click:Connect(function()
             BoxFollowInput.Text = target.Name
             BtnFollowToggle.Text = "Following"
             ToggleVisual(BtnFollowToggle, true)
-            Notify("FOLLOW", "Target: " .. target.Name, Color3.fromRGB(0, 255, 100))
         else
             States.AutoFollow = false
             Notify("FOLLOW", "Player Not Found!", Color3.fromRGB(255, 50, 50))
@@ -2087,7 +2012,7 @@ BoxFollowInput.FocusLost:Connect(function()
 end)
 
 -- ====================================================
--- [PLAYER LOOPS - SMART LOOPING APPLIED]
+-- [PLAYER LOOPS]
 -- ====================================================
 task.spawn(function()
     while true do
@@ -2096,25 +2021,19 @@ task.spawn(function()
                 local tChar = States.FollowTarget.Character
                 local tHRP = tChar and tChar:FindFirstChild("HumanoidRootPart")
                 local myHRP = GetRoot()
-                
-                -- LOGIC UNTUK BAWA ITEM / KENDARAAN
                 local myChar = Player.Character
                 local myHum = GetHum()
                 
                 if tHRP and myHRP and myChar then
-                    -- Cek apakah kita duduk di kursi (Vehicle / Boat)
                     if myHum and myHum.Sit and myHum.SeatPart then
                          local seat = myHum.SeatPart
                          local vehicle = seat.Parent
-                         -- Pindahkan seluruh vehicle ke target
                          if vehicle and vehicle.PrimaryPart then
                              vehicle:SetPrimaryPartCFrame(tHRP.CFrame)
                          else
-                             -- Jika vehicle ga punya primary part, pindahkan seatnya
                              seat.CFrame = tHRP.CFrame
                          end
                     else
-                        -- Jika jalan kaki biasa
                         myHRP.CFrame = tHRP.CFrame
                     end
                 end
@@ -2178,7 +2097,6 @@ BtnLoad.MouseButton1Click:Connect(function()
     if SavedCFrame and hrp then hrp.CFrame = SavedCFrame; Notify("POSITION", "Location Loaded!", nil) end
 end)
 
--- [FIXED] AUTO EQUIP BACKGROUND LOOP (DISABLE SAAT MINING)
 task.spawn(function()
     while true do
         if States.AutoEquip and not States.IsMining then
@@ -2190,7 +2108,9 @@ task.spawn(function()
     end
 end)
 
--- [AUTO TAKE CORAL - SMART LOOP]
+-- ====================================================
+-- [AUTO TAKE CORAL - IMPROVED & SAFE FOR ANTI-277]
+-- ====================================================
 task.spawn(function()
     while true do
         if States.AutoCoral then
@@ -2198,59 +2118,63 @@ task.spawn(function()
                 local spawnFolder = Services.Workspace:FindFirstChild("!!! SEARCH ITEM SPAWNS")
                 if spawnFolder and spawnFolder:FindFirstChild("Coral") then
                     local validCorals = {}
-                    local function GetCorals(folder)
-                        for _, v in pairs(folder:GetChildren()) do
-                            if v:IsA("Model") or v:IsA("BasePart") then
-                                if v:FindFirstChildWhichIsA("ProximityPrompt", true) then
-                                    table.insert(validCorals, v)
-                                end
+                    for _, v in pairs(spawnFolder.Coral:GetDescendants()) do
+                        if v:IsA("ProximityPrompt") and v.Enabled then
+                            local p = v.Parent
+                            if p and (p:IsA("BasePart") or p:IsA("Model")) then
+                                table.insert(validCorals, v)
                             end
-                            if v:IsA("Folder") or v:IsA("Model") then GetCorals(v) end
                         end
                     end
-                    GetCorals(spawnFolder.Coral)
                     
                     if #validCorals > 0 then
                         local hrp = GetRoot()
-                        if not IsLootingCoral and not States.AutoFarmRelic then
-                            if hrp then
-                                CoralReturnCFrame = hrp.CFrame
-                                IsLootingCoral = true
-                                Notify("CORAL", "Found "..#validCorals.." Corals!", Color3.fromRGB(0, 255, 100))
-                                SetWoW(true)
-                            end
+                        if hrp and not IsLootingCoral and not States.AutoFarmRelic and not States.IsMining then
+                            CoralReturnCFrame = hrp.CFrame
+                            IsLootingCoral = true
+                            Notify("CORAL", "Found "..#validCorals.." Corals!", Color3.fromRGB(0, 255, 100))
                         end
-                        if IsLootingCoral then
-                              local v = validCorals[1]
-                             if v and v.Parent then
-                                  local prompt = v:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                 local hrp = GetRoot()
-                                 if prompt and hrp then
-                                      hrp.CFrame = v:GetPivot() + Vector3.new(0, 3, 0)
-                                     task.wait(0.2)
-                                     fireproximityprompt(prompt)
-                                 end
-                              end
+                        
+                        if IsLootingCoral and hrp then
+                            for _, prompt in ipairs(validCorals) do
+                                if not States.AutoCoral or States.IsMining then break end
+                                if prompt and prompt.Parent and prompt.Enabled then
+                                    local targetPos = prompt.Parent:IsA("Model") and prompt.Parent:GetPivot().Position or prompt.Parent.Position
+                                    
+                                    -- Teleport mulus, tahan karakter agar tidak kepental dan nyangkut
+                                    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                                    hrp.Velocity = Vector3.zero
+                                    task.wait(0.5) -- Jeda wajib untuk sinkronisasi server
+                                    
+                                    if prompt and prompt.Parent then
+                                        fireproximityprompt(prompt)
+                                        task.wait(1.5) -- Jeda pengamanan tambahan biar gak Error 277
+                                    end
+                                end
+                            end
+                            task.wait(1)
                         end
                     else
-                          if IsLootingCoral then
+                        if IsLootingCoral then
                             IsLootingCoral = false
                             local hrp = GetRoot()
-                            if CoralReturnCFrame and hrp then hrp.CFrame = CoralReturnCFrame end
-                            SetWoW(false)
-                          end
+                            if CoralReturnCFrame and hrp then 
+                                hrp.CFrame = CoralReturnCFrame 
+                                hrp.Velocity = Vector3.zero
+                            end
+                        end
                     end
                 end
             end)
-            task.wait(1.5)
+            task.wait(1.5) -- Throttle loop
         else
-            if IsLootingCoral then IsLootingCoral = false; SetWoW(false) end
+            if IsLootingCoral then IsLootingCoral = false end
             task.wait(3)
         end
     end
 end)
 
--- [AUTO EVENT LOOP - SMART LOOP]
+-- [AUTO EVENT LOOP]
 local function FindInFolders(targetName)
     local folders = {Services.Workspace:FindFirstChild("ActiveEvents"), Services.Workspace:FindFirstChild("Props")}
     for _, folder in pairs(folders) do
@@ -2287,7 +2211,6 @@ task.spawn(function()
                     if not IsInEvent then
                         EventStartCFrame = hrp.CFrame
                         IsInEvent = true
-                        Notify("AUTO HUNT", "Teleport To ( " .. FoundEvent.Name .. " )", Color3.fromRGB(0, 255, 255))
                         SetWoW(true)
                     end
                     local targetPos = FoundEvent:GetPivot().Position
@@ -2299,7 +2222,6 @@ task.spawn(function()
                 else
                     if IsInEvent then
                         IsInEvent = false
-                        Notify("AUTO HUNT", "Event Finished ", Color3.fromRGB(0, 255, 100))
                         if EventStartCFrame and hrp then
                               hrp.CFrame = EventStartCFrame
                               EventStartCFrame = nil
