@@ -1,8 +1,7 @@
 -- =========================================================================
--- [ SERAPHIN HELPER - ULTIMATE OPTIMIZED EDITION ]
+-- [ SERAPHIN HELPER - ULTIMATE CLEAN CODE EDITION (FULL) ]
 -- =========================================================================
 
--- [1] SERVICES & SETUP UTAMA
 local Services = {
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
@@ -13,922 +12,749 @@ local Services = {
     ReplicatedStorage = game:GetService("ReplicatedStorage"),
     TweenService = game:GetService("TweenService"),
     Workspace = game:GetService("Workspace"),
-    VirtualUser = game:GetService("VirtualUser"),
-    TextChatService = game:GetService("TextChatService")
+    Stats = game:GetService("Stats"),
+    TextChatService = game:GetService("TextChatService"),
+    VirtualUser = game:GetService("VirtualUser")
 }
 
-local Player = Services.Players.LocalPlayer
-local Cam = Services.Workspace.CurrentCamera
+local LocalPlayer = Services.Players.LocalPlayer
+local Net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
 
--- Anti-AFK (Cegah Error 277 / Disconnect karena idle)
-Player.Idled:Connect(function()
+-- [ ANTI-AFK ]
+LocalPlayer.Idled:Connect(function()
     Services.VirtualUser:CaptureController()
     Services.VirtualUser:ClickButton2(Vector2.new())
 end)
 
--- Safe Character Getters
-local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
-local function GetRoot() local c = Player.Character; return c and c:FindFirstChild("HumanoidRootPart") end
-local function GetHum() local c = Player.Character; return c and c:FindFirstChild("Humanoid") end
-
--- Cleanup UI Lama
 if Services.CoreGui:FindFirstChild("SeraHelper") then Services.CoreGui.SeraHelper:Destroy() end
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SeraHelper"
-ScreenGui.Parent = Services.CoreGui
-ScreenGui.ResetOnSpawn = false
-
 -- ====================================================
--- [2] KONFIGURASI TEMA UI (SOLID & NEON STROKE)
+-- [ 1. STATE & CONFIGURATION ]
 -- ====================================================
 local THEME = {
-    BgMain = Color3.fromRGB(12, 12, 16),       -- Hitam Solid
-    BgSide = Color3.fromRGB(8, 8, 11),         -- Hitam Pekat
-    BgElement = Color3.fromRGB(20, 20, 25),    -- Abu Gelap
-    Accent = Color3.fromRGB(0, 255, 200),      -- Neon Cyan
-    AccentOff = Color3.fromRGB(50, 50, 60),    -- Abu mati
-    Stroke = Color3.fromRGB(35, 35, 45),       -- Garis tepi elemen
+    BgMain = Color3.fromRGB(15, 15, 18),
+    BgSide = Color3.fromRGB(10, 10, 12),
+    BgElement = Color3.fromRGB(22, 22, 28),
+    Accent = Color3.fromRGB(0, 255, 200),
+    AccentOff = Color3.fromRGB(50, 50, 60),
+    Stroke = Color3.fromRGB(40, 40, 50),
     TextMain = Color3.fromRGB(245, 245, 245),
-    TextSub = Color3.fromRGB(140, 140, 150),
+    TextSub = Color3.fromRGB(150, 150, 160),
     FontMain = Enum.Font.GothamMedium,
     FontBold = Enum.Font.GothamBold,
-    Radius = UDim.new(0, 6),
-    Width = 430,
-    Height = 290
+    Radius = UDim.new(0, 6)
+}
+
+local State = {
+    SuperBoost = false, HideRod = false, WoW = false, Freeze = false, Noclip = false,
+    AutoEquip = false, AutoMine = false, AutoCoral = false, AutoRelic = false, AutoEvent = false,
+    Speed = false, NoDmg = false, Streamer = false, Panel = true, Follow = false,
+    SpeedVal = 50, FollowTarget = nil, AnimSkin = "Off", RelicSel = "Blacktide", RelicSpot = 1,
+    IsMining = false, IsLootingCoral = false, IsInEvent = false, HasTank = false,
+    MineReturn = nil, CoralReturn = nil, EventStart = nil, NextMineTime = 0
+}
+
+local Connections = {}
+local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt", "Megalodon Hunt"}
+
+-- LOOKUP TABLES
+local TRASH_FX = {
+    Decal=true, Texture=true, ParticleEmitter=true, Trail=true, Beam=true,
+    PointLight=true, SpotLight=true, SurfaceLight=true, Sparkles=true, Fire=true, Smoke=true
+}
+local CULL_ENTITIES = {
+    Accessory=true, Shirt=true, Pants=true, ShirtGraphic=true, CharacterMesh=true, Hat=true
 }
 
 -- ====================================================
--- [3] UI BUILDER LIBRARY (CLEAN & MODULAR CODE)
+-- [ 2. UTILITIES ]
 -- ====================================================
-local UI = {}
+local Utils = {}
+function Utils.GetChar() return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() end
+function Utils.GetRoot() local c = Utils.GetChar(); return c and c:FindFirstChild("HumanoidRootPart") end
+function Utils.GetHum() local c = Utils.GetChar(); return c and c:FindFirstChild("Humanoid") end
 
-function UI.MakeCorner(parent, radius)
-    local corner = Instance.new("UICorner", parent)
-    corner.CornerRadius = radius or THEME.Radius
-    return corner
-end
-
-function UI.MakeStroke(parent, color, thickness)
-    local stroke = Instance.new("UIStroke", parent)
-    stroke.Color = color or THEME.Stroke
-    stroke.Thickness = thickness or 1
-    return stroke
-end
-
-function UI.MakeDrag(gui)
-    local dragToggle, dragStart, startPos
+function Utils.MakeDrag(gui)
+    local dragging, dragStart, startPos
     gui.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragToggle = true; dragStart = input.Position; startPos = gui.Position
-            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end)
-        end
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        dragging = true; dragStart = input.Position; startPos = gui.Position
+        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
     end)
     gui.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            local dragInput = input
-            Services.UserInputService.InputChanged:Connect(function(inputCheck)
-                if inputCheck == dragInput and dragToggle then
-                    local delta = inputCheck.Position - dragStart
-                    gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-                end
-            end)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + (input.Position.X - dragStart.X), startPos.Y.Scale, startPos.Y.Offset + (input.Position.Y - dragStart.Y))
         end
     end)
 end
 
-function UI.Notify(title, text, color)
-    color = color or THEME.Accent
-    local container = ScreenGui:FindFirstChild("NotifyContainer")
-    if not container then
-        container = Instance.new("Frame", ScreenGui)
-        container.Name = "NotifyContainer"
-        container.Size = UDim2.new(0, 220, 0.5, 0)
-        container.Position = UDim2.new(1, -20, 1, -20)
-        container.AnchorPoint = Vector2.new(1, 1)
-        container.BackgroundTransparency = 1
-        local layout = Instance.new("UIListLayout", container)
-        layout.FillDirection = Enum.FillDirection.Vertical
-        layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-        layout.Padding = UDim.new(0, 8)
+function Utils.FindPlayer(nameStr)
+    nameStr = nameStr:lower()
+    for _, p in pairs(Services.Players:GetPlayers()) do
+        if p ~= LocalPlayer and (p.Name:lower():match("^"..nameStr) or p.DisplayName:lower():match("^"..nameStr)) then return p end
+    end
+    return nil
+end
+
+-- ====================================================
+-- [ 3. CORE MODIFICATIONS ]
+-- ====================================================
+local CoreMods = {}
+
+function CoreMods.OptimizeObj(v)
+    pcall(function()
+        local cName = v.ClassName
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic; v.Reflectance = 0; v.CastShadow = false
+            local isCore = (v.Name == "HumanoidRootPart" or v.Name == "Head" or v:IsDescendantOf(LocalPlayer.Character))
+            if not isCore then v.CanTouch = false; v.CanQuery = false end
+            if v.Transparency > 0.5 or v.Name == "Water" then v.Transparency = 1 end
+            if v:IsA("MeshPart") then v.TextureID = "" end
+        elseif TRASH_FX[cName] then v:Destroy()
+        elseif CULL_ENTITIES[cName] and v.Parent ~= LocalPlayer.Character then v:Destroy() end
+    end)
+end
+
+function CoreMods.SetSuperBoost(enable)
+    State.SuperBoost = enable
+    if not enable then 
+        if Connections.Boost then Connections.Boost:Disconnect() end
+        return 
+    end
+
+    if setfpscap then setfpscap(9999) end
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+    
+    pcall(function()
+        Services.Lighting.GlobalShadows = false
+        for _, v in pairs(Services.Lighting:GetChildren()) do 
+            if not v:IsA("PostEffect") and not v:IsA("Atmosphere") and not v:IsA("Sky") then return end
+            v:Destroy() 
+        end
+        local t = Services.Workspace.Terrain
+        t.WaterWaveSize = 0; t.WaterWaveSpeed = 0; t.WaterReflectance = 0; sethiddenproperty(t, "Decoration", false)
+        Services.Workspace.GlobalWind = Vector3.zero
+    end)
+
+    for _, v in pairs(Services.Workspace:GetDescendants()) do CoreMods.OptimizeObj(v) end
+    if Connections.Boost then Connections.Boost:Disconnect() end
+    Connections.Boost = Services.Workspace.DescendantAdded:Connect(function(v) task.wait(); CoreMods.OptimizeObj(v) end)
+end
+
+function CoreMods.CleanRodVisuals(t)
+    task.wait()
+    for _, v in pairs(t:GetDescendants()) do
+        if TRASH_FX[v.ClassName] then v:Destroy()
+        elseif v:IsA("BasePart") then v.Transparency = 1; v.CanCollide = false; v.CastShadow = false end
+    end
+end
+
+function CoreMods.SetGhostRod(enable)
+    State.HideRod = enable; getgenv().RemoveRodEnabled = enable
+    if Connections.GhostRod then Connections.GhostRod:Disconnect() end
+    if not enable then return end
+
+    local c = Utils.GetChar()
+    if not c then return end
+    
+    local t = c:FindFirstChild("!!!EQUIPPED_TOOL!!!") or c:FindFirstChildWhichIsA("Tool")
+    if t then CoreMods.CleanRodVisuals(t) end
+    
+    Connections.GhostRod = c.ChildAdded:Connect(function(ch)
+        if getgenv().RemoveRodEnabled and (ch:IsA("Tool") or ch.Name == "!!!EQUIPPED_TOOL!!!") then CoreMods.CleanRodVisuals(ch) end
+    end)
+end
+
+function CoreMods.SetStreamerMode(enable)
+    State.Streamer = enable
+    local SPOOF_TEXT = '<font color="#00ffff" face="GothamBold"><b>discord.gg/getseraphin</b></font>'
+    local function apply()
+        if not State.Streamer then return end
+        local c = LocalPlayer.Character
+        local lbl = c and c:WaitForChild("HumanoidRootPart", 5) and c.HumanoidRootPart:WaitForChild("Overhead", 5) and c.HumanoidRootPart.Overhead:FindFirstChild("Header", true)
+        if lbl then
+            lbl.RichText = true; lbl.Text = SPOOF_TEXT
+            if Connections.NameSpoof then Connections.NameSpoof:Disconnect() end
+            Connections.NameSpoof = lbl:GetPropertyChangedSignal("Text"):Connect(function() if lbl.Text ~= SPOOF_TEXT then lbl.Text = SPOOF_TEXT end end)
+        end
+    end
+    if enable then
+        apply()
+        if Connections.CharSpoof then Connections.CharSpoof:Disconnect() end
+        Connections.CharSpoof = LocalPlayer.CharacterAdded:Connect(function() task.wait(1); apply() end)
+    else
+        if Connections.CharSpoof then Connections.CharSpoof:Disconnect() end
+        if Connections.NameSpoof then Connections.NameSpoof:Disconnect() end
+    end
+    -- Chat hook
+    Services.TextChatService.OnIncomingMessage = function(msg)
+        if not State.Streamer then return nil end
+        local props = Instance.new("TextChatMessageProperties")
+        if msg.Text:match("caught") or msg.Text:match("obtained") then props.Text = msg.Text:gsub("^%S+", SPOOF_TEXT) end
+        if msg.TextSource then props.PrefixText = SPOOF_TEXT .. ": " end
+        return props
+    end
+end
+
+-- ====================================================
+-- [ 4. AUTO FARMING SYSTEM ]
+-- ====================================================
+local AutoFarm = {}
+
+function AutoFarm.MineZone(tpPos, folderPath)
+    local hrp = Utils.GetRoot()
+    hrp.CFrame = tpPos; hrp.Velocity = Vector3.zero; task.wait(3)
+    
+    while State.AutoMine and State.IsMining do
+        local nodes = {}
+        if folderPath then
+            for _, v in pairs(folderPath:GetChildren()) do
+                if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(nodes, v) end
+            end
+        end
+        if #nodes == 0 then break end
+        
+        local myPos = hrp.Position
+        table.sort(nodes, function(a, b) return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude end)
+        
+        for _, node in ipairs(nodes) do
+            if not State.IsMining then return end
+            local prompt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
+            if not prompt or not prompt.Parent then continue end
+            
+            hrp.CFrame = prompt.Parent.CFrame * CFrame.new(0, 0, 3)
+            hrp.Velocity = Vector3.zero
+            task.wait(1.5)
+            fireproximityprompt(prompt)
+            task.wait(2)
+        end
+        task.wait(1)
+    end
+end
+
+function AutoFarm.ExecuteMining()
+    local hrp = Utils.GetRoot()
+    if not hrp then return end
+    
+    State.MineReturn = hrp.CFrame
+    pcall(function() Net["RE/EquipToolFromHotbar"]:FireServer(2) end); task.wait(1.5)
+    
+    local isls = Services.Workspace:WaitForChild("Islands")
+    AutoFarm.MineZone(CFrame.new(860, 85, -10094), isls:WaitForChild("Lava Basin"):WaitForChild("Crystals"))
+    
+    if State.IsMining then 
+        task.wait(2)
+        AutoFarm.MineZone(CFrame.new(5820, -907, 15424), isls:WaitForChild("Crystal Depths"):WaitForChild("Crystals")) 
     end
     
-    local f = Instance.new("Frame", container)
-    f.Size = UDim2.new(1, 0, 0, 45)
-    f.BackgroundColor3 = THEME.BgMain
-    UI.MakeCorner(f)
-    UI.MakeStroke(f)
+    State.IsMining = false
+    if Utils.GetRoot() and State.MineReturn then Utils.GetRoot().CFrame = State.MineReturn end
+    pcall(function() Net["RE/EquipToolFromHotbar"]:FireServer(1) end)
+end
+
+function AutoFarm.RoutineCoral()
+    if not State.AutoCoral or State.IsMining or State.AutoRelic then return end
+    local spawns = Services.Workspace:FindFirstChild("!!! SEARCH ITEM SPAWNS")
+    local coralFolder = spawns and spawns:FindFirstChild("Coral")
+    if not coralFolder then return end
+
+    local corals = {}
+    for _, v in pairs(coralFolder:GetDescendants()) do
+        if v:IsA("ProximityPrompt") and v.Enabled then table.insert(corals, v) end
+    end
+    
+    local hrp = Utils.GetRoot()
+    if not hrp then return end
+
+    if #corals > 0 then
+        if not State.IsLootingCoral then
+            State.CoralReturn = hrp.CFrame; State.IsLootingCoral = true
+            if not State.HasTank then pcall(function() Net["RF/EquipOxygenTank"]:InvokeServer(105); State.HasTank = true end) end
+        end
+        for _, p in ipairs(corals) do
+            if not State.AutoCoral or State.IsMining then break end
+            if not p.Parent or not p.Enabled then continue end
+            
+            local tPos = p.Parent:IsA("Model") and p.Parent:GetPivot().Position or p.Parent.Position
+            hrp.CFrame = CFrame.new(tPos) + Vector3.new(0, 3, 0); hrp.Velocity = Vector3.zero
+            task.wait(0.6)
+            fireproximityprompt(p)
+            task.wait(1.5)
+        end
+    elseif State.IsLootingCoral and State.CoralReturn then
+        hrp.CFrame = State.CoralReturn; State.IsLootingCoral = false
+    end
+end
+
+function AutoFarm.RoutineRelic()
+    if not State.AutoRelic or State.IsMining then return end
+    local ev = Services.Workspace:FindFirstChild("LeviathanEvent")
+    local relics = ev and ev:FindFirstChild("Relics")
+    if not relics then return end
+
+    local hrp = Utils.GetRoot()
+    if not hrp then return end
+
+    for _, r in pairs(relics:GetChildren()) do
+        if not State.AutoRelic then break end
+        if not r.Name:match("Relic") then continue end
+        
+        if not State.HasTank then pcall(function() Net["RF/EquipOxygenTank"]:InvokeServer(575); State.HasTank = true end) end
+        for _, spot in ipairs(r:GetChildren()) do
+            local pt = spot:FindFirstChild("Part") or (spot:IsA("BasePart") and spot)
+            if not pt then continue end
+            hrp.CFrame = pt.CFrame + Vector3.new(0, 3, 0)
+            task.wait(0.8)
+            Net["RE/ClaimRelic"]:FireServer(r.Name)
+            task.wait(1.5)
+        end
+    end
+end
+
+function AutoFarm.RoutineEvent()
+    if not State.AutoEvent then return end
+    local hrp = Utils.GetRoot(); if not hrp then return end
+    local ev = nil
+    for _, f in pairs({Services.Workspace:FindFirstChild("ActiveEvents"), Services.Workspace:FindFirstChild("Props")}) do
+        if f and not ev then
+            for _, v in pairs(f:GetChildren()) do
+                for _, n in pairs(EventList) do if v.Name:match(n) then ev = v; break end end
+            end
+        end
+    end
+    
+    if ev then
+        if not State.IsInEvent then State.EventStart = hrp.CFrame; State.IsInEvent = true; State.WoW = true end
+        local dp = Vector3.new(ev:GetPivot().Position.X, 4, ev:GetPivot().Position.Z)
+        if (hrp.Position - dp).Magnitude > 5 then hrp.CFrame = CFrame.new(dp) end
+    else
+        if State.IsInEvent then
+            State.IsInEvent = false; State.WoW = false
+            if State.EventStart and hrp then hrp.CFrame = State.EventStart; State.EventStart = nil end
+        end
+    end
+end
+
+-- ====================================================
+-- [ 5. UI LIBRARY ]
+-- ====================================================
+local UILib = { Screen = nil, Notif = nil }
+
+function UILib.Init()
+    UILib.Screen = Instance.new("ScreenGui", Services.CoreGui)
+    UILib.Screen.Name = "SeraHelper"; UILib.Screen.ResetOnSpawn = false
+    
+    UILib.Notif = Instance.new("Frame", UILib.Screen)
+    UILib.Notif.Size = UDim2.new(0, 220, 0.5, 0); UILib.Notif.Position = UDim2.new(1, -20, 1, -20)
+    UILib.Notif.AnchorPoint = Vector2.new(1, 1); UILib.Notif.BackgroundTransparency = 1
+    local nl = Instance.new("UIListLayout", UILib.Notif)
+    nl.FillDirection = Enum.FillDirection.Vertical; nl.VerticalAlignment = Enum.VerticalAlignment.Bottom; nl.Padding = UDim.new(0, 6)
+end
+
+function UILib.Notify(title, text, color)
+    color = color or THEME.Accent
+    local f = Instance.new("Frame", UILib.Notif)
+    f.Size = UDim2.new(1, 0, 0, 42); f.BackgroundColor3 = THEME.BgMain
+    Instance.new("UICorner", f).CornerRadius = THEME.Radius; local s = Instance.new("UIStroke", f); s.Color = THEME.Stroke
     
     local bar = Instance.new("Frame", f)
-    bar.Size = UDim2.new(0, 4, 1, -12)
-    bar.Position = UDim2.new(0, 6, 0, 6)
-    bar.BackgroundColor3 = color
-    UI.MakeCorner(bar, UDim.new(1, 0))
+    bar.Size = UDim2.new(0, 4, 1, -12); bar.Position = UDim2.new(0, 6, 0, 6); bar.BackgroundColor3 = color
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
     
-    local lTitle = Instance.new("TextLabel", f)
-    lTitle.Size = UDim2.new(1, -20, 0, 15)
-    lTitle.Position = UDim2.new(0, 16, 0, 6)
-    lTitle.BackgroundTransparency = 1
-    lTitle.Text = title:upper()
-    lTitle.TextColor3 = color
-    lTitle.Font = THEME.FontBold
-    lTitle.TextSize = 11
-    lTitle.TextXAlignment = Enum.TextXAlignment.Left
+    local t1 = Instance.new("TextLabel", f)
+    t1.Size = UDim2.new(1, -20, 0, 14); t1.Position = UDim2.new(0, 16, 0, 6); t1.BackgroundTransparency = 1
+    t1.Text = title:upper(); t1.TextColor3 = color; t1.Font = THEME.FontBold; t1.TextSize = 11; t1.TextXAlignment = 0
     
-    local lMsg = Instance.new("TextLabel", f)
-    lMsg.Size = UDim2.new(1, -20, 0, 15)
-    lMsg.Position = UDim2.new(0, 16, 0, 22)
-    lMsg.BackgroundTransparency = 1
-    lMsg.Text = text
-    lMsg.TextColor3 = THEME.TextMain
-    lMsg.Font = THEME.FontMain
-    lMsg.TextSize = 10
-    lMsg.TextXAlignment = Enum.TextXAlignment.Left
+    local t2 = Instance.new("TextLabel", f)
+    t2.Size = UDim2.new(1, -20, 0, 14); t2.Position = UDim2.new(0, 16, 0, 22); t2.BackgroundTransparency = 1
+    t2.Text = text; t2.TextColor3 = THEME.TextMain; t2.Font = THEME.FontMain; t2.TextSize = 10; t2.TextXAlignment = 0
 
     f.Position = UDim2.new(1.5, 0, 0, 0)
     Services.TweenService:Create(f, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
     
-    task.delay(3.5, function()
+    task.delay(3, function()
         if not f then return end
-        local tw = Services.TweenService:Create(f, TweenInfo.new(0.3), {BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0)})
-        for _, v in pairs(f:GetDescendants()) do
+        Services.TweenService:Create(f, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+        for _, v in pairs(f:GetChildren()) do
             if v:IsA("TextLabel") then Services.TweenService:Create(v, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-            elseif v:IsA("Frame") then Services.TweenService:Create(v, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
-            elseif v:IsA("UIStroke") then Services.TweenService:Create(v, TweenInfo.new(0.2), {Transparency = 1}):Play() end
+            else Services.TweenService:Create(v, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play() end
         end
-        tw:Play()
-        tw.Completed:Wait()
-        f:Destroy()
+        Services.TweenService:Create(s, TweenInfo.new(0.2), {Transparency = 1}):Play()
+        task.wait(0.3); f:Destroy()
     end)
 end
 
-function UI.CreateButton(parent, text, callback)
+function UILib.Button(parent, text, cb)
     local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(0.95, 0, 0, 28)
-    btn.BackgroundColor3 = THEME.BgElement
-    btn.Text = text
-    btn.TextColor3 = THEME.TextMain
-    btn.Font = THEME.FontBold
-    btn.TextSize = 10
-    btn.AutoButtonColor = true
-    UI.MakeCorner(btn)
-    UI.MakeStroke(btn)
-    
+    btn.Size = UDim2.new(0.98, 0, 0, 30); btn.BackgroundColor3 = THEME.BgElement
+    btn.Text = text; btn.TextColor3 = THEME.TextMain; btn.Font = THEME.FontBold; btn.TextSize = 10
+    Instance.new("UICorner", btn).CornerRadius = THEME.Radius; Instance.new("UIStroke", btn).Color = THEME.Stroke
     btn.MouseButton1Click:Connect(function()
-        Services.TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = THEME.Accent}):Play()
-        task.wait(0.1)
-        Services.TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = THEME.BgElement}):Play()
-        if callback then pcall(callback) end
+        Services.TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = THEME.Accent, TextColor3 = Color3.new(0,0,0)}):Play()
+        task.wait(0.1); Services.TweenService:Create(btn, TweenInfo.new(0.3), {BackgroundColor3 = THEME.BgElement, TextColor3 = THEME.TextMain}):Play()
+        if cb then pcall(cb) end
     end)
     return btn
 end
 
-function UI.CreateToggle(parent, text, default, callback)
+function UILib.Toggle(parent, text, default, cb)
     local f = Instance.new("Frame", parent)
-    f.Size = UDim2.new(0.95, 0, 0, 28)
-    f.BackgroundColor3 = THEME.BgElement
-    UI.MakeCorner(f)
-    UI.MakeStroke(f)
+    f.Size = UDim2.new(0.98, 0, 0, 30); f.BackgroundColor3 = THEME.BgElement
+    Instance.new("UICorner", f).CornerRadius = THEME.Radius; Instance.new("UIStroke", f).Color = THEME.Stroke
     
     local lbl = Instance.new("TextLabel", f)
-    lbl.Size = UDim2.new(0.7, 0, 1, 0)
-    lbl.Position = UDim2.new(0, 10, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = THEME.TextMain
-    lbl.Font = THEME.FontMain
-    lbl.TextSize = 10
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Size = UDim2.new(0.7, 0, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0); lbl.BackgroundTransparency = 1
+    lbl.Text = text; lbl.TextColor3 = THEME.TextMain; lbl.Font = THEME.FontMain; lbl.TextSize = 11; lbl.TextXAlignment = 0
     
     local tBtn = Instance.new("TextButton", f)
-    tBtn.Size = UDim2.new(0, 30, 0, 14)
-    tBtn.Position = UDim2.new(1, -40, 0.5, -7)
-    tBtn.BackgroundColor3 = default and THEME.Accent or THEME.AccentOff
-    tBtn.Text = ""
-    UI.MakeCorner(tBtn, UDim.new(1, 0))
+    tBtn.Size = UDim2.new(0, 34, 0, 16); tBtn.Position = UDim2.new(1, -44, 0.5, -8)
+    tBtn.BackgroundColor3 = default and THEME.Accent or THEME.AccentOff; tBtn.Text = ""
+    Instance.new("UICorner", tBtn).CornerRadius = UDim.new(1, 0)
     
     local circle = Instance.new("Frame", tBtn)
-    circle.Size = UDim2.new(0, 10, 0, 10)
-    circle.Position = default and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)
-    circle.BackgroundColor3 = Color3.new(1,1,1)
-    UI.MakeCorner(circle, UDim.new(1, 0))
+    circle.Size = UDim2.new(0, 12, 0, 12); circle.Position = default and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+    circle.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
     
-    local isOn = default
-    local debounce = false
+    local isOn = default; local db = false
     tBtn.MouseButton1Click:Connect(function()
-        if debounce then return end
-        debounce = true
-        isOn = not isOn
-        
-        local twInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        if isOn then
-            Services.TweenService:Create(tBtn, twInfo, {BackgroundColor3 = THEME.Accent}):Play()
-            Services.TweenService:Create(circle, twInfo, {Position = UDim2.new(1, -12, 0.5, -5)}):Play()
-        else
-            Services.TweenService:Create(tBtn, twInfo, {BackgroundColor3 = THEME.AccentOff}):Play()
-            Services.TweenService:Create(circle, twInfo, {Position = UDim2.new(0, 2, 0.5, -5)}):Play()
-        end
-        if callback then pcall(callback, isOn) end
-        task.wait(0.2)
-        debounce = false
+        if db then return end; db = true; isOn = not isOn
+        Services.TweenService:Create(tBtn, TweenInfo.new(0.2), {BackgroundColor3 = isOn and THEME.Accent or THEME.AccentOff}):Play()
+        Services.TweenService:Create(circle, TweenInfo.new(0.2), {Position = isOn and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)}):Play()
+        if cb then pcall(cb, isOn) end
+        task.wait(0.2); db = false
     end)
-    return f
 end
 
-function UI.CreateDropdown(parent, titleText, options, callback)
-    local container = Instance.new("Frame", parent)
-    container.Size = UDim2.new(0.95, 0, 0, 28)
-    container.BackgroundTransparency = 1
-    container.ClipsDescendants = true
+function UILib.ActionInput(parent, btnText, btnColor, cb)
+    local f = Instance.new("Frame", parent)
+    f.Size = UDim2.new(0.98, 0, 0, 30); f.BackgroundTransparency = 1
     
-    local btn = UI.CreateButton(container, titleText .. " >")
-    btn.Size = UDim2.new(1, 0, 0, 28)
+    local box = Instance.new("TextBox", f)
+    box.Size = UDim2.new(0.3, 0, 1, 0); box.BackgroundColor3 = THEME.BgMain
+    box.Text = "1"; box.PlaceholderText = "Qty"; box.TextColor3 = THEME.TextMain; box.Font = THEME.FontMain; box.TextSize = 12
+    Instance.new("UICorner", box).CornerRadius = THEME.Radius; Instance.new("UIStroke", box).Color = THEME.Stroke
     
-    local listFrm = Instance.new("ScrollingFrame", container)
-    listFrm.Size = UDim2.new(1, 0, 1, -32)
-    listFrm.Position = UDim2.new(0, 0, 0, 32)
-    listFrm.BackgroundColor3 = THEME.BgMain
-    listFrm.ScrollBarThickness = 2
-    listFrm.BorderSizePixel = 0
-    UI.MakeCorner(listFrm)
-    UI.MakeStroke(listFrm)
+    local btn = Instance.new("TextButton", f)
+    btn.Size = UDim2.new(0.65, 0, 1, 0); btn.Position = UDim2.new(0.35, 0, 0, 0)
+    btn.BackgroundColor3 = btnColor; btn.Text = btnText; btn.TextColor3 = Color3.new(1,1,1); btn.Font = THEME.FontBold; btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = THEME.Radius
     
-    local listLayout = Instance.new("UIListLayout", listFrm)
-    listLayout.Padding = UDim.new(0, 4)
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    btn.MouseButton1Click:Connect(function()
+        local q = tonumber(box.Text) or 1; if q < 1 then q = 1 end
+        if cb then pcall(cb, q) end
+    end)
+end
+
+function UILib.Dropdown(parent, title, options, cb)
+    local c = Instance.new("Frame", parent)
+    c.Size = UDim2.new(0.98, 0, 0, 30); c.BackgroundTransparency = 1; c.ClipsDescendants = true
+    local btn = UILib.Button(c, title .. " ▼")
     
-    local isOpen = false
-    local baseHeight = 28
-    local itemHeight = 26
-    local maxDisplay = math.min(#options, 4)
-    local openHeight = baseHeight + 4 + (maxDisplay * itemHeight)
+    local list = Instance.new("ScrollingFrame", c)
+    list.Size = UDim2.new(1, 0, 1, -34); list.Position = UDim2.new(0, 0, 0, 34); list.BackgroundColor3 = THEME.BgMain
+    list.ScrollBarThickness = 2; list.BorderSizePixel = 0; Instance.new("UICorner", list).CornerRadius = THEME.Radius
+    Instance.new("UIStroke", list).Color = THEME.Stroke
+    local lyt = Instance.new("UIListLayout", list); lyt.Padding = UDim.new(0, 4); lyt.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    
+    local isOpen = false; local openH = 36 + (math.min(#options, 4) * 26)
     
     btn.MouseButton1Click:Connect(function()
         isOpen = not isOpen
-        local targetSize = isOpen and UDim2.new(0.95, 0, 0, openHeight) or UDim2.new(0.95, 0, 0, baseHeight)
-        Services.TweenService:Create(container, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+        Services.TweenService:Create(c, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0.98, 0, 0, isOpen and openH or 30)}):Play()
     end)
     
     for _, opt in ipairs(options) do
-        local iBtn = Instance.new("TextButton", listFrm)
-        iBtn.Size = UDim2.new(0.95, 0, 0, 24)
-        iBtn.BackgroundColor3 = THEME.BgElement
-        iBtn.Text = opt
-        iBtn.TextColor3 = THEME.TextMain
-        iBtn.Font = THEME.FontMain
-        iBtn.TextSize = 10
-        UI.MakeCorner(iBtn)
-        
-        iBtn.MouseButton1Click:Connect(function()
-            isOpen = false
-            btn.Text = titleText .. ": " .. opt
-            Services.TweenService:Create(container, TweenInfo.new(0.2), {Size = UDim2.new(0.95, 0, 0, baseHeight)}):Play()
-            if callback then pcall(callback, opt) end
+        local ib = Instance.new("TextButton", list)
+        ib.Size = UDim2.new(0.95, 0, 0, 26); ib.BackgroundColor3 = THEME.BgElement
+        ib.Text = opt; ib.TextColor3 = THEME.TextMain; ib.Font = THEME.FontMain; ib.TextSize = 10
+        Instance.new("UICorner", ib).CornerRadius = UDim.new(0, 4)
+        ib.MouseButton1Click:Connect(function()
+            isOpen = false; btn.Text = title .. ": " .. opt
+            Services.TweenService:Create(c, TweenInfo.new(0.2), {Size = UDim2.new(0.98, 0, 0, 30)}):Play()
+            if cb then pcall(cb, opt) end
         end)
     end
-    listFrm.CanvasSize = UDim2.new(0, 0, 0, #options * itemHeight)
+    list.CanvasSize = UDim2.new(0, 0, 0, #options * 30)
+end
+
+function UILib.ToggleInput(parent, text, dToggle, dInput, pHolder, toggleCB, inputCB)
+    local f = Instance.new("Frame", parent)
+    f.Size = UDim2.new(0.98, 0, 0, 30); f.BackgroundColor3 = THEME.BgElement
+    Instance.new("UICorner", f).CornerRadius = THEME.Radius; Instance.new("UIStroke", f).Color = THEME.Stroke
     
-    return container
+    local tBtn = Instance.new("TextButton", f)
+    tBtn.Size = UDim2.new(0.55, 0, 1, 0); tBtn.BackgroundTransparency = 1
+    tBtn.Text = text .. ": " .. (dToggle and "ON" or "OFF"); tBtn.TextColor3 = dToggle and THEME.Accent or THEME.TextMain
+    tBtn.Font = THEME.FontBold; tBtn.TextSize = 11
+    
+    local box = Instance.new("TextBox", f)
+    box.Size = UDim2.new(0.4, 0, 0.8, 0); box.Position = UDim2.new(0.55, 0, 0.1, 0)
+    box.BackgroundColor3 = THEME.BgMain; box.Text = dInput; box.PlaceholderText = pHolder
+    box.TextColor3 = THEME.TextMain; box.Font = THEME.FontMain; box.TextSize = 11
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4); Instance.new("UIStroke", box).Color = THEME.Stroke
+
+    local isOn = dToggle
+    tBtn.MouseButton1Click:Connect(function()
+        isOn = not isOn; tBtn.Text = text .. ": " .. (isOn and "ON" or "OFF"); tBtn.TextColor3 = isOn and THEME.Accent or THEME.TextMain
+        if toggleCB then pcall(toggleCB, isOn) end
+    end)
+    box.FocusLost:Connect(function() if inputCB then pcall(inputCB, box.Text) end end)
 end
 
 -- ====================================================
--- [4] MINI HUD & MONITOR (DIOPTIMALKAN)
+-- [ 6. BUILD UI INTERFACE ]
 -- ====================================================
-local Monitor = Instance.new("Frame", ScreenGui)
-Monitor.Size = UDim2.new(0, 180, 0, 24)
-Monitor.Position = UDim2.new(0.5, -90, 0, 10)
-Monitor.BackgroundColor3 = THEME.BgMain
-UI.MakeCorner(Monitor)
-UI.MakeStroke(Monitor)
-UI.MakeDrag(Monitor)
+UILib.Init()
 
-local LblMon = Instance.new("TextLabel", Monitor)
-LblMon.Size = UDim2.new(1, 0, 1, 0)
-LblMon.BackgroundTransparency = 1
-LblMon.Text = "FPS: -- | CPU: --"
-LblMon.TextColor3 = THEME.Accent
-LblMon.Font = THEME.FontBold
-LblMon.TextSize = 10
+-- // MINI MONITORS
+local MonitorHUD = Instance.new("Frame", UILib.Screen)
+MonitorHUD.Size = UDim2.new(0, 180, 0, 24); MonitorHUD.Position = UDim2.new(0.5, -90, 0, 10); MonitorHUD.BackgroundColor3 = THEME.BgMain
+Instance.new("UICorner", MonitorHUD).CornerRadius = THEME.Radius; Instance.new("UIStroke", MonitorHUD).Color = THEME.Stroke
+Utils.MakeDrag(MonitorHUD)
+local MonLabel = Instance.new("TextLabel", MonitorHUD)
+MonLabel.Size = UDim2.new(1, 0, 1, 0); MonLabel.BackgroundTransparency = 1; MonLabel.TextColor3 = THEME.Accent; MonLabel.Font = THEME.FontBold; MonLabel.TextSize = 10
 
-local FloatHUD = Instance.new("Frame", ScreenGui)
-FloatHUD.Size = UDim2.new(0, 150, 0, 75)
-FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0)
-FloatHUD.AnchorPoint = Vector2.new(0.5, 0)
-FloatHUD.BackgroundColor3 = THEME.BgMain
-FloatHUD.Visible = false
-UI.MakeCorner(FloatHUD)
-UI.MakeStroke(FloatHUD)
-UI.MakeDrag(FloatHUD)
-
-local LytHUD = Instance.new("UIListLayout", FloatHUD)
-LytHUD.HorizontalAlignment = Enum.HorizontalAlignment.Center
-LytHUD.Padding = UDim.new(0, 2)
+local FloatHUD = Instance.new("Frame", UILib.Screen)
+FloatHUD.Size = UDim2.new(0, 150, 0, 85); FloatHUD.Position = UDim2.new(0.5, 0, 0.35, 0); FloatHUD.AnchorPoint = Vector2.new(0.5, 0); FloatHUD.BackgroundColor3 = THEME.BgMain
+Instance.new("UICorner", FloatHUD).CornerRadius = THEME.Radius; Instance.new("UIStroke", FloatHUD).Color = THEME.Stroke
+Utils.MakeDrag(FloatHUD)
+local FLyt = Instance.new("UIListLayout", FloatHUD)
+FLyt.HorizontalAlignment = Enum.HorizontalAlignment.Center; FLyt.Padding = UDim.new(0, 2)
 Instance.new("UIPadding", FloatHUD).PaddingTop = UDim.new(0, 8)
+local FTitle = Instance.new("TextLabel", FloatHUD)
+FTitle.Size = UDim2.new(1, 0, 0, 15); FTitle.BackgroundTransparency = 1; FTitle.Text = "SERAPHIN PANEL"; FTitle.TextColor3 = THEME.Accent; FTitle.Font = THEME.FontBold; FTitle.TextSize = 11
+local FDiv = Instance.new("Frame", FloatHUD)
+FDiv.Size = UDim2.new(0.8, 0, 0, 1); FDiv.BackgroundColor3 = THEME.Stroke; FDiv.BorderSizePixel = 0
 
-local LblTitleHUD = Instance.new("TextLabel", FloatHUD)
-LblTitleHUD.Size = UDim2.new(1, 0, 0, 15)
-LblTitleHUD.BackgroundTransparency = 1
-LblTitleHUD.Text = "SERAPHIN STATS"
-LblTitleHUD.TextColor3 = THEME.Accent
-LblTitleHUD.Font = THEME.FontBold
-LblTitleHUD.TextSize = 11
-
-local function AddStat(parent, title)
-    local f = Instance.new("Frame", parent)
-    f.Size = UDim2.new(1, 0, 0, 20)
-    f.BackgroundTransparency = 1
+local function AddStat(title)
+    local f = Instance.new("Frame", FloatHUD)
+    f.Size = UDim2.new(0.9, 0, 0, 24); f.BackgroundTransparency = 1
     local l1 = Instance.new("TextLabel", f)
-    l1.Size = UDim2.new(0.5, -5, 1, 0)
-    l1.Position = UDim2.new(0, 5, 0, 0)
-    l1.BackgroundTransparency = 1
-    l1.Text = title
-    l1.TextColor3 = THEME.TextSub
-    l1.Font = THEME.FontMain
-    l1.TextSize = 10
-    l1.TextXAlignment = Enum.TextXAlignment.Left
+    l1.Size = UDim2.new(0.5, 0, 1, 0); l1.BackgroundTransparency = 1; l1.Text = title; l1.TextColor3 = THEME.TextSub; l1.Font = THEME.FontBold; l1.TextSize = 10; l1.TextXAlignment = Enum.TextXAlignment.Left
     local l2 = Instance.new("TextLabel", f)
-    l2.Size = UDim2.new(0.5, -5, 1, 0)
-    l2.Position = UDim2.new(0.5, 0, 0, 0)
-    l2.BackgroundTransparency = 1
-    l2.Text = "-"
-    l2.TextColor3 = THEME.TextMain
-    l2.Font = THEME.FontBold
-    l2.TextSize = 10
-    l2.TextXAlignment = Enum.TextXAlignment.Right
+    l2.Size = UDim2.new(0.5, 0, 1, 0); l2.Position = UDim2.new(0.5, 0, 0, 0); l2.BackgroundTransparency = 1; l2.Text = "..."; l2.TextColor3 = THEME.TextMain; l2.Font = THEME.FontMain; l2.TextSize = 11; l2.TextXAlignment = Enum.TextXAlignment.Right
     return l2
 end
-local StatFish = AddStat(FloatHUD, "FISH:")
-local StatInv = AddStat(FloatHUD, "BAG:")
+local StatFish = AddStat("FISH"); local StatInv = AddStat("INVENTORY")
 
--- ====================================================
--- [5] MAIN UI DASHBOARD
--- ====================================================
-local MainGui = Instance.new("Frame", ScreenGui)
-MainGui.Size = UDim2.new(0, THEME.Width, 0, THEME.Height)
-MainGui.Position = UDim2.new(0, 50, 0.5, -THEME.Height/2)
-MainGui.BackgroundColor3 = THEME.BgMain
-MainGui.ClipsDescendants = true
-UI.MakeCorner(MainGui)
-UI.MakeStroke(MainGui)
-UI.MakeDrag(MainGui)
+-- // MAIN DASHBOARD
+local MainGui = Instance.new("Frame", UILib.Screen)
+MainGui.Size = UDim2.new(0, THEME.Width, 0, THEME.Height); MainGui.Position = UDim2.new(0.5, -THEME.Width/2, 0.5, -THEME.Height/2)
+MainGui.BackgroundColor3 = THEME.BgMain; MainGui.ClipsDescendants = true
+Instance.new("UICorner", MainGui).CornerRadius = THEME.Radius; Instance.new("UIStroke", MainGui).Color = THEME.Stroke
+Utils.MakeDrag(MainGui)
+
+local LogoBtn = Instance.new("TextButton", UILib.Screen)
+LogoBtn.Size = UDim2.new(0, 40, 0, 40); LogoBtn.Position = UDim2.new(0, 20, 0.5, -20); LogoBtn.BackgroundColor3 = THEME.BgMain; LogoBtn.Text = "S"; LogoBtn.TextColor3 = THEME.Accent; LogoBtn.Font = THEME.FontBold; LogoBtn.TextSize = 18; LogoBtn.Visible = false
+Instance.new("UICorner", LogoBtn).CornerRadius = THEME.Radius; Instance.new("UIStroke", LogoBtn).Color = THEME.Stroke
+Utils.MakeDrag(LogoBtn)
 
 local Header = Instance.new("Frame", MainGui)
-Header.Size = UDim2.new(1, 0, 0, 35)
-Header.BackgroundColor3 = THEME.BgSide
-UI.MakeCorner(Header)
-local TitleLabel = Instance.new("TextLabel", Header)
-TitleLabel.Size = UDim2.new(1, -20, 1, 0)
-TitleLabel.Position = UDim2.new(0, 15, 0, 0)
-TitleLabel.BackgroundTransparency = 1
-TitleLabel.Text = "SERAPHIN <font color='#00ffc8'>ULTIMATE</font>"
-TitleLabel.RichText = true
-TitleLabel.TextColor3 = THEME.TextMain
-TitleLabel.Font = THEME.FontBold
-TitleLabel.TextSize = 14
-TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+Header.Size = UDim2.new(1, 0, 0, 35); Header.BackgroundColor3 = THEME.BgSide
+local HTitle = Instance.new("TextLabel", Header)
+HTitle.Size = UDim2.new(1, -50, 1, 0); HTitle.Position = UDim2.new(0, 15, 0, 0); HTitle.BackgroundTransparency = 1
+HTitle.Text = "SERAPHIN <font color='#00ffc8'>ULTIMATE</font>"; HTitle.RichText = true; HTitle.TextColor3 = THEME.TextMain
+HTitle.Font = THEME.FontBold; HTitle.TextSize = 14; HTitle.TextXAlignment = 0
+
+local HideBtn = Instance.new("TextButton", Header)
+HideBtn.Size = UDim2.new(0, 25, 0, 25); HideBtn.Position = UDim2.new(1, -35, 0.5, -5); HideBtn.BackgroundColor3 = THEME.BgElement
+HideBtn.Text = "-"; HideBtn.TextColor3 = THEME.TextMain; HideBtn.Font = THEME.FontBold
+Instance.new("UICorner", HideBtn).CornerRadius = UDim.new(0, 4)
+HideBtn.MouseButton1Click:Connect(function() MainGui.Visible = false; LogoBtn.Visible = true end)
+LogoBtn.MouseButton1Click:Connect(function() MainGui.Visible = true; LogoBtn.Visible = false end)
 
 local Sidebar = Instance.new("Frame", MainGui)
-Sidebar.Size = UDim2.new(0, 100, 1, -35)
-Sidebar.Position = UDim2.new(0, 0, 0, 35)
-Sidebar.BackgroundColor3 = THEME.BgSide
-local SideLyt = Instance.new("UIListLayout", Sidebar)
-SideLyt.Padding = UDim.new(0, 5)
-SideLyt.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Sidebar.Size = UDim2.new(0, 110, 1, -35); Sidebar.Position = UDim2.new(0, 0, 0, 35); Sidebar.BackgroundColor3 = THEME.BgSide
+local SideLyt = Instance.new("UIListLayout", Sidebar); SideLyt.Padding = UDim.new(0, 5); SideLyt.HorizontalAlignment = 1
 Instance.new("UIPadding", Sidebar).PaddingTop = UDim.new(0, 10)
 
 local PageArea = Instance.new("Frame", MainGui)
-PageArea.Size = UDim2.new(1, -110, 1, -45)
-PageArea.Position = UDim2.new(0, 105, 0, 40)
-PageArea.BackgroundTransparency = 1
+PageArea.Size = UDim2.new(1, -120, 1, -45); PageArea.Position = UDim2.new(0, 115, 0, 40); PageArea.BackgroundTransparency = 1
 
-local Tabs = {}
-local Pages = {}
-
-local function CreateTab(name, iconText)
+local Tabs, Pages = {}, {}
+local function CreateTab(name, icon)
     local btn = Instance.new("TextButton", Sidebar)
-    btn.Size = UDim2.new(0.85, 0, 0, 28)
-    btn.BackgroundColor3 = THEME.BgMain
-    btn.Text = iconText .. " " .. name
-    btn.TextColor3 = THEME.TextSub
-    btn.Font = THEME.FontBold
-    btn.TextSize = 10
-    UI.MakeCorner(btn)
+    btn.Size = UDim2.new(0.85, 0, 0, 30); btn.BackgroundColor3 = THEME.BgMain
+    btn.Text = icon.."  "..name; btn.TextColor3 = THEME.TextSub; btn.Font = THEME.FontBold; btn.TextSize = 11
+    Instance.new("UICorner", btn).CornerRadius = THEME.Radius
     
-    local page = Instance.new("ScrollingFrame", PageArea)
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.ScrollBarThickness = 2
-    page.Visible = false
-    page.BorderSizePixel = 0
+    local pg = Instance.new("ScrollingFrame", PageArea)
+    pg.Size = UDim2.new(1, 0, 1, 0); pg.BackgroundTransparency = 1; pg.ScrollBarThickness = 2; pg.BorderSizePixel = 0; pg.Visible = false
+    local lyt = Instance.new("UIListLayout", pg); lyt.Padding = UDim.new(0, 6)
     
-    local layout = Instance.new("UIGridLayout", page)
-    layout.CellSize = UDim2.new(0.48, 0, 0, 28)
-    layout.CellPadding = UDim2.new(0, 8, 0, 8)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    
-    Tabs[name] = btn
-    Pages[name] = page
-    
+    Tabs[name] = btn; Pages[name] = pg
     btn.MouseButton1Click:Connect(function()
-        for tName, tBtn in pairs(Tabs) do
-            tBtn.TextColor3 = THEME.TextSub
-            tBtn.BackgroundColor3 = THEME.BgMain
-            Pages[tName].Visible = false
-        end
-        btn.TextColor3 = THEME.Accent
-        btn.BackgroundColor3 = THEME.BgElement
-        page.Visible = true
+        for n, b in pairs(Tabs) do b.TextColor3 = THEME.TextSub; b.BackgroundColor3 = THEME.BgMain; Pages[n].Visible = false end
+        btn.TextColor3 = THEME.Accent; btn.BackgroundColor3 = THEME.BgElement; pg.Visible = true
     end)
-    return page
+    return pg
 end
 
-local PgMain   = CreateTab("Main", "⚡")
-local PgFarm   = CreateTab("Farm", "⛏️")
-local PgShop   = CreateTab("Shop", "🛒")
+local PgMain = CreateTab("Main", "⚡")
+local PgFarm = CreateTab("Farm/Event", "⛏️")
+local PgShop = CreateTab("Shop", "🛒")
 local PgPlayer = CreateTab("Player", "👤")
+local PgMisc = CreateTab("Misc", "⚙️")
 
--- Initialize First Tab
-Tabs["Main"].TextColor3 = THEME.Accent
-Tabs["Main"].BackgroundColor3 = THEME.BgElement
-Pages["Main"].Visible = true
+Tabs["Main"].TextColor3 = THEME.Accent; Tabs["Main"].BackgroundColor3 = THEME.BgElement; Pages["Main"].Visible = true
 
 -- ====================================================
--- [6] GLOBAL STATES & LOGIC
--- ====================================================
-local States = {
-    SuperBoost = false, Noclip = false, HideRod = false, WoW = false,
-    AutoMine = false, IsMining = false,
-    AutoCoral = false, IsLootingCoral = false, CoralReturn = nil,
-    AutoRelic = false,
-    AutoEvent = false, IsInEvent = false, EventStart = nil,
-    Speed = false, NoDmg = false, AutoEquip = false,
-    Streamer = false, AnimSkin = "Off",
-    HasTank = false,
-    MineReturn = nil
-}
-local Connections = {}
-local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt", "Megalodon Hunt"}
-
--- // LOGIC: GHOST ROD (HIDE ROD)
-getgenv().RemoveRodEnabled = false
-local function ApplyGhostRod(tool)
-    task.wait()
-    for _, obj in pairs(tool:GetDescendants()) do
-        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Light") or obj:IsA("Fire") or obj:IsA("Sparkles") then
-            obj:Destroy()
-        elseif obj:IsA("BasePart") or obj:IsA("MeshPart") then
-            obj.Transparency = 1
-            obj.CanCollide = false
-            obj.CastShadow = false
-        elseif obj:IsA("Texture") or obj:IsA("Decal") then
-            obj:Destroy()
-        end
-    end
-end
-
-local function SetHideRod(val)
-    States.HideRod = val
-    getgenv().RemoveRodEnabled = val
-    if val then
-        local char = GetChar()
-        if char then
-            local t = char:FindFirstChild("!!!EQUIPPED_TOOL!!!") or char:FindFirstChildWhichIsA("Tool")
-            if t then ApplyGhostRod(t) end
-            if Connections.GhostRod then Connections.GhostRod:Disconnect() end
-            Connections.GhostRod = char.ChildAdded:Connect(function(c)
-                if getgenv().RemoveRodEnabled and (c:IsA("Tool") or c.Name == "!!!EQUIPPED_TOOL!!!") then
-                    ApplyGhostRod(c)
-                end
-            end)
-        end
-        UI.Notify("MAIN", "Ghost Rod Active", THEME.Accent)
-    else
-        if Connections.GhostRod then Connections.GhostRod:Disconnect() end
-    end
-end
-
--- // LOGIC: SUPER CPU BOOSTER (MAXIMUM CULLING)
-local BoostConn = nil
-local function SuperOptimize(v)
-    pcall(function()
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-            v.CastShadow = false
-            
-            -- [SUPER CULLING] Matikan hitbox map agar CPU tidak perlu kalkulasi
-            if not v:IsDescendantOf(Player.Character) and v.Name ~= "HumanoidRootPart" and v.Name ~= "Head" then
-                v.CanTouch = false
-                v.CanQuery = false
-            end
-            
-            if v.Transparency > 0.5 then v.Transparency = 1 end
-            if v.Name == "Water" then v.Transparency = 1 end
-            if v:IsA("MeshPart") then v.TextureID = "" end
-            
-        elseif v:IsA("Decal") or v:IsA("Texture") or v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Light") or v:IsA("Sparkles") or v:IsA("Fire") or v:IsA("Smoke") then
-            v:Destroy()
-            
-        elseif v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("CharacterMesh") then
-            -- Hapus baju & aksesoris orang lain
-            if v.Parent and v.Parent ~= Player.Character then
-                v:Destroy()
-            end
-        end
-    end)
-end
-
-local function SetSuperBoost(val)
-    States.SuperBoost = val
-    if val then
-        if setfpscap then setfpscap(9999) end
-        pcall(function()
-            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-            UserSettings():GetService("UserGameSettings").SavedQualityLevel = Enum.SavedQualityLevel.QualityLevel1
-        end)
-        
-        pcall(function()
-            local l = Services.Lighting
-            l.GlobalShadows = false
-            for _, v in pairs(l:GetChildren()) do
-                if v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky") then v:Destroy() end
-            end
-        end)
-        
-        pcall(function()
-            local t = Services.Workspace.Terrain
-            t.WaterWaveSize = 0; t.WaterWaveSpeed = 0; t.WaterReflectance = 0
-            sethiddenproperty(t, "Decoration", false)
-            Services.Workspace.GlobalWind = Vector3.zero
-        end)
-        
-        for _, v in pairs(Services.Workspace:GetDescendants()) do SuperOptimize(v) end
-        if BoostConn then BoostConn:Disconnect() end
-        BoostConn = Services.Workspace.DescendantAdded:Connect(function(v) task.wait(); SuperOptimize(v) end)
-        
-        UI.Notify("BOOST", "SUPER OPTIMIZATION: ON", Color3.fromRGB(0, 255, 100))
-    else
-        if BoostConn then BoostConn:Disconnect() end
-        UI.Notify("BOOST", "Disabled (Rejoin to reset map)", Color3.fromRGB(255, 100, 100))
-    end
-end
-
--- // LOGIC: STREAMER MODE
-local NameSpoofConn, CharSpoofConn = nil, nil
-local SPOOF_TEXT = '<font color="#00ffff" face="GothamBold"><b>discord.gg/getseraphin</b></font>'
-
-local function ApplySpoof()
-    if not States.Streamer then return end
-    local char = Player.Character
-    if char then
-        local hrp = char:WaitForChild("HumanoidRootPart", 5)
-        local oh = hrp and hrp:WaitForChild("Overhead", 5)
-        local lbl = oh and oh:FindFirstChild("Header", true)
-        if lbl then
-            lbl.RichText = true
-            lbl.Text = SPOOF_TEXT
-            if NameSpoofConn then NameSpoofConn:Disconnect() end
-            NameSpoofConn = lbl:GetPropertyChangedSignal("Text"):Connect(function()
-                if lbl.Text ~= SPOOF_TEXT then lbl.Text = SPOOF_TEXT end
-            end)
-        end
-    end
-end
-
-local function SetStreamer(val)
-    States.Streamer = val
-    if val then
-        ApplySpoof()
-        if CharSpoofConn then CharSpoofConn:Disconnect() end
-        CharSpoofConn = Player.CharacterAdded:Connect(function() task.wait(1); ApplySpoof() end)
-    else
-        if CharSpoofConn then CharSpoofConn:Disconnect() end
-        if NameSpoofConn then NameSpoofConn:Disconnect() end
-    end
-end
-
-Services.TextChatService.OnIncomingMessage = function(msg)
-    if not States.Streamer then return nil end
-    local props = Instance.new("TextChatMessageProperties")
-    local text = msg.Text
-    if string.find(text, "caught") or string.find(text, "obtained") then
-        local newText = string.gsub(text, "^%S+", SPOOF_TEXT)
-        props.Text = newText
-    end
-    if msg.TextSource then props.PrefixText = SPOOF_TEXT .. ": " end
-    return props
-end
-
--- ====================================================
--- [7] MENGISI KONTEN TAB (UI POPULATION)
+-- [ 7. POPULATE TAB CONTENTS ]
 -- ====================================================
 
--- >> TAB: MAIN
-UI.CreateToggle(PgMain, "Super CPU Boost", false, SetSuperBoost)
-UI.CreateToggle(PgMain, "Hide Rod (Ghost)", false, SetHideRod)
-UI.CreateToggle(PgMain, "Walk On Water", false, function(val)
-    States.WoW = val
-    if val then
-        local hrp = GetRoot()
-        if hrp then
-            local bv = Instance.new("BodyVelocity", hrp)
-            bv.Name = "WoW_BV"
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            if Connections.WoW then Connections.WoW:Disconnect() end
-            Connections.WoW = Services.RunService.RenderStepped:Connect(function()
-                local h = GetHum()
-                if h and hrp:FindFirstChild("WoW_BV") then
-                    local dir = h.MoveDirection
-                    hrp.WoW_BV.Velocity = Vector3.new(dir.X * h.WalkSpeed, 0, dir.Z * h.WalkSpeed)
-                end
-            end)
-        end
-    else
-        if Connections.WoW then Connections.WoW:Disconnect() end
-        local hrp = GetRoot()
-        if hrp and hrp:FindFirstChild("WoW_BV") then hrp.WoW_BV:Destroy() end
-    end
+-- MAIN
+UILib.Toggle(PgMain, "Super CPU Boost", false, CoreMods.SetSuperBoost)
+UILib.Toggle(PgMain, "Hide Rod (Ghost)", false, CoreMods.SetGhostRod)
+UILib.Toggle(PgMain, "Walk On Water", false, function(v) CoreMods.SetWoW(v) end)
+UILib.Toggle(PgMain, "Freeze Character", false, function(v) State.Freeze = v; local r = Utils.GetRoot(); if r then r.Anchored = v end end)
+UILib.Toggle(PgMain, "No Clip V2", false, function(v)
+    State.Noclip = v
+    if v then Connections.Noclip = Services.RunService.Stepped:Connect(function() local c = Utils.GetChar(); if c then for _,p in pairs(c:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end end end)
+    else if Connections.Noclip then Connections.Noclip:Disconnect() end end
 end)
-UI.CreateToggle(PgMain, "No Clip V2", false, function(val)
-    States.Noclip = val
-    if val then
-        Connections.Noclip = Services.RunService.Stepped:Connect(function()
-            local c = GetChar()
-            if c then for _,v in pairs(c:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide = false end end end
-        end)
-    else
-        if Connections.Noclip then Connections.Noclip:Disconnect() end
-    end
-end)
-UI.CreateToggle(PgMain, "3D No Render", false, function(val)
-    Services.RunService:Set3dRenderingEnabled(not val)
-end)
-UI.CreateToggle(PgMain, "Auto Equip Rod", false, function(val) States.AutoEquip = val end)
+UILib.Toggle(PgMain, "3D No Render", false, function(v) Services.RunService:Set3dRenderingEnabled(not v) end)
 
--- >> TAB: FARM (MINING, CORAL, RELIC, EVENT)
--- Mengubah UIGridLayout khusus tab Farm agar listnya memanjang (Vertical) bukan Grid
-PgFarm:FindFirstChildOfClass("UIGridLayout"):Destroy()
-local LytFarm = Instance.new("UIListLayout", PgFarm)
-LytFarm.Padding = UDim.new(0, 5)
-
-UI.CreateToggle(PgFarm, "Auto Mine Lava & Depths", false, function(val) States.AutoMine = val end)
-UI.CreateToggle(PgFarm, "Auto Take Coral", false, function(val) States.AutoCoral = val end)
-UI.CreateToggle(PgFarm, "Auto Farm All Relics", false, function(val) States.AutoRelic = val end)
-UI.CreateToggle(PgFarm, "Auto Hunt Event", false, function(val) States.AutoEvent = val end)
-UI.CreateButton(PgFarm, "Teleport to NPC Quest", function()
+-- FARM
+UILib.Toggle(PgFarm, "Auto Mine (Lava/Crystal)", false, function(v) State.AutoMine = v end)
+UILib.Toggle(PgFarm, "Auto Take Coral", false, function(v) State.AutoCoral = v end)
+UILib.Toggle(PgFarm, "Auto Take All Relics", false, function(v) State.AutoRelic = v end)
+UILib.Toggle(PgFarm, "Auto Hunt Event", false, function(v) State.AutoEvent = v end)
+UILib.Button(PgFarm, "Teleport NPC Quest", function()
     local npc = Services.Workspace:FindFirstChild("NPC") and Services.Workspace.NPC:FindFirstChild("Archaeologist")
-    local hrp = GetRoot()
-    if npc and hrp then hrp.CFrame = npc:GetPivot() + Vector3.new(0,0,4) end
+    local hrp = Utils.GetRoot(); if npc and hrp then hrp.CFrame = npc:GetPivot() + Vector3.new(0,0,4); UILib.Notify("QUEST", "Teleported") end
+end)
+UILib.Dropdown(PgFarm, "Manual Relic", {"Blacktide", "Burntflame", "Sunken Eye"}, function(v) State.RelicSel = v end)
+UILib.Dropdown(PgFarm, "Relic Spot", {"1","2","3","4"}, function(v) State.RelicSpot = tonumber(v) end)
+UILib.Button(PgFarm, "-> TP TO SELECTED RELIC <-", function()
+    local rName = State.RelicSel .. " Relic"; local spot = State.RelicSpot; local hrp = Utils.GetRoot()
+    if not hrp then return end
+    local trg = Services.Workspace:FindFirstChild("LeviathanEvent") and Services.Workspace.LeviathanEvent:FindFirstChild("Relics") and Services.Workspace.LeviathanEvent.Relics:FindFirstChild(rName)
+    if not trg then UILib.Notify("RELIC", rName.." Not Found!", Color3.fromRGB(255,50,50)); return end
+    
+    local pt = nil
+    if State.RelicSel == "Blacktide" and spot == 4 then local ch = trg:GetChildren(); if ch[4] then pt = ch[4]:FindFirstChild("Part") or ch[4] end
+    elseif spot == 1 then pt = trg:FindFirstChild("Part")
+    else local ch = trg:GetChildren(); if ch[spot] then pt = ch[spot] end end
+    if pt then hrp.CFrame = pt.CFrame + Vector3.new(0,5,0); UILib.Notify("RELIC", "TP to Spot "..spot, THEME.Accent) end
 end)
 
--- >> TAB: SHOP (CRAFTING & BUYING)
-PgShop:FindFirstChildOfClass("UIGridLayout"):Destroy()
-local LytShop = Instance.new("UIListLayout", PgShop)
-LytShop.Padding = UDim.new(0, 5)
-
-local Net = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
-
--- Craft Charm Group
-local selectedCraft = "Oculus Charm"
-UI.CreateDropdown(PgShop, "Craft", {"Oculus Charm", "Anchor Charm", "Hook Charm", "Winged Charm"}, function(val) selectedCraft = val end)
-UI.CreateButton(PgShop, "[ ACTION ] START CRAFT 1x", function()
-    UI.Notify("CRAFT", "Crafting " .. selectedCraft, THEME.Accent)
-    pcall(function()
-        Net["RF/StartCrafting"]:InvokeServer(selectedCraft)
-        task.wait(0.5)
-        Net["RF/ConfirmCrafting"]:InvokeServer()
+-- SHOP
+local selCraft = "Oculus Charm"
+UILib.Dropdown(PgShop, "Select Craft", {"Oculus Charm", "Anchor Charm", "Hook Charm", "Winged Charm"}, function(v) selCraft = v end)
+UILib.ActionInput(PgShop, "START CRAFT", Color3.fromRGB(200, 100, 0), function(qty)
+    UILib.Notify("CRAFT", "Crafting "..qty.."x", THEME.Accent)
+    task.spawn(function()
+        for i=1, qty do pcall(function() Net["RF/StartCrafting"]:InvokeServer(selCraft); task.wait(0.5); Net["RF/ConfirmCrafting"]:InvokeServer() end); task.wait(0.5) end
+        UILib.Notify("CRAFT", "Done!", Color3.fromRGB(0,255,100))
     end)
 end)
 
--- Buy Charm Group
-local selectedCharm = 1
-local charmMap = {["Bone Charm"]=1, ["Algae Charm"]=2, ["Magma Charm"]=3, ["Clover Charm"]=4, ["Heart Charm"]=14}
-UI.CreateDropdown(PgShop, "Buy", {"Bone Charm", "Magma Charm", "Algae Charm", "Clover Charm", "Heart Charm"}, function(val) selectedCharm = charmMap[val] end)
-UI.CreateButton(PgShop, "[ ACTION ] PURCHASE 1x", function()
-    pcall(function() Net["RF/PurchaseCharm"]:InvokeServer(selectedCharm) end)
-    UI.Notify("SHOP", "Purchased Charm", THEME.Accent)
+local selCharm = 1; local cMap = {["Bone Charm"]=1, ["Algae Charm"]=2, ["Magma Charm"]=3, ["Clover Charm"]=4, ["Heart Charm"]=14}
+UILib.Dropdown(PgShop, "Select Buy", {"Bone Charm", "Magma Charm", "Algae Charm", "Clover Charm", "Heart Charm"}, function(v) selCharm = cMap[v] end)
+UILib.ActionInput(PgShop, "PURCHASE", Color3.fromRGB(0, 150, 100), function(qty)
+    task.spawn(function() for i=1, qty do pcall(function() Net["RF/PurchaseCharm"]:InvokeServer(selCharm) end); task.wait(0.3) end end)
 end)
 
--- >> TAB: PLAYER
-UI.CreateToggle(PgPlayer, "No Damage", false, function(val) States.NoDmg = val end)
-UI.CreateToggle(PgPlayer, "Streamer Mode", false, SetStreamer)
-UI.CreateDropdown(PgPlayer, "Skin Anim", {"Off", "Corruption Edge", "Princess Parasol", "Soul Scythe"}, function(val)
-    if val == "Off" then States.AnimSkin = "Off" else States.AnimSkin = val .. " - FishCaught" end
+local selVal = 1; local vMap = {["Love Potion"]=1, ["Love Totem"]=2}
+UILib.Dropdown(PgShop, "Valentine Event", {"Love Potion", "Love Totem"}, function(v) selVal = vMap[v] end)
+UILib.ActionInput(PgShop, "BUY EVENT", Color3.fromRGB(200, 50, 150), function(qty)
+    task.spawn(function() for i=1, qty do pcall(function() Net["RE/LimitedPurchaseRequest"]:FireServer(selVal) end); task.wait(0.3) end end)
 end)
-UI.CreateToggle(PgPlayer, "Walk Speed (50)", false, function(val) States.Speed = val end)
+
+-- PLAYER
+UILib.Toggle(PgPlayer, "Auto Equip Rod", false, function(v) State.AutoEquip = v end)
+UILib.Toggle(PgPlayer, "No Damage", false, function(v) State.NoDmg = v end)
+UILib.ToggleInput(PgPlayer, "Speed", false, "50", "Val", 
+    function(v) State.Speed = v; local h = Utils.GetHum(); if not v and h then h.WalkSpeed = 16 end end, 
+    function(txt) State.SpeedVal = tonumber(txt) or 50 end
+)
+UILib.ToggleInput(PgPlayer, "Follow", false, "", "Name", 
+    function(v) State.Follow = v; if not v then State.FollowTarget = nil end end, 
+    function(txt) 
+        local t = Utils.FindPlayer(txt)
+        if t then State.FollowTarget = t; UILib.Notify("FOLLOW", "Target: "..t.Name, THEME.Accent) else State.Follow = false; UILib.Notify("FOLLOW", "Not Found", Color3.new(1,0,0)) end
+    end
+)
+UILib.Toggle(PgPlayer, "Streamer Mode", false, CoreMods.SetStreamerMode)
+UILib.Dropdown(PgPlayer, "Skin Anim", {"Off", "Corruption Edge", "Princess Parasol", "Soul Scythe"}, function(v) State.AnimSkin = (v == "Off") and "Off" or v.." - FishCaught" end)
+
+-- MISC
+local SavedPos = nil
+UILib.Button(PgMisc, "Save Position", function() local r = Utils.GetRoot(); if r then SavedPos = r.CFrame; UILib.Notify("MISC", "Saved", THEME.Accent) end end)
+UILib.Button(PgMisc, "Load Position", function() local r = Utils.GetRoot(); if r and SavedPos then r.CFrame = SavedPos; UILib.Notify("MISC", "Loaded", THEME.Accent) end end)
+UILib.Button(PgMisc, "Rejoin Server", function() Services.TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
+UILib.Toggle(PgMisc, "Show Live Panel", true, function(v) State.Panel = v; FloatHUD.Visible = v end)
+
 
 -- ====================================================
--- [8] BACKGROUND FARMING LOOPS (SAFE & OPTIMIZED)
+-- [ 8. CENTRAL DISPATCHER (MASTER LOOPS) ]
 -- ====================================================
 
--- 8.1 Auto Mine Routine
-local function ExecuteMining()
-    local hrp = GetRoot()
-    if not hrp then return end
-    States.MineReturn = hrp.CFrame
-    UI.Notify("MINING", "Starting Area Sweep...", THEME.Accent)
-    
-    pcall(function() Net["RE/EquipToolFromHotbar"]:FireServer(2) end)
-    task.wait(1)
-    
-    local function SweepZone(zoneName, tpPos, fld)
-        hrp.CFrame = tpPos; hrp.Velocity = Vector3.zero
-        task.wait(3)
-        while States.AutoMine and States.IsMining do
-            local crystals = {}
-            if fld then
-                for _,v in pairs(fld:GetChildren()) do
-                    if v:FindFirstChildWhichIsA("ProximityPrompt", true) then table.insert(crystals, v) end
-                end
-            end
-            if #crystals == 0 then break end
-            
-            local myPos = GetRoot().Position
-            table.sort(crystals, function(a,b) return (a:GetPivot().Position - myPos).Magnitude < (b:GetPivot().Position - myPos).Magnitude end)
-            
-            for _, node in ipairs(crystals) do
-                if not States.IsMining then return end
-                local prmpt = node:FindFirstChildWhichIsA("ProximityPrompt", true)
-                if prmpt and prmpt.Parent then
-                    GetRoot().CFrame = prmpt.Parent.CFrame * CFrame.new(0,0,3)
-                    GetRoot().Velocity = Vector3.zero
-                    task.wait(1.5) -- Safe wait for server sync
-                    if prmpt.Parent then fireproximityprompt(prmpt) end
-                    task.wait(2)
-                end
-            end
-            task.wait(1)
+-- 1. Physics/Movement Loop (Fast)
+local function HandlePlayerMods(hrp, hum)
+    if State.Follow and State.FollowTarget and hrp then
+        local th = State.FollowTarget.Character and State.FollowTarget.Character:FindFirstChild("HumanoidRootPart")
+        if th then
+            if hum and hum.Sit and hum.SeatPart then
+                local v = hum.SeatPart.Parent; if v and v.PrimaryPart then v:SetPrimaryPartCFrame(th.CFrame) else hum.SeatPart.CFrame = th.CFrame end
+            else hrp.CFrame = th.CFrame end
         end
     end
-    
-    local wsIslands = Services.Workspace:WaitForChild("Islands")
-    SweepZone("Lava Basin", CFrame.new(860, 85, -10094), wsIslands:WaitForChild("Lava Basin"):WaitForChild("Crystals"))
-    if States.IsMining then
-        task.wait(2)
-        SweepZone("Crystal Depths", CFrame.new(5820, -907, 15424), wsIslands:WaitForChild("Crystal Depths"):WaitForChild("Crystals"))
+    if hum then
+        if State.Speed then
+            if hum.Sit and hum.SeatPart then 
+                if hum.SeatPart.AssemblyLinearVelocity.Magnitude > 0 then hum.SeatPart.AssemblyLinearVelocity = hum.SeatPart.CFrame.LookVector * State.SpeedVal end
+            else hum.WalkSpeed = State.SpeedVal end
+        end
+        if State.NoDmg and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
     end
-    
-    States.IsMining = false
-    if GetRoot() and States.MineReturn then GetRoot().CFrame = States.MineReturn end
-    pcall(function() Net["RE/EquipToolFromHotbar"]:FireServer(1) end)
 end
+task.spawn(function() while task.wait() do pcall(function() HandlePlayerMods(Utils.GetRoot(), Utils.GetHum()) end) end end)
 
-task.spawn(function()
-    local nextMine = 0
-    while task.wait(5) do
-        if States.AutoMine and tick() >= nextMine and not States.IsMining then
-            States.IsMining = true
-            ExecuteMining()
-            nextMine = tick() + (2.5 * 3600) -- 2.5 Jam
-            UI.Notify("SCHEDULER", "Next mine in 2.5 Hours", THEME.Accent)
-        elseif not States.AutoMine then
-            States.IsMining = false
-        end
-    end
-end)
-
--- 8.2 Auto Coral Routine
+-- 2. Automation Loop (Slower/Server Interactions)
 task.spawn(function()
     while task.wait(1.5) do
-        if States.AutoCoral and not States.IsMining and not States.AutoRelic then
-            pcall(function()
-                local corals = {}
-                local spawns = Services.Workspace:FindFirstChild("!!! SEARCH ITEM SPAWNS")
-                if spawns and spawns:FindFirstChild("Coral") then
-                    for _, v in pairs(spawns.Coral:GetDescendants()) do
-                        if v:IsA("ProximityPrompt") and v.Enabled then table.insert(corals, v) end
-                    end
-                end
-                
-                local hrp = GetRoot()
-                if #corals > 0 and hrp then
-                    if not States.IsLootingCoral then
-                        States.CoralReturn = hrp.CFrame
-                        States.IsLootingCoral = true
-                        if not States.HasTank then pcall(function() Net["RF/EquipOxygenTank"]:InvokeServer(105); States.HasTank=true end) end
-                    end
-                    
-                    for _, prmpt in ipairs(corals) do
-                        if not States.AutoCoral or States.IsMining then break end
-                        if prmpt and prmpt.Parent and prmpt.Enabled then
-                            hrp.CFrame = CFrame.new(prmpt.Parent:IsA("Model") and prmpt.Parent:GetPivot().Position or prmpt.Parent.Position) + Vector3.new(0,3,0)
-                            hrp.Velocity = Vector3.zero
-                            task.wait(0.6)
-                            if prmpt.Parent then fireproximityprompt(prmpt) end
-                            task.wait(1.5) -- Anti 277 spam limit
-                        end
-                    end
-                else
-                    if States.IsLootingCoral and hrp and States.CoralReturn then
-                        hrp.CFrame = States.CoralReturn
-                        States.IsLootingCoral = false
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- 8.3 Auto Relic Routine
-task.spawn(function()
-    while task.wait(3) do
-        if States.AutoRelic and not States.IsMining then
-            pcall(function()
-                local relics = Services.Workspace:FindFirstChild("LeviathanEvent") and Services.Workspace.LeviathanEvent:FindFirstChild("Relics")
-                if relics then
-                    for _, r in pairs(relics:GetChildren()) do
-                        if not States.AutoRelic then break end
-                        if r.Name:match("Relic") then
-                            if not States.HasTank then pcall(function() Net["RF/EquipOxygenTank"]:InvokeServer(575); States.HasTank=true end) end
-                            local hrp = GetRoot()
-                            for _, spot in ipairs(r:GetChildren()) do
-                                local part = spot:FindFirstChild("Part") or (spot:IsA("BasePart") and spot)
-                                if part and hrp then
-                                    hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-                                    task.wait(0.8)
-                                    Net["RE/ClaimRelic"]:FireServer(r.Name)
-                                    task.wait(1.5)
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- 8.4 Background Player Adjustments (Speed & God)
-task.spawn(function()
-    while task.wait() do
-        local h = GetHum()
-        if h then
-            if States.Speed then
-                if h.Sit and h.SeatPart then
-                    if h.SeatPart.AssemblyLinearVelocity.Magnitude > 0 then
-                        h.SeatPart.AssemblyLinearVelocity = h.SeatPart.CFrame.LookVector * 50
-                    end
-                else
-                    h.WalkSpeed = 50
-                end
-            end
-            if States.NoDmg and h.Health < h.MaxHealth then
-                h.Health = h.MaxHealth
-            end
-        end
-    end
-end)
-
--- 8.5 Auto Equip
-task.spawn(function()
-    while task.wait(2) do
-        if States.AutoEquip and not States.IsMining then
-            pcall(function() Net["RE/EquipToolFromHotbar"]:FireServer(1) end)
-        end
-    end
-end)
-
--- 8.6 System Monitor Update
-local lastFpsTime = os.clock()
-local frames = 0
-Services.RunService.RenderStepped:Connect(function() frames = frames + 1 end)
-
-task.spawn(function()
-    while task.wait(0.5) do
-        local fps = math.floor(frames / (os.clock() - lastFpsTime))
-        lastFpsTime = os.clock(); frames = 0
-        local cpu = Services.Stats.PerformanceStats.CPU:GetValue()
-        LblMon.Text = string.format("FPS: %d | CPU: %.1f ms", fps, cpu)
-        
         pcall(function()
-            local ls = Player:FindFirstChild("leaderstats")
-            local c = ls and ls:FindFirstChild("Caught") and ls.Caught.Value or 0
-            StatFish.Text = tostring(c):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "")
-            if Player:FindFirstChild("Backpack") then
-                StatInv.Text = tostring(#Player.Backpack:GetChildren())
+            if State.AutoEquip and not State.IsMining then Net["RE/EquipToolFromHotbar"]:FireServer(1) end
+            if State.AutoMine and tick() >= State.NextMineTime and not State.IsMining then
+                State.IsMining = true; AutoFarm.ExecuteMining(); State.NextMineTime = tick() + (2.5 * 3600)
             end
+            AutoFarm.RoutineCoral()
+            AutoFarm.RoutineRelic()
+            AutoFarm.RoutineEvent()
         end)
     end
 end)
 
--- ====================================================
--- [9] ANIMATION EVENT HOOK
--- ====================================================
-local fishCaughtRemote = Net:FindFirstChild("RE/FishCaught")
-if fishCaughtRemote then
-    fishCaughtRemote.OnClientEvent:Connect(function()
-        if States.AnimSkin ~= "Off" then
+-- 3. Live Monitor Loop
+local lFps = os.clock(); local frms = 0
+Services.RunService.RenderStepped:Connect(function() frms = frms + 1 end)
+task.spawn(function()
+    while task.wait(0.5) do
+        local fps = math.floor(frms / (os.clock() - lFps)); lFps = os.clock(); frms = 0
+        local cpu = Services.Stats.PerformanceStats.CPU:GetValue()
+        local t = DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us")
+        MonLabel.Text = string.format("FPS: %d | CPU: %.1f ms | %s", fps, cpu, t)
+        
+        pcall(function()
+            local ls = LocalPlayer:FindFirstChild("leaderstats"); local c = ls and ls:FindFirstChild("Caught") and ls.Caught.Value or 0
+            StatFish.Text = tostring(c):reverse():gsub("%d%d%d","%1,"):reverse():gsub("^,","")
+            if LocalPlayer:FindFirstChild("Backpack") then StatInv.Text = tostring(#LocalPlayer.Backpack:GetChildren()) end
+        end)
+    end
+end)
+
+-- 4. Animation Hook
+local fRemote = Net:FindFirstChild("RE/FishCaught")
+if fRemote then
+    fRemote.OnClientEvent:Connect(function()
+        if State.AnimSkin ~= "Off" then
             pcall(function()
-                local char = Player.Character
-                local animator = char and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Animator")
-                if animator then
-                    for _, t in pairs(animator:GetPlayingAnimationTracks()) do t:Stop(0.1) end
-                    local animObj = Services.ReplicatedStorage.Modules.Animations:FindFirstChild(States.AnimSkin)
-                    if animObj then
-                        local track = animator:LoadAnimation(animObj)
-                        track.Priority = Enum.AnimationPriority.Action4
-                        track:Play()
-                    end
+                local a = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid:FindFirstChild("Animator")
+                if a then
+                    for _, t in pairs(a:GetPlayingAnimationTracks()) do t:Stop(0.1) end
+                    local ao = Services.ReplicatedStorage.Modules.Animations:FindFirstChild(State.AnimSkin)
+                    if ao then local tr = a:LoadAnimation(ao); tr.Priority = Enum.AnimationPriority.Action4; tr:Play() end
                 end
             end)
         end
@@ -936,7 +762,7 @@ if fishCaughtRemote then
 end
 
 -- ====================================================
--- STARTUP
+-- [ 9. INIT & STARTUP ]
 -- ====================================================
 MainGui.Visible = true
-FloatHUD.Visible = true
+FloatHUD.Visible = State.Panel
