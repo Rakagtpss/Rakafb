@@ -1,470 +1,206 @@
---[[ ==========================================================
-    SERAPHIN HELPER SCRIPT
-    V31 Anti-277 Edition (Clean Code Refactored)
-============================================================ ]]
+-- ==========================================
+-- SCRIPT SAMBUNG KATA FULL AUTO BOT + UI
+-- ==========================================
 
--- ============================================================
--- [1] SERVICES & LOCAL VARIABLES
--- ============================================================
-local Services = {
-    Players           = game:GetService("Players"),
-    RunService        = game:GetService("RunService"),
-    CoreGui           = game:GetService("CoreGui"),
-    Lighting          = game:GetService("Lighting"),
-    TeleportService   = game:GetService("TeleportService"),
-    UserInputService  = game:GetService("UserInputService"),
-    ReplicatedStorage = game:GetService("ReplicatedStorage"),
-    TweenService      = game:GetService("TweenService"),
-    Workspace         = game:GetService("Workspace"),
-    SoundService      = game:GetService("SoundService"),
-    Stats             = game:GetService("Stats"),
-    TextChatService   = game:GetService("TextChatService"),
-    VirtualUser       = game:GetService("VirtualUser")
-}
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
 
-local Player  = Services.Players.LocalPlayer
-local NetPath = Services.ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+-- ==========================================
+-- ⚙️ KONFIGURASI UTAMA (WAJIB DIISI) ⚙️
+-- ==========================================
+-- Ganti bagian 'nil' di bawah ini dengan Path hasil copy dari Dex Explorer!
+-- Contoh: local PathTeks_Target = player.PlayerGui.MainGui.WordFrame.TextLabel
+local PathTeks_Target = nil 
 
-Player.Idled:Connect(function()
-    Services.VirtualUser:CaptureController()
-    Services.VirtualUser:ClickButton2(Vector2.new())
-end)
+local DelayKetik = 0.05 -- Kecepatan ngetik per huruf (0.05 = natural)
 
-local function GetChar() return Player.Character or Player.CharacterAdded:Wait() end
-local function GetRoot() return Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") end
-local function GetHum()  return Player.Character and Player.Character:FindFirstChild("Humanoid") end
+-- ==========================================
+-- 1. DATABASE KAMUS (Auto Fetch GitHub)
+-- ==========================================
+local kamus = {}
+local kataTerpakai = {}
+local isKamusReady = false
 
--- ============================================================
--- [2] CONFIGURATION & STATES
--- ============================================================
-local UI_THEME = {
-    Width = 400, Height = 270,
-    Color = Color3.fromRGB(12, 12, 14), SidebarColor = Color3.fromRGB(8, 8, 8),
-    SidebarTransparency = 0.5, Transparency = 0.15,
-    Accent = Color3.fromRGB(255, 255, 255), TextMain = Color3.fromRGB(240, 240, 240), TextDim = Color3.fromRGB(160, 160, 170),
-    FontUI = Enum.Font.GothamBlack, FontBtn = Enum.Font.GothamBold,
-    CornerRadius = UDim.new(0, 10)
-}
+local function loadKamus()
+    local url = "https://raw.githubusercontent.com/Bhinneka/indonesian-wordlist/master/kamus.txt"
+    local success, response = pcall(function() return game:HttpGet(url) end)
 
-local States = {
-    Freeze = false, WoW = false, Boost = false, NoRender = false, Noclip = false, Panel = true, AutoEquip = false,
-    AutoEvent = false, Speed = false, SpeedVal = 50, NoDmg = false, AutoFollow = false, FollowTarget = nil,
-    AutoCoral = false, AutoFarmRelic = false, AutoMiningV20 = false, Busy = false, IsMining = false, HasTank = false,
-    RelicSel = "Blacktide", RelicSpot = 1, HideRod = false, StreamerMode = false, AnimSkin = "Off"
-}
+    if success and response then
+        for word in string.gmatch(response, "[^\r\n]+") do
+            word = string.lower(word)
+            local hurufPertama = string.sub(word, 1, 1)
+            if not kamus[hurufPertama] then kamus[hurufPertama] = {} end
+            table.insert(kamus[hurufPertama], word)
+        end
+        isKamusReady = true
+        return true
+    end
+    return false
+end
 
-local SavedCFrame, EventStartCFrame, CoralReturnCFrame, SavedMinePosition = nil, nil, nil, nil
-local IsInEvent, IsLootingCoral = false, false
-local Connections, BodyV = {}, nil
-local EventList = {"Ghost Shark Hunt", "Worm Hunt", "Treasure Hunt", "Shark Hunt", "Megalodon Hunt"}
+-- ==========================================
+-- 2. LOGIKA MENCARI & MENGIRIM KATA
+-- ==========================================
+local function ketikDanKirimKata(kata)
+    local remotes = ReplicatedStorage:WaitForChild("Remotes")
+    
+    -- 1. Mulai
+    remotes:WaitForChild("BillboardStart"):FireServer(string.sub(kata, 1, 1))
+    task.wait(DelayKetik)
+    
+    -- 2. Update per huruf
+    for i = 2, #kata do
+        remotes:WaitForChild("BillboardUpdate"):FireServer(string.sub(kata, 1, i))
+        task.wait(DelayKetik)
+    end
+    
+    -- 3. Submit
+    remotes:WaitForChild("SubmitWord"):FireServer(kata)
+    task.wait(0.1)
+    
+    -- 4. End
+    remotes:WaitForChild("BillboardEnd"):FireServer()
+end
 
--- ============================================================
--- [3] UTILITIES & NOTIFICATIONS
--- ============================================================
-if Services.CoreGui:FindFirstChild("SeraphinHelper") then Services.CoreGui.SeraphinHelper:Destroy() end
+local function cariKata(awalan)
+    awalan = string.lower(awalan:match("^%s*(.-)%s*$")) -- Bersihkan spasi
+    if awalan == "" then return nil end
+    
+    local hurufPertama = string.sub(awalan, 1, 1)
+    local daftarKata = kamus[hurufPertama]
+    
+    if daftarKata then
+        for _, kata in ipairs(daftarKata) do
+            if string.sub(kata, 1, #awalan) == awalan and not kataTerpakai[kata] then
+                kataTerpakai[kata] = true 
+                return kata
+            end
+        end
+    end
+    return nil
+end
+
+local function eksekusiAutoJawab()
+    if not isKamusReady then return "Kamus belum siap!" end
+    if not PathTeks_Target then return "Path Teks belum diisi di script!" end
+    
+    local hurufDiLayar = PathTeks_Target.Text
+    if hurufDiLayar == "" then return "Tidak ada huruf terdeteksi" end
+    
+    local kataPilihan = cariKata(hurufDiLayar)
+    if kataPilihan then
+        ketikDanKirimKata(kataPilihan)
+        return "Berhasil: " .. kataPilihan
+    else
+        return "Kata awalan '"..hurufDiLayar.."' habis!"
+    end
+end
+
+-- ==========================================
+-- 3. UI SEDERHANA & ELEGAN
+-- ==========================================
+local guiName = "AutoSambungKata"
+if CoreGui:FindFirstChild(guiName) then CoreGui[guiName]:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name, ScreenGui.Parent, ScreenGui.ResetOnSpawn = "SeraphinHelper", Services.CoreGui, false
+ScreenGui.Name = guiName
+ScreenGui.Parent = CoreGui
 
-local function EnableDrag(frame, dragInputObj)
-    local dragToggle, dragStart, startPos
-    dragInputObj.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragToggle, dragStart, startPos = true, input.Position, frame.Position
-            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragToggle = false end end)
-        end
-    end)
-    dragInputObj.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            Services.UserInputService.InputChanged:Connect(function(inputCheck)
-                if inputCheck == input and dragToggle then
-                    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + (inputCheck.Position - dragStart).X, startPos.Y.Scale, startPos.Y.Offset + (inputCheck.Position - dragStart).Y)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0.5, -110, 0.8, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundTransparency = 1
+Title.Text = "🤖 Auto Sambung Kata"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = MainFrame
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(1, 0, 0, 20)
+StatusText.Position = UDim2.new(0, 0, 0, 35)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = "Mengunduh KBBI..."
+StatusText.TextColor3 = Color3.fromRGB(0, 255, 150)
+StatusText.Font = Enum.Font.Gotham
+StatusText.TextSize = 12
+StatusText.Parent = MainFrame
+
+local BtnJawab = Instance.new("TextButton")
+BtnJawab.Size = UDim2.new(0.8, 0, 0, 35)
+BtnJawab.Position = UDim2.new(0.1, 0, 0, 65)
+BtnJawab.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+BtnJawab.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnJawab.Text = "Jawab Sekali"
+BtnJawab.Font = Enum.Font.GothamBold
+BtnJawab.TextSize = 14
+BtnJawab.Parent = MainFrame
+Instance.new("UICorner", BtnJawab).CornerRadius = UDim.new(0, 6)
+
+local BtnAuto = Instance.new("TextButton")
+BtnAuto.Size = UDim2.new(0.8, 0, 0, 35)
+BtnAuto.Position = UDim2.new(0.1, 0, 0, 110)
+BtnAuto.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+BtnAuto.TextColor3 = Color3.fromRGB(255, 255, 255)
+BtnAuto.Text = "Auto Bot: OFF"
+BtnAuto.Font = Enum.Font.GothamBold
+BtnAuto.TextSize = 14
+BtnAuto.Parent = MainFrame
+Instance.new("UICorner", BtnAuto).CornerRadius = UDim.new(0, 6)
+
+-- ==========================================
+-- 4. KONTROL TOMBOL & AUTO BOT
+-- ==========================================
+local isAutoBotOn = false
+
+-- Load Kamus di awal
+task.spawn(function()
+    if loadKamus() then
+        StatusText.Text = "✅ Siap digunakan!"
+    else
+        StatusText.Text = "❌ Gagal muat kamus!"
+        StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
+    end
+end)
+
+-- Tombol Jawab Manual (Tapi deteksi otomatis)
+BtnJawab.MouseButton1Click:Connect(function()
+    StatusText.Text = "Mendeteksi & Mengetik..."
+    local hasil = eksekusiAutoJawab()
+    StatusText.Text = hasil
+end)
+
+-- Tombol Toggle Auto Bot
+BtnAuto.MouseButton1Click:Connect(function()
+    isAutoBotOn = not isAutoBotOn
+    if isAutoBotOn then
+        BtnAuto.Text = "Auto Bot: ON"
+        BtnAuto.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        StatusText.Text = "Bot aktif! Menunggu giliran..."
+        
+        -- Jika PathTeks_Target diisi, pantau setiap kali teksnya berubah
+        if PathTeks_Target then
+            PathTeks_Target:GetPropertyChangedSignal("Text"):Connect(function()
+                if isAutoBotOn and PathTeks_Target.Text ~= "" then
+                    task.wait(0.5) -- Jeda setengah detik agar tidak kelihatan seperti citer
+                    StatusText.Text = eksekusiAutoJawab()
                 end
             end)
         end
-    end)
-end
-
-local NotifyContainer = Instance.new("Frame", ScreenGui)
-NotifyContainer.Name, NotifyContainer.Size, NotifyContainer.AnchorPoint, NotifyContainer.Position, NotifyContainer.BackgroundTransparency = "NotificationContainer", UDim2.new(0, 220, 0.5, 0), Vector2.new(1, 1), UDim2.new(1, -20, 1, -20), 1
-local NotifyLayout = Instance.new("UIListLayout", NotifyContainer)
-NotifyLayout.FillDirection, NotifyLayout.VerticalAlignment, NotifyLayout.Padding = Enum.FillDirection.Vertical, Enum.VerticalAlignment.Bottom, UDim.new(0, 5)
-
-local function Notify(title, text, colorOverride, duration)
-    local color = colorOverride or Color3.fromRGB(200, 200, 200)
-    local Frame = Instance.new("Frame", NotifyContainer)
-    Frame.Size, Frame.BackgroundColor3, Frame.BackgroundTransparency, Frame.BorderSizePixel = UDim2.new(1, 0, 0, 0), Color3.fromRGB(18, 18, 22), 0.1, 0
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
-    
-    local Bar = Instance.new("Frame", Frame)
-    Bar.Size, Bar.Position, Bar.BackgroundColor3, Bar.BorderSizePixel = UDim2.new(0, 3, 1, -10), UDim2.new(0, 0, 0, 5), color, 0
-    Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 4)
-
-    local LblTitle = Instance.new("TextLabel", Frame)
-    LblTitle.Size, LblTitle.Position, LblTitle.BackgroundTransparency, LblTitle.Text, LblTitle.TextColor3, LblTitle.Font, LblTitle.TextSize, LblTitle.TextXAlignment = UDim2.new(1, -15, 0, 14), UDim2.new(0, 10, 0, 6), 1, string.upper(title), color, UI_THEME.FontUI, 12, Enum.TextXAlignment.Left
-    
-    local LblMsg = Instance.new("TextLabel", Frame)
-    LblMsg.Size, LblMsg.Position, LblMsg.BackgroundTransparency, LblMsg.Text, LblMsg.TextColor3, LblMsg.Font, LblMsg.TextSize, LblMsg.TextXAlignment = UDim2.new(1, -15, 0, 14), UDim2.new(0, 10, 0, 20), 1, text, UI_THEME.TextMain, Enum.Font.GothamMedium, 10, Enum.TextXAlignment.Left
-
-    Services.TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 0, 40)}):Play()
-    task.delay(duration or 3, function()
-        if not Frame then return end
-        local TweenOut = Services.TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(1, 20, 0, 0), BackgroundTransparency = 1})
-        TweenOut:Play()
-        Services.TweenService:Create(LblTitle, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-        Services.TweenService:Create(LblMsg, TweenInfo.new(0.2), {TextTransparency = 1}):Play()
-        TweenOut.Completed:Wait()
-        Frame:Destroy()
-    end)
-end
-
-Notify("SERAPHIN", "V31 Refactored Edition", nil, 4)
-
--- ============================================================
--- [4] UI CORE & LAYOUT
--- ============================================================
--- Monitor
-local MonitorHUD = Instance.new("Frame", ScreenGui)
-MonitorHUD.Size, MonitorHUD.Position, MonitorHUD.BackgroundColor3, MonitorHUD.BackgroundTransparency, MonitorHUD.BorderSizePixel, MonitorHUD.Active = UDim2.new(0, 180, 0, 24), UDim2.new(0.5, -90, 0, 10), Color3.fromRGB(15, 15, 18), 0.2, 0, true
-Instance.new("UICorner", MonitorHUD).CornerRadius = UDim.new(0, 6)
-local MonLabel = Instance.new("TextLabel", MonitorHUD)
-MonLabel.Size, MonLabel.BackgroundTransparency, MonLabel.TextColor3, MonLabel.Font, MonLabel.TextSize = UDim2.new(1, 0, 1, 0), 1, Color3.fromRGB(255, 255, 255), UI_THEME.FontUI, 10
-EnableDrag(MonitorHUD, MonitorHUD)
-
--- Float HUD
-local FloatHUD = Instance.new("Frame", ScreenGui)
-FloatHUD.AnchorPoint, FloatHUD.Size, FloatHUD.Position, FloatHUD.BackgroundColor3, FloatHUD.BackgroundTransparency, FloatHUD.BorderSizePixel, FloatHUD.Visible, FloatHUD.Active = Vector2.new(0.5, 0), UDim2.new(0, 150, 0, 100), UDim2.new(0.5, 0, 0.35, 0), Color3.fromRGB(15, 15, 18), 0.3, 0, false, true
-Instance.new("UICorner", FloatHUD).CornerRadius = UDim.new(0, 8)
-local FloatLayout = Instance.new("UIListLayout", FloatHUD)
-FloatLayout.HorizontalAlignment, FloatLayout.SortOrder = Enum.HorizontalAlignment.Center, Enum.SortOrder.LayoutOrder
-local TitleLabel = Instance.new("TextLabel", FloatHUD)
-TitleLabel.Size, TitleLabel.BackgroundTransparency, TitleLabel.Text, TitleLabel.TextColor3, TitleLabel.Font, TitleLabel.TextSize = UDim2.new(1, 0, 0, 24), 1, "PANEL SERAPHIN", Color3.fromRGB(255, 255, 255), UI_THEME.FontUI, 12
-
-local function CreateStatBlock(titleText, defaultVal)
-    local Block = Instance.new("Frame", FloatHUD)
-    Block.Size, Block.BackgroundTransparency = UDim2.new(1, 0, 0, 28), 1
-    local LblTitle = Instance.new("TextLabel", Block)
-    LblTitle.Size, LblTitle.Position, LblTitle.BackgroundTransparency, LblTitle.Text, LblTitle.TextColor3, LblTitle.Font, LblTitle.TextSize = UDim2.new(1, 0, 0, 12), UDim2.new(0, 0, 0, 2), 1, string.upper(titleText), UI_THEME.TextDim, Enum.Font.GothamBold, 9
-    local LblValue = Instance.new("TextLabel", Block)
-    LblValue.Size, LblValue.Position, LblValue.BackgroundTransparency, LblValue.Text, LblValue.TextColor3, LblValue.Font, LblValue.TextSize = UDim2.new(1, 0, 0, 14), UDim2.new(0, 0, 0, 12), 1, defaultVal, UI_THEME.TextMain, UI_THEME.FontUI, 12
-    return LblValue
-end
-local LblFishVal, LblInvVal = CreateStatBlock("FISH CAUGHT", "0"), CreateStatBlock("INVENTORY", "0/0")
-EnableDrag(FloatHUD, FloatHUD)
-
--- Main UI Container
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size, Main.Position, Main.BackgroundColor3, Main.BackgroundTransparency, Main.ClipsDescendants, Main.Visible = UDim2.new(0, UI_THEME.Width, 0, UI_THEME.Height), UDim2.new(0, 50, 0.5, -UI_THEME.Height/2), UI_THEME.Color, UI_THEME.Transparency, true, false
-local MainCorner = Instance.new("UICorner", Main); MainCorner.CornerRadius = UI_THEME.CornerRadius
-EnableDrag(Main, Main)
-
-local Header = Instance.new("Frame", Main)
-Header.Size, Header.BackgroundColor3, Header.BackgroundTransparency, Header.BorderSizePixel = UDim2.new(1, 0, 0, 32), UI_THEME.SidebarColor, UI_THEME.SidebarTransparency, 0
-local TitleText = Instance.new("TextLabel", Header)
-TitleText.Size, TitleText.Position, TitleText.Text, TitleText.RichText, TitleText.TextColor3, TitleText.Font, TitleText.TextSize, TitleText.BackgroundTransparency, TitleText.TextXAlignment = UDim2.new(1, -40, 1, 0), UDim2.new(0, 12, 0, 0), "SERA <font color=\"rgb(255, 255, 255)\">HELPER</font>", true, UI_THEME.TextMain, UI_THEME.FontUI, 12, 1, Enum.TextXAlignment.Left
-
-local ContentContainer = Instance.new("Frame", Main)
-ContentContainer.Size, ContentContainer.Position, ContentContainer.BackgroundTransparency = UDim2.new(1, 0, 1, -32), UDim2.new(0, 0, 0, 32), 1
-local Sidebar = Instance.new("Frame", ContentContainer)
-Sidebar.Size, Sidebar.BackgroundColor3, Sidebar.BackgroundTransparency, Sidebar.BorderSizePixel = UDim2.new(0, 95, 1, 0), UI_THEME.SidebarColor, UI_THEME.SidebarTransparency, 0
-local SidebarLayout = Instance.new("UIListLayout", Sidebar)
-SidebarLayout.Padding, SidebarLayout.HorizontalAlignment = UDim.new(0, 5), Enum.HorizontalAlignment.Center
-Instance.new("UIPadding", Sidebar).PaddingTop = UDim.new(0, 8)
-
-local PageArea = Instance.new("Frame", ContentContainer)
-PageArea.Size, PageArea.Position, PageArea.BackgroundTransparency = UDim2.new(1, -105, 1, -10), UDim2.new(0, 100, 0, 5), 1
-
-local Pages = {}
-local function CreatePage(name, isList)
-    local pg = Instance.new("ScrollingFrame", PageArea)
-    pg.Size, pg.BackgroundTransparency, pg.ScrollBarThickness, pg.Visible, pg.BorderSizePixel = UDim2.new(1, 0, 1, 0), 1, 2, false, 0
-    if isList then
-        Instance.new("UIListLayout", pg).Padding = UDim.new(0, 5)
     else
-        local gl = Instance.new("UIGridLayout", pg)
-        gl.CellSize, gl.CellPadding = UDim2.new(0.48, 0, 0, 26), UDim2.new(0, 5, 0, 5)
-    end
-    Pages[name] = pg
-    return pg
-end
-
-local PageMain = CreatePage("Main", false); PageMain.Visible = true
-local PageCharm, PageEvent, PagePlayer, PageMisc = CreatePage("Charm", true), CreatePage("Event", true), CreatePage("Player", true), CreatePage("Misc", true)
-
--- Tab Switch Logic (Refactored)
-local Tabs = {}
-local function SwitchTab(tabName)
-    for name, btn in pairs(Tabs) do
-        local isActive = (name == tabName)
-        Pages[name].Visible = isActive
-        Services.TweenService:Create(btn, TweenInfo.new(0.2), {
-            BackgroundTransparency = isActive and 0.3 or 1,
-            TextColor3 = isActive and Color3.new(1,1,1) or UI_THEME.TextDim,
-            BackgroundColor3 = isActive and Color3.fromRGB(40, 40, 50) or Color3.fromRGB(255,255,255)
-        }):Play()
-    end
-end
-
-local function CreateSideTab(name, text, isActive)
-    local btn = Instance.new("TextButton", Sidebar)
-    btn.Size, btn.Text, btn.Font, btn.TextSize, btn.AutoButtonColor, btn.BorderSizePixel = UDim2.new(0.85, 0, 0, 26), text, UI_THEME.FontBtn, 10, true, 0
-    btn.BackgroundColor3 = isActive and Color3.fromRGB(40, 40, 50) or Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = isActive and 0.3 or 1
-    btn.TextColor3 = isActive and Color3.new(1,1,1) or UI_THEME.TextDim
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    btn.MouseButton1Click:Connect(function() SwitchTab(name) end)
-    Tabs[name] = btn
-end
-
-CreateSideTab("Main", "MAIN", true); CreateSideTab("Charm", "SHOP", false); CreateSideTab("Event", "EVENT", false)
-CreateSideTab("Player", "PLAYER", false); CreateSideTab("Misc", "MISC", false)
-
--- Helpers UI
-local function MakeBtn(parent, text)
-    local b = Instance.new("TextButton", parent)
-    b.Size, b.Text, b.BackgroundColor3, b.BackgroundTransparency, b.TextColor3, b.Font, b.TextScaled, b.AutoButtonColor = parent:IsA("ScrollingFrame") and parent:FindFirstChildOfClass("UIListLayout") and UDim2.new(0.95, 0, 0, 26) or UDim2.new(0,0,0,0), text, Color3.fromRGB(30, 30, 40), 0.3, UI_THEME.TextMain, UI_THEME.FontBtn, true, true
-    Instance.new("UITextSizeConstraint", b).MaxTextSize = 10
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    return b
-end
-
-local function ToggleVisual(btn, on)
-    Services.TweenService:Create(btn, TweenInfo.new(0.2), {
-        TextColor3 = on and Color3.new(1,1,1) or UI_THEME.TextMain,
-        BackgroundColor3 = on and Color3.fromRGB(40, 40, 50) or Color3.fromRGB(30, 30, 40)
-    }):Play()
-end
-
-local function MakeSwitch(parent, text, defaultState, callback)
-    local Frame = Instance.new("Frame", parent)
-    Frame.Size, Frame.BackgroundColor3, Frame.BackgroundTransparency = parent:IsA("ScrollingFrame") and parent:FindFirstChildOfClass("UIListLayout") and UDim2.new(0.95, 0, 0, 26) or UDim2.new(0,0,0,0), Color3.fromRGB(30, 30, 40), 0.3
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
-    
-    local Label = Instance.new("TextLabel", Frame)
-    Label.Size, Label.Position, Label.BackgroundTransparency, Label.Text, Label.TextColor3, Label.Font, Label.TextSize, Label.TextXAlignment = UDim2.new(0.65, 0, 1, 0), UDim2.new(0, 8, 0, 0), 1, text, UI_THEME.TextMain, UI_THEME.FontBtn, 9, Enum.TextXAlignment.Left
-    
-    local ToggleBtn = Instance.new("TextButton", Frame)
-    ToggleBtn.Size, ToggleBtn.Position, ToggleBtn.BackgroundColor3, ToggleBtn.Text = UDim2.new(0, 28, 0, 14), UDim2.new(1, -34, 0.5, -7), defaultState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(50, 50, 60), ""
-    Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
-    
-    local Circle = Instance.new("Frame", ToggleBtn)
-    Circle.Size, Circle.Position, Circle.BackgroundColor3 = UDim2.new(0, 10, 0, 10), defaultState and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5), Color3.fromRGB(255, 255, 255)
-    Instance.new("UICorner", Circle).CornerRadius = UDim.new(1, 0)
-    
-    local IsOn, Debounce = defaultState, false
-    ToggleBtn.MouseButton1Click:Connect(function()
-        if Debounce then return end
-        Debounce, IsOn = true, not IsOn
-        Services.TweenService:Create(ToggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = IsOn and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(50, 50, 60)}):Play()
-        Services.TweenService:Create(Circle, TweenInfo.new(0.2), {Position = IsOn and UDim2.new(1, -12, 0.5, -5) or UDim2.new(0, 2, 0.5, -5)}):Play()
-        if callback then callback(IsOn) end
-        task.wait(0.2); Debounce = false
-    end)
-    return Frame
-end
-
--- ============================================================
--- [5] REFACTORED GAME LOGIC (Guard Clauses & Tables)
--- ============================================================
-
--- Function 1: Force Equip
-local function ForceEquipRod(slot)
-    local remote = NetPath:FindFirstChild("RE/EquipToolFromHotbar")
-    if remote then remote:FireServer(slot or 1) end
-end
-
--- Function 2: Nuke Visuals (Table Mapping)
-local VisualClasses = {ParticleEmitter=true, Trail=true, Beam=true, Light=true, Fire=true, Sparkles=true}
-local HideClasses = {BasePart=true, MeshPart=true, UnionOperation=true, Texture=true, Decal=true}
-
-local function NukeVisuals(tool)
-    task.wait()
-    for _, obj in pairs(tool:GetDescendants()) do
-        if VisualClasses[obj.ClassName] then 
-            obj:Destroy()
-        elseif HideClasses[obj.ClassName] then
-            obj.Transparency = 1
-            pcall(function() obj.CanCollide = false; obj.CastShadow = false end)
-        end
-    end
-end
-
-local function SetHideRod(bool)
-    States.HideRod, getgenv().RemoveRodEnabled = bool, bool
-    if Connections["GhostRod"] then Connections["GhostRod"]:Disconnect() end
-    
-    if not bool then Notify("MAIN", "Ghost Rod: OFF", nil); return end
-
-    local char = GetChar()
-    if not char then return end
-    
-    local t = char:FindFirstChild("!!!EQUIPPED_TOOL!!!") or char:FindFirstChildWhichIsA("Tool")
-    if t then NukeVisuals(t) end
-    
-    Connections["GhostRod"] = char.ChildAdded:Connect(function(child)
-        if getgenv().RemoveRodEnabled and (child:IsA("Tool") or child.Name == "!!!EQUIPPED_TOOL!!!") then
-            NukeVisuals(child)
-        end
-    end)
-    Notify("MAIN", "Hide Rod: ON", nil)
-end
-
--- Function 3: Water Walk (Early Returns)
-local function SetWoW(bool)
-    States.WoW = bool
-    if Connections["WoW"] then Connections["WoW"]:Disconnect() end
-    
-    if not bool then
-        if BodyV then BodyV:Destroy(); BodyV = nil end
-        return
-    end
-    
-    local hrp = GetRoot()
-    if not hrp then return end
-    
-    BodyV = BodyV or Instance.new("BodyVelocity")
-    BodyV.Name, BodyV.MaxForce, BodyV.Velocity, BodyV.Parent = "WoW_Velocity", Vector3.new(math.huge, math.huge, math.huge), Vector3.zero, hrp
-    
-    Connections["WoW"] = Services.RunService.RenderStepped:Connect(function()
-        local humNow = GetHum()
-        if not (GetRoot() and humNow and BodyV and BodyV.Parent) then return end
-        local moveDir = humNow.MoveDirection
-        BodyV.Velocity = moveDir.Magnitude > 0 and Vector3.new(moveDir.X * humNow.WalkSpeed, 0, moveDir.Z * humNow.WalkSpeed) or Vector3.zero
-    end)
-end
-
--- Function 4: Optimize Objects (CPU Booster Refactor)
-local function OptimizeObject(v)
-    pcall(function()
-        if HideClasses[v.ClassName] then 
-            if v:IsA("BasePart") then v.Material, v.Reflectance, v.CastShadow = Enum.Material.SmoothPlastic, 0, false end
-            if v:IsA("MeshPart") then v.TextureID = "" end
-            if v.Transparency > 0.5 then v.Transparency = 1 end
-            if v.Name == "Water" then v.Transparency = 1 end
-        elseif VisualClasses[v.ClassName] then
-            v.Enabled = false
-        end
-    end)
-end
-
--- Function 5: Streamer Mode (Regex Refactor)
-local SPOOF_NAME = '<font face="GothamBold"><b>discord.gg/getseraphin VISUAL</b></font>'
-local function CustomizeMessage(message)
-    if not States.StreamerMode then return nil end
-    local txt = message.Text
-    if not (txt:find("caught") or txt:find("obtained") or txt:find("found")) then return nil end
-    
-    local props = Instance.new("TextChatMessageProperties")
-    props.Text = txt:gsub("^%S+", "<font color='#00ffff'>"..SPOOF_NAME.."</font>")
-    props.PrefixText = "<font color='#00ffff'>["..SPOOF_NAME.."]:</font> "
-    return props
-end
-Services.TextChatService.OnIncomingMessage = CustomizeMessage
-
--- ============================================================
--- [6] POPULATE PAGES (MAIN / PLAYER / EVENT)
--- ============================================================
-MakeSwitch(PageMain, "Auto Equip Rod", States.AutoEquip, function(v) States.AutoEquip = v end)
-MakeSwitch(PageMain, "Hide Rod ", States.HideRod, SetHideRod)
-MakeSwitch(PageMain, "Walk In Water", States.WoW, SetWoW)
-MakeSwitch(PageMain, "Freeze Character", States.Freeze, function(v)
-    States.Freeze = v
-    local hrp = GetRoot()
-    if hrp then hrp.Anchored = v end
-end)
-MakeSwitch(PageMain, "No Clip", States.Noclip, function(v)
-    States.Noclip = v
-    if Connections["Noclip"] then Connections["Noclip"]:Disconnect() end
-    if v then
-        Connections["Noclip"] = Services.RunService.Stepped:Connect(function()
-            local char = GetChar()
-            if not char then return end
-            for _,p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-        end)
+        BtnAuto.Text = "Auto Bot: OFF"
+        BtnAuto.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        StatusText.Text = "Bot dimatikan."
     end
 end)
-
-MakeSwitch(PagePlayer, "No Damage", States.NoDmg, function(v) States.NoDmg = v end)
-MakeSwitch(PagePlayer, "Streamer Mode", States.StreamerMode, function(v) States.StreamerMode = v end)
-
-MakeSwitch(PageEvent, "Auto Hunt Event", States.AutoEvent, function(v)
-    States.AutoEvent = v
-    if not v then
-        local hrp = GetRoot()
-        if IsInEvent and EventStartCFrame and hrp then hrp.CFrame = EventStartCFrame; EventStartCFrame = nil end
-        IsInEvent = false; SetWoW(false)
-    end
-end)
-
-MakeSwitch(PageMisc, "Panel Seraphin", States.Panel, function(v) States.Panel = v; FloatHUD.Visible = v end)
-MakeBtn(PageMisc, "Rejoin Server").MouseButton1Click:Connect(function() Services.TeleportService:Teleport(game.PlaceId, Player) end)
-
--- ============================================================
--- [7] BACKGROUND LOOPS (Optimized Delays & Early Returns)
--- ============================================================
-
--- Speed Loop
-task.spawn(function()
-    while true do
-        task.wait(States.Speed and 0.1 or 1) -- Ternary Wait!
-        if not States.Speed then continue end
-        
-        local hum = GetHum()
-        if not hum then continue end
-        
-        if hum.Sit and hum.SeatPart then
-            local sv = hum.SeatPart.AssemblyLinearVelocity
-            if sv.Magnitude > 0 then hum.SeatPart.AssemblyLinearVelocity = hum.SeatPart.CFrame.LookVector * States.SpeedVal end
-        else
-            hum.WalkSpeed = States.SpeedVal
-        end
-    end
-end)
-
--- No Damage Loop
-task.spawn(function()
-    while true do
-        task.wait(States.NoDmg and 0.5 or 2)
-        if not States.NoDmg then continue end
-        
-        local hum = GetHum()
-        if hum and hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
-    end
-end)
-
--- Auto Equip Loop
-task.spawn(function()
-    while true do
-        task.wait(States.AutoEquip and 2 or 5)
-        if States.AutoEquip and not States.IsMining then ForceEquipRod() end
-    end
-end)
-
--- Status Info Update Loop
-task.spawn(function()
-    while true do
-        task.wait(States.Panel and 1 or 3)
-        if not States.Panel then continue end
-        
-        pcall(function()
-            local ls = Player:FindFirstChild("leaderstats")
-            LblFishVal.Text = ls and ls:FindFirstChild("Caught") and tostring(ls.Caught.Value):reverse():gsub("%d%d%d", "%1,"):reverse():gsub("^,", "") or "0"
-            LblInvVal.Text = Player:FindFirstChild("Backpack") and tostring(#Player.Backpack:GetChildren()) or "0"
-        end)
-    end
-end)
-
--- Live Monitor Loop
-local sec, frames = os.clock(), 0
-Services.RunService.RenderStepped:Connect(function() frames = frames + 1 end)
-task.spawn(function()
-    while task.wait(0.5) do
-        local fps = math.floor(frames / (os.clock() - sec))
-        sec, frames = os.clock(), 0
-        MonLabel.Text = string.format("FPS: %d | CPU: %.2f ms | TIME: %s", fps, Services.Stats.PerformanceStats.CPU:GetValue(), DateTime.now():FormatUniversalTime("HH:mm:ss", "en-us"))
-    end
-end)
-
--- Boot
-if setfpscap then setfpscap(9999) end
-task.delay(1, function() Main.Visible = true; FloatHUD.Visible = States.Panel end)
