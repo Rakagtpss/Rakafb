@@ -1,155 +1,157 @@
--- 🎣 INSTAN FISHING SCRIPT dengan SIMPLE UI
--- Copy-paste langsung ke executor (SynapseX, Krnl, etc.)
+-- ==========================================
+-- SIMPLE INSTANT AUTO FISHING + CUSTOM DELAY
+-- ==========================================
 
-local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+-- Path Remotes
+local NetPath = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+local ChargeRodRemote = NetPath:WaitForChild("RF/ce8387781fe14f962f4d74a737b0ebfdae347070f82b867d4639713961a1a2c8")
+local LemparBaitRemote = NetPath:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
+local DapatIkanRemote = NetPath:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
 
--- Path Remote (dari query user)
-local net = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+-- Global State
+getgenv().AutoFishSetting = {
+    IsActive = false
+}
 
-local chargeRod = net:WaitForChild("RF/ce8387781fe14f962f4d74a737b0ebfdae347070f82b867d4639713961a1a2c8")
-local lemparBait = net:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
-local dapatIkan = net:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
-
--- State
-local autoFishing = false
-local fishingCoroutine = nil
-
--- Fungsi Instan Fishing Cycle
-local function doInstanFishing()
-    pcall(function()
-        chargeRod:InvokeServer()  -- Charge rod [cite:2]
-        task.wait(0.1)
-        
-        local args = {
-            -1.233184814453125,
-            0.05894758483513807,
-            tick() * 1000  -- Timestamp dinamis biar fresh [web:9]
-        }
-        lemparBait:InvokeServer(unpack(args))  -- Lempar bait [cite:2]
-        task.wait(0.1)
-        
-        dapatIkan:InvokeServer()  -- Dapat ikan [cite:2]
-    end)
+-- ==========================================
+-- [UI SETUP]
+-- ==========================================
+if CoreGui:FindFirstChild("SimpleAutoFish") then
+    CoreGui.SimpleAutoFish:Destroy()
 end
 
--- Fungsi Loop Auto
-local function startAutoFishing()
-    if fishingCoroutine then return end
-    fishingCoroutine = coroutine.create(function()
-        while autoFishing do
-            doInstanFishing()
-            task.wait(0.5)  -- Delay minimal anti-detect, sesuaikan [web:6]
-        end
-    end)
-    coroutine.resume(fishingCoroutine)
-end
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local BaitLabel = Instance.new("TextLabel")
+local BaitInput = Instance.new("TextBox")
+local CatchLabel = Instance.new("TextLabel")
+local CatchInput = Instance.new("TextBox")
+local ToggleBtn = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
 
-local function stopAutoFishing()
-    autoFishing = false
-    fishingCoroutine = nil
-end
+if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
+ScreenGui.Name = "SimpleAutoFish"
+ScreenGui.Parent = CoreGui
 
--- Buat Simple UI [web:9]
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "InstanFishingUI"
-screenGui.Parent = playerGui
-screenGui.ResetOnSpawn = false
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+MainFrame.Size = UDim2.new(0, 200, 0, 190)
+MainFrame.Active = true
+MainFrame.Draggable = true
+UICorner.Parent = MainFrame
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 220, 0, 120)
-mainFrame.Position = UDim2.new(0, 20, 0, 20)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "INSTANT FISHING"
+Title.TextColor3 = Color3.fromRGB(0, 200, 255)
+Title.TextSize = 14
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = mainFrame
+-- Delay Bait UI
+BaitLabel.Parent = MainFrame
+BaitLabel.BackgroundTransparency = 1
+BaitLabel.Position = UDim2.new(0.05, 0, 0.2, 0)
+BaitLabel.Size = UDim2.new(0.9, 0, 0, 20)
+BaitLabel.Font = Enum.Font.Gotham
+BaitLabel.Text = "Delay Lempar Bait (Detik):"
+BaitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+BaitLabel.TextSize = 11
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "🎣 Instan Fishing"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextScaled = true
-title.Font = Enum.Font.GothamBold
-title.Parent = mainFrame
+BaitInput.Parent = MainFrame
+BaitInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+BaitInput.Position = UDim2.new(0.1, 0, 0.32, 0)
+BaitInput.Size = UDim2.new(0.8, 0, 0, 25)
+BaitInput.Font = Enum.Font.GothamBold
+BaitInput.Text = "1.5" -- Default
+BaitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+BaitInput.TextSize = 12
+Instance.new("UICorner", BaitInput).CornerRadius = UDim.new(0, 4)
 
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
-toggleBtn.Position = UDim2.new(0.05, 0, 0, 50)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-toggleBtn.Text = "START AUTO"
-toggleBtn.TextColor3 = Color3.white
-toggleBtn.TextScaled = true
-toggleBtn.Font = Enum.Font.Gotham
-toggleBtn.Parent = mainFrame
+-- Delay Dapat Ikan UI
+CatchLabel.Parent = MainFrame
+CatchLabel.BackgroundTransparency = 1
+CatchLabel.Position = UDim2.new(0.05, 0, 0.48, 0)
+CatchLabel.Size = UDim2.new(0.9, 0, 0, 20)
+CatchLabel.Font = Enum.Font.Gotham
+CatchLabel.Text = "Delay Dapat Ikan (Detik):"
+CatchLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+CatchLabel.TextSize = 11
 
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 8)
-btnCorner.Parent = toggleBtn
+CatchInput.Parent = MainFrame
+CatchInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+CatchInput.Position = UDim2.new(0.1, 0, 0.6, 0)
+CatchInput.Size = UDim2.new(0.8, 0, 0, 25)
+CatchInput.Font = Enum.Font.GothamBold
+CatchInput.Text = "2.2" -- Default
+CatchInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+CatchInput.TextSize = 12
+Instance.new("UICorner", CatchInput).CornerRadius = UDim.new(0, 4)
 
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, 0, 0, 25)
-statusLabel.Position = UDim2.new(0, 0, 0, 90)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: OFF"
-statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-statusLabel.TextScaled = true
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.Parent = mainFrame
+-- Toggle Button
+ToggleBtn.Parent = MainFrame
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.78, 0)
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 30)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "START"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 14
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
--- Drag UI [web:9]
-local dragging = false
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-    end
-end)
-mainFrame.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        mainFrame.Position = UDim2.new(mainFrame.Position.X.Scale, mainFrame.Position.X.Offset + input.Delta.X, mainFrame.Position.Y.Scale, mainFrame.Position.Y.Offset + input.Delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+-- ==========================================
+-- [MAIN LOGIC]
+-- ==========================================
 
--- Toggle Logic
-toggleBtn.MouseButton1Click:Connect(function()
-    autoFishing = not autoFishing
+ToggleBtn.MouseButton1Click:Connect(function()
+    getgenv().AutoFishSetting.IsActive = not getgenv().AutoFishSetting.IsActive
     
-    if autoFishing then
-        toggleBtn.Text = "STOP AUTO"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-        statusLabel.Text = "Status: ON"
-        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        startAutoFishing()
+    if getgenv().AutoFishSetting.IsActive then
+        ToggleBtn.Text = "STOP"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
     else
-        toggleBtn.Text = "START AUTO"
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        statusLabel.Text = "Status: OFF"
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        stopAutoFishing()
+        ToggleBtn.Text = "START"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
     end
 end)
 
--- Animasi Hover
-local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
-toggleBtn.MouseEnter:Connect(function()
-    TweenService:Create(toggleBtn, tweenInfo, {Size = UDim2.new(0.92, 0, 0, 37)}):Play()
-end)
-toggleBtn.MouseLeave:Connect(function()
-    TweenService:Create(toggleBtn, tweenInfo, {Size = UDim2.new(0.9, 0, 0, 35)}):Play()
-end)
+task.spawn(function()
+    while task.wait(0.1) do
+        if getgenv().AutoFishSetting.IsActive then
+            pcall(function()
+                -- Ambil angka dari TextBox (Jika diisi huruf, otomatis kembali ke default 1.5 / 2.2)
+                local delayBait = tonumber(BaitInput.Text) or 1.5
+                local delayCatch = tonumber(CatchInput.Text) or 2.2
 
-print("🎣 Instan Fishing UI Loaded! Drag frame untuk pindah posisi. [web:9][cite:4]")
+                -- 1. Charge Rod
+                ChargeRodRemote:InvokeServer()
+                
+                -- 2. Tunggu Lempar Bait
+                task.wait(delayBait)
+                
+                -- 3. Lempar Bait
+                local args = {
+                    -1.233184814453125,
+                    0.05894758483513807,
+                    os.time() -- Dynamic Time agar server tidak error mendeteksi waktu lama
+                }
+                LemparBaitRemote:InvokeServer(unpack(args))
+                
+                -- 4. Tunggu Ikan
+                task.wait(delayCatch)
+                
+                -- 5. Tarik Ikan
+                DapatIkanRemote:InvokeServer()
+            end)
+            
+            -- Jeda 0.5 detik antar siklus memancing agar tidak spamming terlalu cepat
+            task.wait(0.5)
+        end
+    end
+end)
