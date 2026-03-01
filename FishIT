@@ -1,5 +1,5 @@
 -- ==========================================
--- SIMPLE INSTANT AUTO FISHING + AUTO SELL
+-- INSTANT AUTO FISHING + AUTO SELL + UNLOCKED LIMITER
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -9,7 +9,7 @@ local Workspace = game:GetService("Workspace")
 
 getgenv().AutoFishSetting = {
     IsActive = false,
-    CurrentCatchCount = 0 -- Penghitung jumlah tangkapan
+    LastSellTime = os.time()
 }
 
 -- ==========================================
@@ -50,9 +50,9 @@ ScreenGui.Parent = targetParent
 ScreenGui.ResetOnSpawn = false
 
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
-MainFrame.Size = UDim2.new(0, 200, 0, 260) -- Tinggi ditambah untuk UI baru
+MainFrame.Size = UDim2.new(0, 200, 0, 260)
 MainFrame.Active = true
 MainFrame.Draggable = true
 UICorner.Parent = MainFrame
@@ -60,10 +60,10 @@ UICorner.Parent = MainFrame
 Title.Parent = MainFrame
 Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "INSTANT FISHING"
-Title.TextColor3 = Color3.fromRGB(0, 200, 255)
-Title.TextSize = 14
+Title.Font = Enum.Font.GothamBlack
+Title.Text = "SPAM FISHING (UNLOCKED)"
+Title.TextColor3 = Color3.fromRGB(255, 50, 50)
+Title.TextSize = 12
 
 -- 1. Delay Bait UI
 BaitLabel.Parent = MainFrame
@@ -71,7 +71,7 @@ BaitLabel.BackgroundTransparency = 1
 BaitLabel.Position = UDim2.new(0.05, 0, 0, 35)
 BaitLabel.Size = UDim2.new(0.9, 0, 0, 15)
 BaitLabel.Font = Enum.Font.Gotham
-BaitLabel.Text = "Delay Bait (Detik):"
+BaitLabel.Text = "Delay Bait (Bisa 0):"
 BaitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 BaitLabel.TextSize = 11
 
@@ -80,7 +80,7 @@ BaitInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 BaitInput.Position = UDim2.new(0.1, 0, 0, 50)
 BaitInput.Size = UDim2.new(0.8, 0, 0, 25)
 BaitInput.Font = Enum.Font.GothamBold
-BaitInput.Text = "1.5"
+BaitInput.Text = "0" -- Mode Spam Default
 BaitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 BaitInput.TextSize = 12
 Instance.new("UICorner", BaitInput).CornerRadius = UDim.new(0, 4)
@@ -91,7 +91,7 @@ CatchLabel.BackgroundTransparency = 1
 CatchLabel.Position = UDim2.new(0.05, 0, 0, 85)
 CatchLabel.Size = UDim2.new(0.9, 0, 0, 15)
 CatchLabel.Font = Enum.Font.Gotham
-CatchLabel.Text = "Delay Catch (Detik):"
+CatchLabel.Text = "Delay Catch (Bisa 0):"
 CatchLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 CatchLabel.TextSize = 11
 
@@ -100,18 +100,18 @@ CatchInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 CatchInput.Position = UDim2.new(0.1, 0, 0, 100)
 CatchInput.Size = UDim2.new(0.8, 0, 0, 25)
 CatchInput.Font = Enum.Font.GothamBold
-CatchInput.Text = "2.2"
+CatchInput.Text = "0" -- Mode Spam Default
 CatchInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 CatchInput.TextSize = 12
 Instance.new("UICorner", CatchInput).CornerRadius = UDim.new(0, 4)
 
--- 3. Auto Sell Count UI
+-- 3. Auto Sell Waktu UI
 SellLabel.Parent = MainFrame
 SellLabel.BackgroundTransparency = 1
 SellLabel.Position = UDim2.new(0.05, 0, 0, 135)
 SellLabel.Size = UDim2.new(0.9, 0, 0, 15)
 SellLabel.Font = Enum.Font.Gotham
-SellLabel.Text = "Auto Sell After (Catches):"
+SellLabel.Text = "Auto Sell Every (Menit):"
 SellLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
 SellLabel.TextSize = 11
 
@@ -120,20 +120,20 @@ SellInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 SellInput.Position = UDim2.new(0.1, 0, 0, 150)
 SellInput.Size = UDim2.new(0.8, 0, 0, 25)
 SellInput.Font = Enum.Font.GothamBold
-SellInput.Text = "50" -- Default 50 ikan baru sell
+SellInput.Text = "5"
 SellInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 SellInput.TextSize = 12
 Instance.new("UICorner", SellInput).CornerRadius = UDim.new(0, 4)
 
--- Status Tangkapan
+-- Status Waktu Auto Sell
 StatusLabel.Parent = MainFrame
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Position = UDim2.new(0.05, 0, 0, 180)
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 15)
 StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "Caught: 0 / 50"
+StatusLabel.Text = "Next Sell in: Waiting..."
 StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-StatusLabel.TextSize = 10
+StatusLabel.TextSize = 11
 
 -- Toggle Button
 ToggleBtn.Parent = MainFrame
@@ -152,23 +152,26 @@ Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
 
 local function TriggerAutoSell()
     pcall(function()
-        -- Mencari folder utama
         local depsFolder = Workspace:FindFirstChild("!!! DEPENDENCIES")
         if not depsFolder then return end
         
-        -- Mengikuti path yang diminta: GetChildren()[9] -> SellAllPrompt -> SellAllPrompt
         local child9 = depsFolder:GetChildren()[9]
-        if child9 then
-            local promptParent = child9:FindFirstChild("SellAllPrompt")
-            if promptParent then
-                local actualPrompt = promptParent:FindFirstChild("SellAllPrompt")
+        if not child9 then return end
+        
+        local actualPrompt = child9:FindFirstChild("SellAllPrompt", true)
+        
+        if actualPrompt and actualPrompt:IsA("ProximityPrompt") then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local oldPos = hrp.CFrame
+                hrp.CFrame = actualPrompt.Parent.CFrame
+                task.wait(0.3) 
                 
-                -- Jika ketemu proximity prompt, kita picu (fire)
-                if actualPrompt and actualPrompt:IsA("ProximityPrompt") then
-                    fireproximityprompt(actualPrompt)
-                    -- Opsi: jika jarak diperlukan, teleport sebentar lalu kembali
-                    -- Namun kebanyakan ProximityPrompt bisa di-fire dari jauh dengan script.
-                end
+                fireproximityprompt(actualPrompt)
+                
+                task.wait(0.5)
+                hrp.CFrame = oldPos
+                task.wait(0.2)
             end
         end
     end)
@@ -184,11 +187,11 @@ ToggleBtn.MouseButton1Click:Connect(function()
     if getgenv().AutoFishSetting.IsActive then
         ToggleBtn.Text = "STOP"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
-        getgenv().AutoFishSetting.CurrentCatchCount = 0 -- Reset hitungan saat di-start ulang
+        getgenv().AutoFishSetting.LastSellTime = os.time()
     else
         ToggleBtn.Text = "START"
         ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        StatusLabel.Text = "Caught: 0 / " .. (tonumber(SellInput.Text) or 50)
+        StatusLabel.Text = "Next Sell in: Stopped"
     end
 end)
 
@@ -198,44 +201,37 @@ task.spawn(function()
     local LemparBaitRemote = NetPath:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
     local DapatIkanRemote = NetPath:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
 
-    while task.wait(0.1) do
+    -- UNLOCKED LOOP: task.wait() tanpa angka akan berjalan secepat mungkin
+    while task.wait() do 
         if getgenv().AutoFishSetting.IsActive then
             pcall(function()
-                -- 1. Ambil data dari Input Box
-                local delayBait = tonumber(BaitInput.Text) or 1.5
-                local delayCatch = tonumber(CatchInput.Text) or 2.2
-                local targetSellCount = tonumber(SellInput.Text) or 50
+                local delayBait = tonumber(BaitInput.Text) or 0
+                local delayCatch = tonumber(CatchInput.Text) or 0
+                
+                local sellIntervalSeconds = (tonumber(SellInput.Text) or 5) * 60
+                local timePassed = os.time() - getgenv().AutoFishSetting.LastSellTime
+                local timeLeft = sellIntervalSeconds - timePassed
 
-                -- 2. Update UI Teks
-                StatusLabel.Text = "Caught: " .. getgenv().AutoFishSetting.CurrentCatchCount .. " / " .. targetSellCount
-
-                -- 3. Cek apakah sudah waktunya Sell?
-                if getgenv().AutoFishSetting.CurrentCatchCount >= targetSellCount then
+                if timeLeft <= 0 then
                     StatusLabel.Text = "Selling Fish..."
                     TriggerAutoSell()
-                    task.wait(1) -- Beri waktu sedikit untuk server memproses penjualan
-                    getgenv().AutoFishSetting.CurrentCatchCount = 0 -- Reset Hitungan
+                    getgenv().AutoFishSetting.LastSellTime = os.time()
                 else
-                    -- 4. Fishing Cycle
+                    local minutes = math.floor(timeLeft / 60)
+                    local seconds = timeLeft % 60
+                    StatusLabel.Text = string.format("Next Sell in: %02d:%02d", minutes, seconds)
+
+                    -- Eksekusi Remotes (Spam Mode)
                     ChargeRodRemote:InvokeServer()
-                    task.wait(delayBait)
+                    if delayBait > 0 then task.wait(delayBait) end
                     
-                    local args = {
-                        -1.233184814453125,
-                        0.05894758483513807,
-                        os.time() 
-                    }
+                    local args = { -1.233184814453125, 0.05894758483513807, os.time() }
                     LemparBaitRemote:InvokeServer(unpack(args))
                     
-                    task.wait(delayCatch)
+                    if delayCatch > 0 then task.wait(delayCatch) end
                     DapatIkanRemote:InvokeServer()
-                    
-                    -- Tambah hitungan ikan yang berhasil ditangkap
-                    getgenv().AutoFishSetting.CurrentCatchCount = getgenv().AutoFishSetting.CurrentCatchCount + 1
                 end
             end)
-            
-            task.wait(0.5) -- Anti server spam crash
         end
     end
 end)
