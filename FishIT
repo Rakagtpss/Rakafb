@@ -1,27 +1,32 @@
 -- ==========================================
--- SIMPLE INSTANT AUTO FISHING + CUSTOM DELAY
+-- SIMPLE INSTANT AUTO FISHING + CUSTOM DELAY (FIX UI)
 -- ==========================================
 
-local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
--- Path Remotes
-local NetPath = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
-local ChargeRodRemote = NetPath:WaitForChild("RF/ce8387781fe14f962f4d74a737b0ebfdae347070f82b867d4639713961a1a2c8")
-local LemparBaitRemote = NetPath:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
-local DapatIkanRemote = NetPath:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
-
--- Global State
 getgenv().AutoFishSetting = {
     IsActive = false
 }
 
 -- ==========================================
--- [UI SETUP]
+-- [SAFE UI PARENTING]
 -- ==========================================
-if CoreGui:FindFirstChild("SimpleAutoFish") then
-    CoreGui.SimpleAutoFish:Destroy()
+local targetParent
+if gethui then
+    targetParent = gethui()
+else
+    local success, coreGui = pcall(function() return game:GetService("CoreGui") end)
+    if success and coreGui then
+        targetParent = coreGui
+    else
+        targetParent = LocalPlayer:WaitForChild("PlayerGui")
+    end
+end
+
+if targetParent:FindFirstChild("SimpleAutoFish") then
+    targetParent.SimpleAutoFish:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -36,7 +41,8 @@ local UICorner = Instance.new("UICorner")
 
 if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
 ScreenGui.Name = "SimpleAutoFish"
-ScreenGui.Parent = CoreGui
+ScreenGui.Parent = targetParent
+ScreenGui.ResetOnSpawn = false
 
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -69,7 +75,7 @@ BaitInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 BaitInput.Position = UDim2.new(0.1, 0, 0.32, 0)
 BaitInput.Size = UDim2.new(0.8, 0, 0, 25)
 BaitInput.Font = Enum.Font.GothamBold
-BaitInput.Text = "1.5" -- Default
+BaitInput.Text = "1.5"
 BaitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 BaitInput.TextSize = 12
 Instance.new("UICorner", BaitInput).CornerRadius = UDim.new(0, 4)
@@ -89,7 +95,7 @@ CatchInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 CatchInput.Position = UDim2.new(0.1, 0, 0.6, 0)
 CatchInput.Size = UDim2.new(0.8, 0, 0, 25)
 CatchInput.Font = Enum.Font.GothamBold
-CatchInput.Text = "2.2" -- Default
+CatchInput.Text = "2.2"
 CatchInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 CatchInput.TextSize = 12
 Instance.new("UICorner", CatchInput).CornerRadius = UDim.new(0, 4)
@@ -121,11 +127,18 @@ ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Gunakan task.spawn agar background proses tidak mengganggu UI
 task.spawn(function()
+    -- Load path remote secara aman (tidak nge-freeze game)
+    local NetPath = ReplicatedStorage:WaitForChild("Packages", 999):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
+    local ChargeRodRemote = NetPath:WaitForChild("RF/ce8387781fe14f962f4d74a737b0ebfdae347070f82b867d4639713961a1a2c8")
+    local LemparBaitRemote = NetPath:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
+    local DapatIkanRemote = NetPath:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
+
     while task.wait(0.1) do
         if getgenv().AutoFishSetting.IsActive then
             pcall(function()
-                -- Ambil angka dari TextBox (Jika diisi huruf, otomatis kembali ke default 1.5 / 2.2)
+                -- Ambil angka dari TextBox (Jika gagal jadi angka, pakai default)
                 local delayBait = tonumber(BaitInput.Text) or 1.5
                 local delayCatch = tonumber(CatchInput.Text) or 2.2
 
@@ -139,7 +152,7 @@ task.spawn(function()
                 local args = {
                     -1.233184814453125,
                     0.05894758483513807,
-                    os.time() -- Dynamic Time agar server tidak error mendeteksi waktu lama
+                    os.time() 
                 }
                 LemparBaitRemote:InvokeServer(unpack(args))
                 
@@ -150,8 +163,7 @@ task.spawn(function()
                 DapatIkanRemote:InvokeServer()
             end)
             
-            -- Jeda 0.5 detik antar siklus memancing agar tidak spamming terlalu cepat
-            task.wait(0.5)
+            task.wait(0.5) -- Jeda loop agar tidak terjadi crash / terdeteksi spam server
         end
     end
 end)
