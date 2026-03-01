@@ -1,206 +1,155 @@
--- ==========================================
--- SCRIPT SAMBUNG KATA FULL AUTO BOT + UI
--- ==========================================
+-- 🎣 INSTAN FISHING SCRIPT dengan SIMPLE UI
+-- Copy-paste langsung ke executor (SynapseX, Krnl, etc.)
 
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
--- ==========================================
--- ⚙️ KONFIGURASI UTAMA (WAJIB DIISI) ⚙️
--- ==========================================
--- Ganti bagian 'nil' di bawah ini dengan Path hasil copy dari Dex Explorer!
--- Contoh: local PathTeks_Target = player.PlayerGui.MainGui.WordFrame.TextLabel
-local PathTeks_Target = nil 
+-- Path Remote (dari query user)
+local net = ReplicatedStorage:WaitForChild("Packages"):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
 
-local DelayKetik = 0.05 -- Kecepatan ngetik per huruf (0.05 = natural)
+local chargeRod = net:WaitForChild("RF/ce8387781fe14f962f4d74a737b0ebfdae347070f82b867d4639713961a1a2c8")
+local lemparBait = net:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
+local dapatIkan = net:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
 
--- ==========================================
--- 1. DATABASE KAMUS (Auto Fetch GitHub)
--- ==========================================
-local kamus = {}
-local kataTerpakai = {}
-local isKamusReady = false
+-- State
+local autoFishing = false
+local fishingCoroutine = nil
 
-local function loadKamus()
-    local url = "https://raw.githubusercontent.com/Bhinneka/indonesian-wordlist/master/kamus.txt"
-    local success, response = pcall(function() return game:HttpGet(url) end)
-
-    if success and response then
-        for word in string.gmatch(response, "[^\r\n]+") do
-            word = string.lower(word)
-            local hurufPertama = string.sub(word, 1, 1)
-            if not kamus[hurufPertama] then kamus[hurufPertama] = {} end
-            table.insert(kamus[hurufPertama], word)
-        end
-        isKamusReady = true
-        return true
-    end
-    return false
-end
-
--- ==========================================
--- 2. LOGIKA MENCARI & MENGIRIM KATA
--- ==========================================
-local function ketikDanKirimKata(kata)
-    local remotes = ReplicatedStorage:WaitForChild("Remotes")
-    
-    -- 1. Mulai
-    remotes:WaitForChild("BillboardStart"):FireServer(string.sub(kata, 1, 1))
-    task.wait(DelayKetik)
-    
-    -- 2. Update per huruf
-    for i = 2, #kata do
-        remotes:WaitForChild("BillboardUpdate"):FireServer(string.sub(kata, 1, i))
-        task.wait(DelayKetik)
-    end
-    
-    -- 3. Submit
-    remotes:WaitForChild("SubmitWord"):FireServer(kata)
-    task.wait(0.1)
-    
-    -- 4. End
-    remotes:WaitForChild("BillboardEnd"):FireServer()
-end
-
-local function cariKata(awalan)
-    awalan = string.lower(awalan:match("^%s*(.-)%s*$")) -- Bersihkan spasi
-    if awalan == "" then return nil end
-    
-    local hurufPertama = string.sub(awalan, 1, 1)
-    local daftarKata = kamus[hurufPertama]
-    
-    if daftarKata then
-        for _, kata in ipairs(daftarKata) do
-            if string.sub(kata, 1, #awalan) == awalan and not kataTerpakai[kata] then
-                kataTerpakai[kata] = true 
-                return kata
-            end
-        end
-    end
-    return nil
-end
-
-local function eksekusiAutoJawab()
-    if not isKamusReady then return "Kamus belum siap!" end
-    if not PathTeks_Target then return "Path Teks belum diisi di script!" end
-    
-    local hurufDiLayar = PathTeks_Target.Text
-    if hurufDiLayar == "" then return "Tidak ada huruf terdeteksi" end
-    
-    local kataPilihan = cariKata(hurufDiLayar)
-    if kataPilihan then
-        ketikDanKirimKata(kataPilihan)
-        return "Berhasil: " .. kataPilihan
-    else
-        return "Kata awalan '"..hurufDiLayar.."' habis!"
-    end
-end
-
--- ==========================================
--- 3. UI SEDERHANA & ELEGAN
--- ==========================================
-local guiName = "AutoSambungKata"
-if CoreGui:FindFirstChild(guiName) then CoreGui[guiName]:Destroy() end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = guiName
-ScreenGui.Parent = CoreGui
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 220, 0, 160)
-MainFrame.Position = UDim2.new(0.5, -110, 0.8, -160)
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
-MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundTransparency = 1
-Title.Text = "🤖 Auto Sambung Kata"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.Parent = MainFrame
-
-local StatusText = Instance.new("TextLabel")
-StatusText.Size = UDim2.new(1, 0, 0, 20)
-StatusText.Position = UDim2.new(0, 0, 0, 35)
-StatusText.BackgroundTransparency = 1
-StatusText.Text = "Mengunduh KBBI..."
-StatusText.TextColor3 = Color3.fromRGB(0, 255, 150)
-StatusText.Font = Enum.Font.Gotham
-StatusText.TextSize = 12
-StatusText.Parent = MainFrame
-
-local BtnJawab = Instance.new("TextButton")
-BtnJawab.Size = UDim2.new(0.8, 0, 0, 35)
-BtnJawab.Position = UDim2.new(0.1, 0, 0, 65)
-BtnJawab.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-BtnJawab.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnJawab.Text = "Jawab Sekali"
-BtnJawab.Font = Enum.Font.GothamBold
-BtnJawab.TextSize = 14
-BtnJawab.Parent = MainFrame
-Instance.new("UICorner", BtnJawab).CornerRadius = UDim.new(0, 6)
-
-local BtnAuto = Instance.new("TextButton")
-BtnAuto.Size = UDim2.new(0.8, 0, 0, 35)
-BtnAuto.Position = UDim2.new(0.1, 0, 0, 110)
-BtnAuto.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-BtnAuto.TextColor3 = Color3.fromRGB(255, 255, 255)
-BtnAuto.Text = "Auto Bot: OFF"
-BtnAuto.Font = Enum.Font.GothamBold
-BtnAuto.TextSize = 14
-BtnAuto.Parent = MainFrame
-Instance.new("UICorner", BtnAuto).CornerRadius = UDim.new(0, 6)
-
--- ==========================================
--- 4. KONTROL TOMBOL & AUTO BOT
--- ==========================================
-local isAutoBotOn = false
-
--- Load Kamus di awal
-task.spawn(function()
-    if loadKamus() then
-        StatusText.Text = "✅ Siap digunakan!"
-    else
-        StatusText.Text = "❌ Gagal muat kamus!"
-        StatusText.TextColor3 = Color3.fromRGB(255, 50, 50)
-    end
-end)
-
--- Tombol Jawab Manual (Tapi deteksi otomatis)
-BtnJawab.MouseButton1Click:Connect(function()
-    StatusText.Text = "Mendeteksi & Mengetik..."
-    local hasil = eksekusiAutoJawab()
-    StatusText.Text = hasil
-end)
-
--- Tombol Toggle Auto Bot
-BtnAuto.MouseButton1Click:Connect(function()
-    isAutoBotOn = not isAutoBotOn
-    if isAutoBotOn then
-        BtnAuto.Text = "Auto Bot: ON"
-        BtnAuto.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        StatusText.Text = "Bot aktif! Menunggu giliran..."
+-- Fungsi Instan Fishing Cycle
+local function doInstanFishing()
+    pcall(function()
+        chargeRod:InvokeServer()  -- Charge rod [cite:2]
+        task.wait(0.1)
         
-        -- Jika PathTeks_Target diisi, pantau setiap kali teksnya berubah
-        if PathTeks_Target then
-            PathTeks_Target:GetPropertyChangedSignal("Text"):Connect(function()
-                if isAutoBotOn and PathTeks_Target.Text ~= "" then
-                    task.wait(0.5) -- Jeda setengah detik agar tidak kelihatan seperti citer
-                    StatusText.Text = eksekusiAutoJawab()
-                end
-            end)
+        local args = {
+            -1.233184814453125,
+            0.05894758483513807,
+            tick() * 1000  -- Timestamp dinamis biar fresh [web:9]
+        }
+        lemparBait:InvokeServer(unpack(args))  -- Lempar bait [cite:2]
+        task.wait(0.1)
+        
+        dapatIkan:InvokeServer()  -- Dapat ikan [cite:2]
+    end)
+end
+
+-- Fungsi Loop Auto
+local function startAutoFishing()
+    if fishingCoroutine then return end
+    fishingCoroutine = coroutine.create(function()
+        while autoFishing do
+            doInstanFishing()
+            task.wait(0.5)  -- Delay minimal anti-detect, sesuaikan [web:6]
         end
-    else
-        BtnAuto.Text = "Auto Bot: OFF"
-        BtnAuto.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-        StatusText.Text = "Bot dimatikan."
+    end)
+    coroutine.resume(fishingCoroutine)
+end
+
+local function stopAutoFishing()
+    autoFishing = false
+    fishingCoroutine = nil
+end
+
+-- Buat Simple UI [web:9]
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "InstanFishingUI"
+screenGui.Parent = playerGui
+screenGui.ResetOnSpawn = false
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 120)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "🎣 Instan Fishing"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
+toggleBtn.Position = UDim2.new(0.05, 0, 0, 50)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+toggleBtn.Text = "START AUTO"
+toggleBtn.TextColor3 = Color3.white
+toggleBtn.TextScaled = true
+toggleBtn.Font = Enum.Font.Gotham
+toggleBtn.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 25)
+statusLabel.Position = UDim2.new(0, 0, 0, 90)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "Status: OFF"
+statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.Parent = mainFrame
+
+-- Drag UI [web:9]
+local dragging = false
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
     end
 end)
+mainFrame.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        mainFrame.Position = UDim2.new(mainFrame.Position.X.Scale, mainFrame.Position.X.Offset + input.Delta.X, mainFrame.Position.Y.Scale, mainFrame.Position.Y.Offset + input.Delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- Toggle Logic
+toggleBtn.MouseButton1Click:Connect(function()
+    autoFishing = not autoFishing
+    
+    if autoFishing then
+        toggleBtn.Text = "STOP AUTO"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+        statusLabel.Text = "Status: ON"
+        statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        startAutoFishing()
+    else
+        toggleBtn.Text = "START AUTO"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+        statusLabel.Text = "Status: OFF"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        stopAutoFishing()
+    end
+end)
+
+-- Animasi Hover
+local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+toggleBtn.MouseEnter:Connect(function()
+    TweenService:Create(toggleBtn, tweenInfo, {Size = UDim2.new(0.92, 0, 0, 37)}):Play()
+end)
+toggleBtn.MouseLeave:Connect(function()
+    TweenService:Create(toggleBtn, tweenInfo, {Size = UDim2.new(0.9, 0, 0, 35)}):Play()
+end)
+
+print("🎣 Instan Fishing UI Loaded! Drag frame untuk pindah posisi. [web:9][cite:4]")
