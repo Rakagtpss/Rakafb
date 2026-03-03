@@ -1,237 +1,184 @@
--- ==========================================
--- INSTANT AUTO FISHING + AUTO SELL + UNLOCKED LIMITER
--- ==========================================
-
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local LocalPlayer = Players.LocalPlayer
 
-getgenv().AutoFishSetting = {
-    IsActive = false,
-    LastSellTime = os.time()
-}
-
--- ==========================================
--- [SAFE UI PARENTING]
--- ==========================================
-local targetParent
-if gethui then
-    targetParent = gethui()
-else
-    local success, coreGui = pcall(function() return game:GetService("CoreGui") end)
-    if success and coreGui then
-        targetParent = coreGui
-    else
-        targetParent = LocalPlayer:WaitForChild("PlayerGui")
-    end
+-- Hapus UI lama jika script dijalankan ulang
+if CoreGui:FindFirstChild("AutoKBBI_UI") then
+	CoreGui.AutoKBBI_UI:Destroy()
 end
 
-if targetParent:FindFirstChild("SimpleAutoFish") then
-    targetParent.SimpleAutoFish:Destroy()
-end
-
+-- ==========================================
+-- 1. SETUP UI MOD MENU (ON/OFF & KECEPATAN)
+-- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoKBBI_UI"
+ScreenGui.Parent = CoreGui
+
 local MainFrame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local BaitLabel = Instance.new("TextLabel")
-local BaitInput = Instance.new("TextBox")
-local CatchLabel = Instance.new("TextLabel")
-local CatchInput = Instance.new("TextBox")
-local SellLabel = Instance.new("TextLabel")
-local SellInput = Instance.new("TextBox")
-local ToggleBtn = Instance.new("TextButton")
-local StatusLabel = Instance.new("TextLabel")
-local UICorner = Instance.new("UICorner")
-
-if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
-ScreenGui.Name = "SimpleAutoFish"
-ScreenGui.Parent = targetParent
-ScreenGui.ResetOnSpawn = false
-
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
-MainFrame.Size = UDim2.new(0, 200, 0, 260)
+MainFrame.Size = UDim2.new(0, 250, 0, 180)
+MainFrame.Position = UDim2.new(0.5, -125, 0.8, -180)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 MainFrame.Active = true
-MainFrame.Draggable = true
-UICorner.Parent = MainFrame
+MainFrame.Draggable = true 
+MainFrame.Parent = ScreenGui
 
-Title.Parent = MainFrame
-Title.BackgroundTransparency = 1
+local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Font = Enum.Font.GothamBlack
-Title.Text = "SPAM FISHING (UNLOCKED)"
-Title.TextColor3 = Color3.fromRGB(255, 50, 50)
-Title.TextSize = 12
+Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Text = "🤖 100% Auto KBBI"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.Parent = MainFrame
 
--- 1. Delay Bait UI
-BaitLabel.Parent = MainFrame
-BaitLabel.BackgroundTransparency = 1
-BaitLabel.Position = UDim2.new(0.05, 0, 0, 35)
-BaitLabel.Size = UDim2.new(0.9, 0, 0, 15)
-BaitLabel.Font = Enum.Font.Gotham
-BaitLabel.Text = "Delay Bait (Bisa 0):"
-BaitLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-BaitLabel.TextSize = 11
+-- Kotak teks untuk Kecepatan Ngetik (Delay)
+local InputDelay = Instance.new("TextBox")
+InputDelay.Size = UDim2.new(0.8, 0, 0, 30)
+InputDelay.Position = UDim2.new(0.1, 0, 0.25, 0)
+InputDelay.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+InputDelay.TextColor3 = Color3.fromRGB(255, 255, 255)
+InputDelay.PlaceholderText = "Kecepatan Ngetik (0.1)"
+InputDelay.Text = "0.1" 
+InputDelay.Font = Enum.Font.Gotham
+InputDelay.TextSize = 14
+InputDelay.Parent = MainFrame
 
-BaitInput.Parent = MainFrame
-BaitInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-BaitInput.Position = UDim2.new(0.1, 0, 0, 50)
-BaitInput.Size = UDim2.new(0.8, 0, 0, 25)
-BaitInput.Font = Enum.Font.GothamBold
-BaitInput.Text = "0" -- Mode Spam Default
-BaitInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-BaitInput.TextSize = 12
-Instance.new("UICorner", BaitInput).CornerRadius = UDim.new(0, 4)
-
--- 2. Delay Dapat Ikan UI
-CatchLabel.Parent = MainFrame
-CatchLabel.BackgroundTransparency = 1
-CatchLabel.Position = UDim2.new(0.05, 0, 0, 85)
-CatchLabel.Size = UDim2.new(0.9, 0, 0, 15)
-CatchLabel.Font = Enum.Font.Gotham
-CatchLabel.Text = "Delay Catch (Bisa 0):"
-CatchLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-CatchLabel.TextSize = 11
-
-CatchInput.Parent = MainFrame
-CatchInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-CatchInput.Position = UDim2.new(0.1, 0, 0, 100)
-CatchInput.Size = UDim2.new(0.8, 0, 0, 25)
-CatchInput.Font = Enum.Font.GothamBold
-CatchInput.Text = "0" -- Mode Spam Default
-CatchInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-CatchInput.TextSize = 12
-Instance.new("UICorner", CatchInput).CornerRadius = UDim.new(0, 4)
-
--- 3. Auto Sell Waktu UI
-SellLabel.Parent = MainFrame
-SellLabel.BackgroundTransparency = 1
-SellLabel.Position = UDim2.new(0.05, 0, 0, 135)
-SellLabel.Size = UDim2.new(0.9, 0, 0, 15)
-SellLabel.Font = Enum.Font.Gotham
-SellLabel.Text = "Auto Sell Every (Menit):"
-SellLabel.TextColor3 = Color3.fromRGB(255, 170, 0)
-SellLabel.TextSize = 11
-
-SellInput.Parent = MainFrame
-SellInput.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-SellInput.Position = UDim2.new(0.1, 0, 0, 150)
-SellInput.Size = UDim2.new(0.8, 0, 0, 25)
-SellInput.Font = Enum.Font.GothamBold
-SellInput.Text = "5"
-SellInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-SellInput.TextSize = 12
-Instance.new("UICorner", SellInput).CornerRadius = UDim.new(0, 4)
-
--- Status Waktu Auto Sell
-StatusLabel.Parent = MainFrame
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 180)
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 15)
-StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "Next Sell in: Waiting..."
-StatusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-StatusLabel.TextSize = 11
-
--- Toggle Button
-ToggleBtn.Parent = MainFrame
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0, 210)
+-- Tombol ON/OFF Auto Detect
+local ToggleBtn = Instance.new("TextButton")
 ToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.Text = "START"
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Merah (OFF)
 ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Text = "AUTO DETECT: OFF"
+ToggleBtn.Font = Enum.Font.GothamBold
 ToggleBtn.TextSize = 14
-Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 6)
+ToggleBtn.Parent = MainFrame
+
+local StatusTxt = Instance.new("TextLabel")
+StatusTxt.Size = UDim2.new(1, 0, 0, 20)
+StatusTxt.Position = UDim2.new(0, 0, 0.75, 0)
+StatusTxt.BackgroundTransparency = 1
+StatusTxt.TextColor3 = Color3.fromRGB(200, 200, 200)
+StatusTxt.Text = "Mengunduh KBBI..."
+StatusTxt.Font = Enum.Font.Gotham
+StatusTxt.TextSize = 12
+StatusTxt.Parent = MainFrame
+
+-- Variabel status Auto-Detect
+local isAutoON = false
+local isTyping = false -- Mencegah script spam ngetik dobel
 
 -- ==========================================
--- [CORE FUNCTIONS]
+-- 2. MENGUNDUH DATABASE KBBI
 -- ==========================================
+local urlKBBI = "https://raw.githubusercontent.com/damzaky/kumpulan-kata-bahasa-indonesia-KBBI/master/legacy/indonesian-words.txt"
+local success, response = pcall(function() return game:HttpGet(urlKBBI) end)
 
-local function TriggerAutoSell()
-    pcall(function()
-        local depsFolder = Workspace:FindFirstChild("!!! DEPENDENCIES")
-        if not depsFolder then return end
-        
-        local child9 = depsFolder:GetChildren()[9]
-        if not child9 then return end
-        
-        local actualPrompt = child9:FindFirstChild("SellAllPrompt", true)
-        
-        if actualPrompt and actualPrompt:IsA("ProximityPrompt") then
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local oldPos = hrp.CFrame
-                hrp.CFrame = actualPrompt.Parent.CFrame
-                task.wait(0.3) 
-                
-                fireproximityprompt(actualPrompt)
-                
-                task.wait(0.5)
-                hrp.CFrame = oldPos
-                task.wait(0.2)
-            end
-        end
-    end)
+local daftarKataKBBI = {}
+if success then
+	local cleanData = string.gsub(response, "\r", "")
+	daftarKataKBBI = string.split(cleanData, "\n")
+	StatusTxt.Text = "Siap! " .. #daftarKataKBBI .. " kata dimuat."
+else
+	StatusTxt.Text = "❌ Gagal mengunduh kata!"
 end
 
 -- ==========================================
--- [MAIN LOGIC]
+-- 3. LOGIC PENCARIAN & AUTO-KETIK
 -- ==========================================
+local function cariKataYangCocok(sukuKata)
+	sukuKata = string.lower(sukuKata)
+	local kataCocok = {}
+	
+	for _, kata in ipairs(daftarKataKBBI) do
+		if string.find(string.lower(kata), sukuKata) then
+			table.insert(kataCocok, kata)
+		end
+	end
+	
+	if #kataCocok > 0 then
+		return kataCocok[math.random(1, #kataCocok)]
+	else
+		return nil
+	end
+end
 
+local function autoKetik(kata, delayNgetik)
+	isTyping = true
+	StatusTxt.Text = "Mengetik: " .. kata
+	local currentText = ""
+	
+	for i = 1, #kata do
+		local huruf = string.sub(kata, i, i)
+		currentText = currentText .. huruf
+		
+		if i == 1 then
+			Remotes:WaitForChild("BillboardStart"):FireServer(currentText)
+		else
+			Remotes:WaitForChild("BillboardUpdate"):FireServer(currentText)
+		end
+		
+		task.wait(delayNgetik)
+	end
+	
+	Remotes:WaitForChild("SubmitWord"):FireServer(string.lower(kata))
+	Remotes:WaitForChild("BillboardEnd"):FireServer()
+	
+	task.wait(0.5)
+	StatusTxt.Text = "Standby..."
+	isTyping = false
+end
+
+-- ==========================================
+-- 4. SISTEM FULL AUTO-DETEKSI DARI MATCH UI
+-- ==========================================
+math.randomseed(os.time())
+
+-- PERHATIAN: Kamu mungkin perlu menambahkan spesifik lokasi TextLabel-nya di bawah ini!
+-- Jika error, cek di Dark Dex apakah ada frame lagi setelah "MatchUI"
+local MatchUI = LocalPlayer.PlayerGui:WaitForChild("MatchUI")
+
+-- Asumsi lokasi Teks adalah TextLabel di dalam MatchUI (UBAH JIKA PERLU)
+-- Misalnya: local TeksGiliran = MatchUI.Frame.TeksSukuKata
+local TeksGiliran = MatchUI -- << GANTI INI KE PATH TEXTLABEL YANG BENAR JIKA TIDAK JALAN
+
+-- Event Listener: Memantau perubahan teks di layar gamenya
+if TeksGiliran:IsA("TextLabel") or TeksGiliran:IsA("TextBox") then
+	TeksGiliran:GetPropertyChangedSignal("Text"):Connect(function()
+		local sukuKataMuncul = TeksGiliran.Text
+		
+		-- Syarat jalan: Auto harus ON, Tidak sedang ngetik, Teks tidak boleh kosong
+		if isAutoON and not isTyping and sukuKataMuncul ~= "" and #sukuKataMuncul >= 2 then
+			local delayNgetik = tonumber(InputDelay.Text) or 0.1 
+			local kataDitemukan = cariKataYangCocok(sukuKataMuncul)
+			
+			if kataDitemukan then
+				task.spawn(function()
+					autoKetik(kataDitemukan, delayNgetik)
+				end)
+			else
+				StatusTxt.Text = "❌ Kata tdk ada di KBBI!"
+			end
+		end
+	end)
+else
+	warn("TeksGiliran belum menunjuk ke TextLabel yang benar! Cek baris 108 di script.")
+	StatusTxt.Text = "⚠️ Path TextLabel salah!"
+end
+
+-- Logic Tombol Sakelar UI
 ToggleBtn.MouseButton1Click:Connect(function()
-    getgenv().AutoFishSetting.IsActive = not getgenv().AutoFishSetting.IsActive
-    
-    if getgenv().AutoFishSetting.IsActive then
-        ToggleBtn.Text = "STOP"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
-        getgenv().AutoFishSetting.LastSellTime = os.time()
-    else
-        ToggleBtn.Text = "START"
-        ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-        StatusLabel.Text = "Next Sell in: Stopped"
-    end
-end)
-
-task.spawn(function()
-    local NetPath = ReplicatedStorage:WaitForChild("Packages", 999):WaitForChild("_Index"):WaitForChild("sleitnick_net@0.2.0"):WaitForChild("net")
-    local ChargeRodRemote = NetPath:WaitForChild("RF/ce8387781fe14f962f4d74a737b0ebfdae347070f82b867d4639713961a1a2c8")
-    local LemparBaitRemote = NetPath:WaitForChild("RF/3ab64f9b8c1417b91c1b9d9c42a7092e25aba5d66fa2bbe362216c53a0003406")
-    local DapatIkanRemote = NetPath:WaitForChild("RF/53492427a4a6ec4551121d738f97ec5e2eb77d4678ae9353885fb2a701409d5e")
-
-    -- UNLOCKED LOOP: task.wait() tanpa angka akan berjalan secepat mungkin
-    while task.wait() do 
-        if getgenv().AutoFishSetting.IsActive then
-            pcall(function()
-                local delayBait = tonumber(BaitInput.Text) or 0
-                local delayCatch = tonumber(CatchInput.Text) or 0
-                
-                local sellIntervalSeconds = (tonumber(SellInput.Text) or 5) * 60
-                local timePassed = os.time() - getgenv().AutoFishSetting.LastSellTime
-                local timeLeft = sellIntervalSeconds - timePassed
-
-                if timeLeft <= 0 then
-                    StatusLabel.Text = "Selling Fish..."
-                    TriggerAutoSell()
-                    getgenv().AutoFishSetting.LastSellTime = os.time()
-                else
-                    local minutes = math.floor(timeLeft / 60)
-                    local seconds = timeLeft % 60
-                    StatusLabel.Text = string.format("Next Sell in: %02d:%02d", minutes, seconds)
-
-                    -- Eksekusi Remotes (Spam Mode)
-                    ChargeRodRemote:InvokeServer()
-                    if delayBait > 0 then task.wait(delayBait) end
-                    
-                    local args = { -1.233184814453125, 0.05894758483513807, os.time() }
-                    LemparBaitRemote:InvokeServer(unpack(args))
-                    
-                    if delayCatch > 0 then task.wait(delayCatch) end
-                    DapatIkanRemote:InvokeServer()
-                end
-            end)
-        end
-    end
+	isAutoON = not isAutoON
+	
+	if isAutoON then
+		ToggleBtn.Text = "AUTO DETECT: ON"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50) -- Hijau
+		StatusTxt.Text = "Sistem Aktif. Menunggu huruf..."
+	else
+		ToggleBtn.Text = "AUTO DETECT: OFF"
+		ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Merah
+		StatusTxt.Text = "Sistem Dimatikan."
+	end
 end)
