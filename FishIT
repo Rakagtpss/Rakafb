@@ -1,184 +1,168 @@
-local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
 
--- Hapus UI lama jika script dijalankan ulang
-if CoreGui:FindFirstChild("AutoKBBI_UI") then
-	CoreGui.AutoKBBI_UI:Destroy()
+local BillboardStart = Remotes:WaitForChild("BillboardStart")
+local BillboardUpdate = Remotes:WaitForChild("BillboardUpdate")
+local SubmitWord = Remotes:WaitForChild("SubmitWord")
+local BillboardEnd = Remotes:WaitForChild("BillboardEnd")
+
+-- ==========================================
+-- 1. FETCH DATABASE DARI WEB
+-- ==========================================
+local kamusKBBI = {}
+local kataTerpakai = {}
+local autoAktif = false
+
+local urlKBBI = "https://raw.githubusercontent.com/Bhinneka/indonesian-wordlist/master/indonesian-words.txt"
+
+print("Sedang mengunduh database KBBI...")
+local success, rawData = pcall(function()
+    return game:HttpGet(urlKBBI)
+end)
+
+if success and rawData then
+    for kata in string.gmatch(rawData, "[^\r\n]+") do
+        kata = string.lower(kata)
+        if #kata > 1 then
+            local hurufAwal = string.sub(kata, 1, 1)
+            if not kamusKBBI[hurufAwal] then kamusKBBI[hurufAwal] = {} end
+            table.insert(kamusKBBI[hurufAwal], kata)
+        end
+    end
+    print("Database KBBI berhasil dimuat!")
+else
+    warn("Gagal mengunduh database KBBI.")
 end
 
 -- ==========================================
--- 1. SETUP UI MOD MENU (ON/OFF & KECEPATAN)
+-- 2. LOGIKA AUTO SAMBUNG KATA
+-- ==========================================
+local function cariKata(hurufAwal)
+    hurufAwal = string.lower(hurufAwal) 
+    local listKata = kamusKBBI[hurufAwal]
+    
+    if listKata then
+        for _, kata in ipairs(listKata) do
+            if not kataTerpakai[kata] then
+                kataTerpakai[kata] = true
+                return kata
+            end
+        end
+    end
+    return nil
+end
+
+local function autoKetikKata(kata)
+    local teksBerjalan = ""
+    for i = 1, #kata do
+        teksBerjalan = string.sub(kata, 1, i)
+        
+        local args = {teksBerjalan}
+        if i == 1 then
+            BillboardStart:FireServer(unpack(args))
+        else
+            BillboardUpdate:FireServer(unpack(args))
+        end
+        task.wait(0.05) -- Jeda aman anti-kick / anti-spam
+    end
+    
+    SubmitWord:FireServer(teksBerjalan)
+    task.wait(0.05)
+    BillboardEnd:FireServer()
+end
+
+-- ==========================================
+-- 3. SIMPLE UI (DRAGGABLE)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AutoKBBI_UI"
-ScreenGui.Parent = CoreGui
-
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 250, 0, 180)
-MainFrame.Position = UDim2.new(0.5, -125, 0.8, -180)
-MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-MainFrame.Active = true
-MainFrame.Draggable = true 
-MainFrame.Parent = ScreenGui
-
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Text = "🤖 100% Auto KBBI"
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 14
-Title.Parent = MainFrame
-
--- Kotak teks untuk Kecepatan Ngetik (Delay)
-local InputDelay = Instance.new("TextBox")
-InputDelay.Size = UDim2.new(0.8, 0, 0, 30)
-InputDelay.Position = UDim2.new(0.1, 0, 0.25, 0)
-InputDelay.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-InputDelay.TextColor3 = Color3.fromRGB(255, 255, 255)
-InputDelay.PlaceholderText = "Kecepatan Ngetik (0.1)"
-InputDelay.Text = "0.1" 
-InputDelay.Font = Enum.Font.Gotham
-InputDelay.TextSize = 14
-InputDelay.Parent = MainFrame
-
--- Tombol ON/OFF Auto Detect
 local ToggleBtn = Instance.new("TextButton")
-ToggleBtn.Size = UDim2.new(0.8, 0, 0, 35)
-ToggleBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Merah (OFF)
-ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleBtn.Text = "AUTO DETECT: OFF"
-ToggleBtn.Font = Enum.Font.GothamBold
-ToggleBtn.TextSize = 14
+local Status = Instance.new("TextLabel")
+
+ScreenGui.Name = "AutoKBBI_UI"
+ScreenGui.Parent = pcall(function() return CoreGui end) and CoreGui or Players.LocalPlayer:WaitForChild("PlayerGui")
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
+MainFrame.Size = UDim2.new(0, 200, 0, 150)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "Auto KBBI"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
+
+ToggleBtn.Name = "ToggleBtn"
 ToggleBtn.Parent = MainFrame
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+ToggleBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
+ToggleBtn.Size = UDim2.new(0.8, 0, 0, 40)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.Text = "AUTO: OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 16
 
-local StatusTxt = Instance.new("TextLabel")
-StatusTxt.Size = UDim2.new(1, 0, 0, 20)
-StatusTxt.Position = UDim2.new(0, 0, 0.75, 0)
-StatusTxt.BackgroundTransparency = 1
-StatusTxt.TextColor3 = Color3.fromRGB(200, 200, 200)
-StatusTxt.Text = "Mengunduh KBBI..."
-StatusTxt.Font = Enum.Font.Gotham
-StatusTxt.TextSize = 12
-StatusTxt.Parent = MainFrame
+Status.Name = "Status"
+Status.Parent = MainFrame
+Status.BackgroundTransparency = 1
+Status.Position = UDim2.new(0, 0, 0.8, 0)
+Status.Size = UDim2.new(1, 0, 0, 20)
+Status.Font = Enum.Font.Gotham
+Status.Text = "Menunggu trigger..."
+Status.TextColor3 = Color3.fromRGB(150, 150, 150)
+Status.TextSize = 12
 
--- Variabel status Auto-Detect
-local isAutoON = false
-local isTyping = false -- Mencegah script spam ngetik dobel
-
--- ==========================================
--- 2. MENGUNDUH DATABASE KBBI
--- ==========================================
-local urlKBBI = "https://raw.githubusercontent.com/damzaky/kumpulan-kata-bahasa-indonesia-KBBI/master/legacy/indonesian-words.txt"
-local success, response = pcall(function() return game:HttpGet(urlKBBI) end)
-
-local daftarKataKBBI = {}
-if success then
-	local cleanData = string.gsub(response, "\r", "")
-	daftarKataKBBI = string.split(cleanData, "\n")
-	StatusTxt.Text = "Siap! " .. #daftarKataKBBI .. " kata dimuat."
-else
-	StatusTxt.Text = "❌ Gagal mengunduh kata!"
-end
-
--- ==========================================
--- 3. LOGIC PENCARIAN & AUTO-KETIK
--- ==========================================
-local function cariKataYangCocok(sukuKata)
-	sukuKata = string.lower(sukuKata)
-	local kataCocok = {}
-	
-	for _, kata in ipairs(daftarKataKBBI) do
-		if string.find(string.lower(kata), sukuKata) then
-			table.insert(kataCocok, kata)
-		end
-	end
-	
-	if #kataCocok > 0 then
-		return kataCocok[math.random(1, #kataCocok)]
-	else
-		return nil
-	end
-end
-
-local function autoKetik(kata, delayNgetik)
-	isTyping = true
-	StatusTxt.Text = "Mengetik: " .. kata
-	local currentText = ""
-	
-	for i = 1, #kata do
-		local huruf = string.sub(kata, i, i)
-		currentText = currentText .. huruf
-		
-		if i == 1 then
-			Remotes:WaitForChild("BillboardStart"):FireServer(currentText)
-		else
-			Remotes:WaitForChild("BillboardUpdate"):FireServer(currentText)
-		end
-		
-		task.wait(delayNgetik)
-	end
-	
-	Remotes:WaitForChild("SubmitWord"):FireServer(string.lower(kata))
-	Remotes:WaitForChild("BillboardEnd"):FireServer()
-	
-	task.wait(0.5)
-	StatusTxt.Text = "Standby..."
-	isTyping = false
-end
-
--- ==========================================
--- 4. SISTEM FULL AUTO-DETEKSI DARI MATCH UI
--- ==========================================
-math.randomseed(os.time())
-
--- PERHATIAN: Kamu mungkin perlu menambahkan spesifik lokasi TextLabel-nya di bawah ini!
--- Jika error, cek di Dark Dex apakah ada frame lagi setelah "MatchUI"
-local MatchUI = LocalPlayer.PlayerGui:WaitForChild("MatchUI")
-
--- Asumsi lokasi Teks adalah TextLabel di dalam MatchUI (UBAH JIKA PERLU)
--- Misalnya: local TeksGiliran = MatchUI.Frame.TeksSukuKata
-local TeksGiliran = MatchUI -- << GANTI INI KE PATH TEXTLABEL YANG BENAR JIKA TIDAK JALAN
-
--- Event Listener: Memantau perubahan teks di layar gamenya
-if TeksGiliran:IsA("TextLabel") or TeksGiliran:IsA("TextBox") then
-	TeksGiliran:GetPropertyChangedSignal("Text"):Connect(function()
-		local sukuKataMuncul = TeksGiliran.Text
-		
-		-- Syarat jalan: Auto harus ON, Tidak sedang ngetik, Teks tidak boleh kosong
-		if isAutoON and not isTyping and sukuKataMuncul ~= "" and #sukuKataMuncul >= 2 then
-			local delayNgetik = tonumber(InputDelay.Text) or 0.1 
-			local kataDitemukan = cariKataYangCocok(sukuKataMuncul)
-			
-			if kataDitemukan then
-				task.spawn(function()
-					autoKetik(kataDitemukan, delayNgetik)
-				end)
-			else
-				StatusTxt.Text = "❌ Kata tdk ada di KBBI!"
-			end
-		end
-	end)
-else
-	warn("TeksGiliran belum menunjuk ke TextLabel yang benar! Cek baris 108 di script.")
-	StatusTxt.Text = "⚠️ Path TextLabel salah!"
-end
-
--- Logic Tombol Sakelar UI
 ToggleBtn.MouseButton1Click:Connect(function()
-	isAutoON = not isAutoON
-	
-	if isAutoON then
-		ToggleBtn.Text = "AUTO DETECT: ON"
-		ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50) -- Hijau
-		StatusTxt.Text = "Sistem Aktif. Menunggu huruf..."
-	else
-		ToggleBtn.Text = "AUTO DETECT: OFF"
-		ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Merah
-		StatusTxt.Text = "Sistem Dimatikan."
-	end
+    autoAktif = not autoAktif
+    if autoAktif then
+        ToggleBtn.Text = "AUTO: ON"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    else
+        ToggleBtn.Text = "AUTO: OFF"
+        ToggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    end
+end)
+
+-- ==========================================
+-- 4. TRIGGER LEWAT REMOTEEVENT
+-- ==========================================
+-- UBAH NAMA "NamaRemoteGiliran" DENGAN NAMA REMOTE ASLI DARI GAME
+local TurnRemote = Remotes:WaitForChild("NamaRemoteGiliran")
+
+-- OnClientEvent digunakan untuk "mendengarkan" perintah dari server ke client
+TurnRemote.OnClientEvent:Connect(function(arg1)
+    if not autoAktif then return end
+    
+    -- Asumsi: Server mengirim huruf pertama sebagai argument pertama (arg1)
+    -- Jika argumentnya berupa tabel atau urutannya berbeda, kamu harus menyesuaikannya.
+    local hurufBaru = tostring(arg1)
+    
+    -- Mengambil karakter pertamanya saja untuk keamanan data
+    hurufBaru = string.sub(hurufBaru, 1, 1)
+    
+    if hurufBaru ~= "" then
+        Status.Text = "Giliran! Huruf: " .. hurufBaru
+        print("[Auto KBBI] Menerima huruf: " .. hurufBaru)
+        
+        local kataPilihan = cariKata(hurufBaru)
+        
+        if kataPilihan then
+            Status.Text = "Mengetik: " .. kataPilihan
+            autoKetikKata(kataPilihan)
+            Status.Text = "Selesai ketik."
+        else
+            Status.Text = "Kata habis!"
+            warn("[Auto KBBI] Kamus habis untuk huruf: " .. hurufBaru)
+        end
+    end
 end)
